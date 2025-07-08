@@ -1,0 +1,40 @@
+# Documentation generation workflow
+name: Generate Documentation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'internal/**'
+      - 'templates/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'internal/**'
+      - 'templates/**'
+      - '.github/workflows/docs.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.0"
+      - name: Generate documentation
+        run: |
+          go generate ./...
+      - name: Check for changes
+        run: |
+          git diff --compact-summary --exit-code || \
+            (echo; echo "Unexpected difference in docs after generation. Run 'go generate ./...' command and commit."; exit 1)

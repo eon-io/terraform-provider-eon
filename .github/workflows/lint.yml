@@ -1,0 +1,75 @@
+# Linting workflow
+name: Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  golangci:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+      - name: Set up Go 1.23 for project
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: false
+      - name: Run golangci-lint
+        run: golangci-lint run --timeout=5m
+
+  terraform:
+    name: terraform-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive ./examples/
+      - name: Validate Examples (skip provider directory)
+        run: |
+          for dir in examples/*/; do
+            if [[ "$(basename "$dir")" == "provider" ]]; then
+              echo "Skipping provider directory (requires published provider)"
+              continue
+            fi
+            echo "Validating $dir"
+            cd "$dir"
+            terraform init -backend=false
+            terraform validate
+            cd ../..
+          done
+
+  security:
+    name: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - name: Run gosec security scan
+        run: gosec ./...
