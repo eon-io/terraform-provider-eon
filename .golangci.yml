@@ -1,0 +1,57 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - gci
+    - gofmt
+    - goimports
+    - gosec
+    - misspell
+    - unconvert
+    - unparam
+    - gocyclo
+    - gocritic
+    - goconst
+    - revive
+
+linters-settings:
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/eon-io/terraform-provider-eon)
+  gocyclo:
+    min-complexity: 15
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+  revive:
+    rules:
+      - name: exported
+        disabled: true
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+        - unparam
+    - path: internal/provider/
+      text: "should not use dot imports"
+      linters:
+        - revive
+  max-issues-per-linter: 0
+  max-same-issues: 0

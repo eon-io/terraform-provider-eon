@@ -1,0 +1,63 @@
+---
+page_title: "{{.ProviderShortName}} Provider"
+subcategory: ""
+description: |-
+  {{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.ProviderShortName}} Provider
+
+{{ .Description | trimspace }}
+
+## Features
+
+- **Source Account Management**: Connect and manage cloud accounts containing resources to be backed up
+- **Restore Account Management**: Connect and manage cloud accounts where backups can be restored
+- **Multi-Cloud Support**: AWS (fully supported), Azure and GCP (in development)
+- **Data Sources**: Query existing source and restore accounts
+
+## Example Usage
+
+{{tffile "examples/provider/provider.tf"}}
+
+## Authentication
+
+The provider supports authentication via OAuth2 client credentials. You can configure authentication in several ways:
+
+### Environment Variables (Recommended)
+
+```bash
+export EON_ENDPOINT="https://your-eon-instance.eon.io"
+export EON_CLIENT_ID="your-client-id"
+export EON_CLIENT_SECRET="your-client-secret"
+export EON_PROJECT_ID="your-project-id"
+export EON_ACCOUNT_ID="your-account-id"
+```
+
+### Provider Configuration
+
+```terraform
+provider "{{.ProviderShortName}}" {
+  endpoint       = "https://your-eon-instance.eon.io"
+  client_id      = "your-client-id"
+  client_secret  = "your-client-secret"
+  project_id     = "your-project-id"
+  eon_account_id = "your-account-id"
+}
+```
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Cloud Provider Support
+
+| Provider | Source Accounts | Restore Accounts | Status |
+|----------|----------------|------------------|--------|
+| AWS      | ✅             | ✅               | Fully Supported |
+| Azure    | 🚧             | 🚧               | In Development |
+| GCP      | 🚧             | 🚧               | In Development |
+
+## Getting Help
+
+- [Eon Documentation](https://docs.eon.io)
+- [Provider Issues](https://github.com/eon-io/terraform-provider-eon/issues)
+- [Community Forum](https://community.eon.io)
