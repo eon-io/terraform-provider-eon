@@ -41,8 +41,8 @@ jobs:
           echo "default-cache-ttl 7200" >> ~/.gnupg/gpg-agent.conf
           gpg-connect-agent reloadagent /bye
           
-          # Import the private key
-          echo "$GPG_PRIVATE_KEY" | gpg --import --batch --pinentry-mode loopback --passphrase ""
+          # Import the private key with passphrase
+          echo "$GPG_PRIVATE_KEY" | gpg --import --batch --pinentry-mode loopback --passphrase "${GPG_PASSPHRASE:-}"
           echo "GPG key imported successfully"
           
           # Get the key ID for signing
@@ -51,6 +51,7 @@ jobs:
           echo "GPG_TTY=$GPG_TTY" >> $GITHUB_ENV
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
@@ -62,3 +63,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ env.GPG_FINGERPRINT }}
           GPG_TTY: ${{ env.GPG_TTY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
