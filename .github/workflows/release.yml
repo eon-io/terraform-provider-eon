@@ -32,6 +32,8 @@ jobs:
         run: |
           # Configure GPG for non-interactive use
           export GPG_TTY=$(tty)
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
           echo "use-agent" >> ~/.gnupg/gpg.conf
           echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
           echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
