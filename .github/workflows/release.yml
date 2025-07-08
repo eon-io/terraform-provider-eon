@@ -30,11 +30,23 @@ jobs:
 
       - name: Import GPG key
         run: |
-          echo "$GPG_PRIVATE_KEY" | gpg --import --batch
+          # Configure GPG for non-interactive use
+          export GPG_TTY=$(tty)
+          echo "use-agent" >> ~/.gnupg/gpg.conf
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          echo "max-cache-ttl 7200" >> ~/.gnupg/gpg-agent.conf
+          echo "default-cache-ttl 7200" >> ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent reloadagent /bye
+          
+          # Import the private key
+          echo "$GPG_PRIVATE_KEY" | gpg --import --batch --pinentry-mode loopback --passphrase ""
           echo "GPG key imported successfully"
+          
           # Get the key ID for signing
           KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | head -1 | sed 's/.*\/\([A-F0-9]*\) .*/\1/')
           echo "GPG_FINGERPRINT=$KEY_ID" >> $GITHUB_ENV
+          echo "GPG_TTY=$GPG_TTY" >> $GITHUB_ENV
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
@@ -47,3 +59,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ env.GPG_FINGERPRINT }}
+          GPG_TTY: ${{ env.GPG_TTY }}
