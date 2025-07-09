@@ -24,6 +24,7 @@ github.com/hashicorp/go-plugin v1.6.3 h1:xgHB+ZUSYeuJi96WtxEjzi23uh7YQpznjGh0U0U
 github.com/hashicorp/go-plugin v1.6.3/go.mod h1:MRobyh+Wc/nYy1V4KAXUiYfzxoYhs7V1mlH1Z7iY2h0=
 github.com/hashicorp/go-uuid v1.0.3 h1:2gKiV6YVmrJ1i2CKKa9obLvRieoRGviZFL26PcT/Co8=
 github.com/hashicorp/go-uuid v1.0.3/go.mod h1:6SBZvOh/SIDV7/2o3Jml5SYk/TvGqwFJ/bN7x4byOro=
+github.com/hashicorp/terraform-plugin-docs v0.22.0 h1:fwIDStbFel1PPNkM+mDPnpB4efHZBdGoMz/zt5FbTDw=
 github.com/hashicorp/terraform-plugin-docs v0.22.0/go.mod h1:55DJVyZ7BNK4t/lANcQ1YpemRuS6KsvIO1BbGA+xzGE=
 github.com/hashicorp/terraform-plugin-framework v1.11.0 h1:M7+9zBArexHFXDx/pKTxjE6n/2UCXY6b8FIq9ZYhwfE=
 github.com/hashicorp/terraform-plugin-framework v1.11.0/go.mod h1:qBXLDn69kM97NNVi/MQ9qgd1uWWsVftGSnygYG1tImM=
