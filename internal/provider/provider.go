@@ -51,21 +51,21 @@ func (p *EonProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 		MarkdownDescription: "The Eon provider allows you to manage your Eon cloud backup and restore infrastructure using Terraform. Configure your cloud accounts, manage backup policies, and orchestrate disaster recovery workflows.",
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Eon API endpoint URL. Can also be set via the `EON_ENDPOINT` environment variable.",
+				MarkdownDescription: "Eon API base URL. Can also be set with the `EON_ENDPOINT` environment variable.",
 				Optional:            true,
 			},
 			"client_id": schema.StringAttribute{
-				MarkdownDescription: "Eon OAuth client ID for authentication. Can also be set via the `EON_CLIENT_ID` environment variable.",
+				MarkdownDescription: "Eon API client ID for authentication. Can also be set with the `EON_CLIENT_ID` environment variable.",
 				Optional:            true,
 				Sensitive:           true,
 			},
 			"client_secret": schema.StringAttribute{
-				MarkdownDescription: "Eon OAuth client secret for authentication. Can also be set via the `EON_CLIENT_SECRET` environment variable.",
+				MarkdownDescription: "Eon API client secret for authentication. Can also be set with the `EON_CLIENT_SECRET` environment variable.",
 				Optional:            true,
 				Sensitive:           true,
 			},
 			"project_id": schema.StringAttribute{
-				MarkdownDescription: "Eon project ID. Can also be set via the `EON_PROJECT_ID` environment variable.",
+				MarkdownDescription: "Eon project ID. Can also be set with the `EON_PROJECT_ID` environment variable.",
 				Optional:            true,
 			},
 		},
