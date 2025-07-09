@@ -6,8 +6,9 @@ The Terraform provider for Eon allows you to manage your cloud backup and restor
 
 - **Source Account Management**: Connect and manage cloud accounts containing resources to be backed up
 - **Restore Account Management**: Connect and manage cloud accounts where backups can be restored
+- **Backup Policy Management**: Create, update, and manage backup policies with schedules, retention, and notifications
 - **Multi-Cloud Support**: AWS, Azure, and GCP (AWS fully supported, Azure and GCP in development)
-- **Data Sources**: Query existing source and restore accounts
+- **Data Sources**: Query existing source and restore accounts, backup policies, and snapshots
 
 ## Requirements
 
@@ -87,6 +88,21 @@ resource "eon_restore_account" "aws_disaster_recovery" {
 }
 ```
 
+### Basic Backup Policy
+
+```hcl
+# Create a backup policy
+resource "eon_backup_policy" "daily_production" {
+  name                    = "Daily Production Backup"
+  enabled                 = true
+  resource_selection_mode = "ALL"
+  backup_policy_type      = "STANDARD"
+  
+  resource_inclusion_override = []
+  resource_exclusion_override = []
+}
+```
+
 ### Data Sources
 
 ```hcl
@@ -96,8 +112,15 @@ data "eon_source_accounts" "all" {}
 # List all restore accounts
 data "eon_restore_accounts" "all" {}
 
+# List all backup policies
+data "eon_backup_policies" "all" {}
+
 output "source_account_count" {
   value = length(data.eon_source_accounts.all.accounts)
+}
+
+output "backup_policy_count" {
+  value = length(data.eon_backup_policies.all.policies)
 }
 ```
 
@@ -137,6 +160,23 @@ Manages restore accounts for restore operations.
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
 
+### `eon_backup_policy`
+
+Manages backup policies for automated backup operations.
+
+**Arguments:**
+- `name` (Required) - Display name for the backup policy
+- `enabled` (Required) - Whether the backup policy is enabled
+- `resource_selection_mode` (Required) - Resource selection mode: 'ALL', 'NONE', or 'CONDITIONAL'
+- `backup_policy_type` (Required) - Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', or 'PITR'
+- `resource_inclusion_override` (Optional) - List of resource IDs to include regardless of selection mode
+- `resource_exclusion_override` (Optional) - List of resource IDs to exclude regardless of selection mode
+
+**Attributes:**
+- `id` - Backup policy identifier
+- `created_at` - Creation timestamp
+- `updated_at` - Last update timestamp
+
 ## Data Sources
 
 ### `eon_source_accounts`
@@ -153,48 +193,9 @@ Retrieves information about all restore accounts.
 **Attributes:**
 - `accounts` - List of restore account objects with `id`, `provider`, `provider_account_id`, `status`, and `regions`
 
-## Development
+### `eon_backup_policies`
 
-### Building the Provider
+Retrieves information about all backup policies.
 
-```bash
-git clone https://github.com/eon-io/terraform-provider-eon
-cd terraform-provider-eon
-go build -o terraform-provider-eon
-```
-
-### Running Tests
-
-```bash
-go test ./...
-```
-
-### Local Development
-
-1. Build the provider: `go build -o terraform-provider-eon`
-2. Create a `.terraformrc` file in your home directory:
-
-```hcl
-provider_installation {
-  dev_overrides {
-    "eon-io/eon" = "/path/to/terraform-provider-eon"
-  }
-  direct {}
-}
-```
-
-3. Run `terraform init` and `terraform plan` in your test configuration
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-## License
-
-This project is licensed under the Mozilla Public License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-- [Documentation](https://docs.eon.io)
-- [GitHub Issues](https://github.com/eon-io/terraform-provider-eon/issues)
-- [Community Forum](https://community.eon.io)
+**Attributes:**
+- `policies` - List of backup policy objects with `id`, `name`, and `enabled`

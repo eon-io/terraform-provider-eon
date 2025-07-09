@@ -43,8 +43,6 @@ Thumbs.db
 /dist/
 /bin/
 
-# Documentation generation
-/docs/
 
 # Local development
 /examples/terraform.tfstate*

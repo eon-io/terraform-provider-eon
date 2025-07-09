@@ -27,7 +27,7 @@ func NewEonClient(endpoint, clientID, clientSecret, projectID, eonAccountID stri
 	config := externalEonSdkAPI.NewConfiguration()
 	config.Servers = []externalEonSdkAPI.ServerConfiguration{
 		{
-			URL: endpoint,
+			URL: fmt.Sprintf("%s/api", endpoint),
 		},
 	}
 
@@ -49,10 +49,10 @@ func NewEonClient(endpoint, clientID, clientSecret, projectID, eonAccountID stri
 
 // authenticate performs OAuth authentication with the Eon API
 func (c *EonClient) authenticate() error {
-	resp, httpResp, err := c.client.AuthAPI.GetAccessTokenOAuth2(context.Background()).
-		ClientId(c.clientID).
-		ClientSecret(c.clientSecret).
-		Execute()
+	resp, httpResp, err := c.client.AuthAPI.GetAccessToken(context.Background()).ApiCredentials(externalEonSdkAPI.ApiCredentials{
+		ClientId:     c.clientID,
+		ClientSecret: c.clientSecret,
+	}).Execute()
 	if err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}
@@ -64,7 +64,7 @@ func (c *EonClient) authenticate() error {
 	}
 
 	c.authToken = resp.GetAccessToken()
-	c.tokenExpiry = time.Now().Add(time.Duration(resp.GetExpiresIn()) * time.Second)
+	c.tokenExpiry = time.Now().Add(time.Duration(resp.GetExpirationSeconds()) * time.Second)
 
 	c.client.GetConfig().DefaultHeader["Authorization"] = "Bearer " + c.authToken
 
@@ -85,7 +85,7 @@ func (c *EonClient) ListSourceAccounts(ctx context.Context) ([]externalEonSdkAPI
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ListSourceAccounts(ctx, c.ProjectID).Execute()
+	resp, httpResp, err := c.client.AccountsAPI.ListSourceAccounts(ctx, c.ProjectID).ListSourceAccountsRequest(externalEonSdkAPI.ListSourceAccountsRequest{}).Execute()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list source accounts: %w", err)
 	}
@@ -109,7 +109,7 @@ func (c *EonClient) ListRestoreAccounts(ctx context.Context) ([]externalEonSdkAP
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ListRestoreAccounts(ctx, c.ProjectID).Execute()
+	resp, httpResp, err := c.client.AccountsAPI.ListRestoreAccounts(ctx, c.ProjectID).ListRestoreAccountsRequest(externalEonSdkAPI.ListRestoreAccountsRequest{}).Execute()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list restore accounts: %w", err)
 	}
@@ -397,4 +397,111 @@ func (c *EonClient) WaitForRestoreJobCompletion(ctx context.Context, jobId strin
 			}
 		}
 	}
+}
+
+// ListBackupPolicies retrieves all backup policies for the project
+func (c *EonClient) ListBackupPolicies(ctx context.Context) ([]externalEonSdkAPI.BackupPolicy, error) {
+	if err := c.ensureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.BackupPoliciesAPI.ListBackupPolicies(ctx, c.ProjectID).Execute()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list backup policies: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+	}
+
+	if resp.GetBackupPolicies() == nil {
+		return []externalEonSdkAPI.BackupPolicy{}, nil
+	}
+
+	return resp.GetBackupPolicies(), nil
+}
+
+// GetBackupPolicy retrieves a backup policy by ID
+func (c *EonClient) GetBackupPolicy(ctx context.Context, policyId string) (*externalEonSdkAPI.BackupPolicy, error) {
+	if err := c.ensureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.BackupPoliciesAPI.GetBackupPolicy(ctx, policyId, c.ProjectID).Execute()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get backup policy: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+	}
+
+	policy := resp.GetBackupPolicy()
+	return &policy, nil
+}
+
+// CreateBackupPolicy creates a new backup policy
+func (c *EonClient) CreateBackupPolicy(ctx context.Context, req externalEonSdkAPI.CreateBackupPolicyRequest) (*externalEonSdkAPI.BackupPolicy, error) {
+	if err := c.ensureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.BackupPoliciesAPI.CreateBackupPolicy(ctx, c.ProjectID).CreateBackupPolicyRequest(req).Execute()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup policy: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+	}
+
+	policy := resp.GetBackupPolicy()
+	return &policy, nil
+}
+
+// UpdateBackupPolicy updates an existing backup policy
+func (c *EonClient) UpdateBackupPolicy(ctx context.Context, policyId string, req externalEonSdkAPI.UpdateBackupPolicyRequest) (*externalEonSdkAPI.BackupPolicy, error) {
+	if err := c.ensureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.BackupPoliciesAPI.UpdateBackupPolicy(ctx, policyId, c.ProjectID).UpdateBackupPolicyRequest(req).Execute()
+	if err != nil {
+		return nil, fmt.Errorf("failed to update backup policy: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+	}
+
+	policy := resp.GetBackupPolicy()
+	return &policy, nil
+}
+
+// DeleteBackupPolicy deletes a backup policy
+func (c *EonClient) DeleteBackupPolicy(ctx context.Context, policyId string) error {
+	if err := c.ensureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.BackupPoliciesAPI.DeleteBackupPolicy(ctx, policyId, c.ProjectID).Execute()
+	if err != nil {
+		return fmt.Errorf("failed to delete backup policy: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+	}
+
+	return nil
 }
