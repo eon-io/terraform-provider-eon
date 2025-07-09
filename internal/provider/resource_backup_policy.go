@@ -183,11 +183,20 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 
 	switch data.BackupPolicyType.ValueString() {
 	case "STANDARD", "PITR":
-		scheduleConfig := createStandardScheduleConfig(&data)
-		if scheduleConfig == nil {
+		scheduleConfig, err := createStandardScheduleConfig(&data)
+		if err != nil {
 			resp.Diagnostics.AddError(
 				"Invalid Schedule Configuration",
-				fmt.Sprintf("Failed to create schedule configuration for %s policy", data.BackupPolicyType.ValueString()),
+				fmt.Sprintf("Failed to create schedule configuration for %s policy: %s", data.BackupPolicyType.ValueString(), err),
+			)
+			return
+		}
+
+		retentionDays, err := SafeInt32Conversion(data.RetentionDays.ValueInt64())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Invalid Retention Days",
+				fmt.Sprintf("Failed to validate retention days: %s", err),
 			)
 			return
 		}
@@ -195,7 +204,7 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		backupSchedule := externalEonSdkAPI.NewStandardBackupSchedules(
 			data.VaultId.ValueString(),
 			*scheduleConfig,
-			int32(data.RetentionDays.ValueInt64()),
+			retentionDays,
 		)
 
 		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(
@@ -205,11 +214,20 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
-		highFreqScheduleConfig := createHighFrequencyScheduleConfig(&data)
-		if highFreqScheduleConfig == nil {
+		highFreqScheduleConfig, err := createHighFrequencyScheduleConfig(&data)
+		if err != nil {
 			resp.Diagnostics.AddError(
 				"Invalid Schedule Configuration",
-				fmt.Sprintf("Failed to create high frequency schedule configuration"),
+				fmt.Sprintf("Failed to create high frequency schedule configuration: %s", err),
+			)
+			return
+		}
+
+		retentionDays, err := SafeInt32Conversion(data.RetentionDays.ValueInt64())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Invalid Retention Days",
+				fmt.Sprintf("Failed to validate retention days: %s", err),
 			)
 			return
 		}
@@ -217,7 +235,7 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		backupSchedule := externalEonSdkAPI.NewHighFrequencyBackupSchedules(
 			data.VaultId.ValueString(),
 			*highFreqScheduleConfig,
-			int32(data.RetentionDays.ValueInt64()),
+			retentionDays,
 		)
 
 		resourceTypes, err := createHighFrequencyResourceTypes(ctx, &data)
@@ -391,11 +409,20 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 
 	switch data.BackupPolicyType.ValueString() {
 	case "STANDARD", "PITR":
-		scheduleConfig := createStandardScheduleConfig(&data)
-		if scheduleConfig == nil {
+		scheduleConfig, err := createStandardScheduleConfig(&data)
+		if err != nil {
 			resp.Diagnostics.AddError(
 				"Invalid Schedule Configuration",
-				fmt.Sprintf("Failed to create schedule configuration for %s policy", data.BackupPolicyType.ValueString()),
+				fmt.Sprintf("Failed to create schedule configuration for %s policy: %s", data.BackupPolicyType.ValueString(), err),
+			)
+			return
+		}
+
+		retentionDays, err := SafeInt32Conversion(data.RetentionDays.ValueInt64())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Invalid Retention Days",
+				fmt.Sprintf("Failed to validate retention days: %s", err),
 			)
 			return
 		}
@@ -403,7 +430,7 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		backupSchedule := externalEonSdkAPI.NewStandardBackupSchedules(
 			data.VaultId.ValueString(),
 			*scheduleConfig,
-			int32(data.RetentionDays.ValueInt64()),
+			retentionDays,
 		)
 
 		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(
@@ -413,11 +440,20 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
-		highFreqScheduleConfig := createHighFrequencyScheduleConfig(&data)
-		if highFreqScheduleConfig == nil {
+		highFreqScheduleConfig, err := createHighFrequencyScheduleConfig(&data)
+		if err != nil {
 			resp.Diagnostics.AddError(
 				"Invalid Schedule Configuration",
-				fmt.Sprintf("Failed to create high frequency schedule configuration"),
+				fmt.Sprintf("Failed to create high frequency schedule configuration: %s", err),
+			)
+			return
+		}
+
+		retentionDays, err := SafeInt32Conversion(data.RetentionDays.ValueInt64())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Invalid Retention Days",
+				fmt.Sprintf("Failed to validate retention days: %s", err),
 			)
 			return
 		}
@@ -425,7 +461,7 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		backupSchedule := externalEonSdkAPI.NewHighFrequencyBackupSchedules(
 			data.VaultId.ValueString(),
 			*highFreqScheduleConfig,
-			int32(data.RetentionDays.ValueInt64()),
+			retentionDays,
 		)
 
 		resourceTypes, err := createHighFrequencyResourceTypes(ctx, &data)
@@ -518,46 +554,73 @@ func (r *BackupPolicyResource) ImportState(ctx context.Context, req resource.Imp
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func createTimeOfDay(data *BackupPolicyResourceModel) *externalEonSdkAPI.TimeOfDay {
+func createTimeOfDay(data *BackupPolicyResourceModel) (*externalEonSdkAPI.TimeOfDay, error) {
 	if data.TimeOfDayHour.IsNull() || data.TimeOfDayMinutes.IsNull() {
-		return nil
+		return nil, nil
 	}
-	return externalEonSdkAPI.NewTimeOfDay(
-		int32(data.TimeOfDayHour.ValueInt64()),
-		int32(data.TimeOfDayMinutes.ValueInt64()),
-	)
+
+	hour, err := SafeInt32Conversion(data.TimeOfDayHour.ValueInt64())
+	if err != nil {
+		return nil, err
+	}
+
+	minutes, err := SafeInt32Conversion(data.TimeOfDayMinutes.ValueInt64())
+	if err != nil {
+		return nil, err
+	}
+
+	return externalEonSdkAPI.NewTimeOfDay(hour, minutes), nil
 }
 
-func getStartWindowMinutes(data *BackupPolicyResourceModel) *int32 {
+func getStartWindowMinutes(data *BackupPolicyResourceModel) (*int32, error) {
 	if data.StartWindowMinutes.IsNull() {
-		return nil
+		return nil, nil
 	}
-	value := int32(data.StartWindowMinutes.ValueInt64())
-	return &value
+	value, err := SafeInt32Conversion(data.StartWindowMinutes.ValueInt64())
+	if err != nil {
+		return nil, err
+	}
+	return &value, nil
 }
 
-func createDailyConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.DailyConfig {
+func createDailyConfig(data *BackupPolicyResourceModel) (*externalEonSdkAPI.DailyConfig, error) {
 	dailyConfig := externalEonSdkAPI.NewDailyConfigWithDefaults()
 
-	if timeOfDay := createTimeOfDay(data); timeOfDay != nil {
+	timeOfDay, err := createTimeOfDay(data)
+	if err != nil {
+		return nil, err
+	}
+	if timeOfDay != nil {
 		dailyConfig.SetTimeOfDay(*timeOfDay)
 	}
 
-	if startWindow := getStartWindowMinutes(data); startWindow != nil {
+	startWindow, err := getStartWindowMinutes(data)
+	if err != nil {
+		return nil, err
+	}
+	if startWindow != nil {
 		dailyConfig.SetStartWindowMinutes(*startWindow)
 	}
 
-	return dailyConfig
+	return dailyConfig, nil
 }
 
-func createWeeklyConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.WeeklyConfig {
+func createWeeklyConfig(data *BackupPolicyResourceModel) (*externalEonSdkAPI.WeeklyConfig, error) {
 	weeklyConfig := externalEonSdkAPI.NewWeeklyConfigWithDefaults()
 
-	if timeOfDay := createTimeOfDay(data); timeOfDay != nil {
+	timeOfDay, err := createTimeOfDay(data)
+	if err != nil {
+		return nil, err
+	}
+	if timeOfDay != nil {
 		weeklyConfig.SetTimeOfDay(*timeOfDay)
 	}
 
-	if startWindow := getStartWindowMinutes(data); startWindow != nil {
+	startWindow, err := getStartWindowMinutes(data)
+	if err != nil {
+		return nil, err
+	}
+	if startWindow != nil {
 		weeklyConfig.SetStartWindowMinutes(*startWindow)
 	}
 
@@ -570,34 +633,50 @@ func createWeeklyConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.Week
 	}
 	weeklyConfig.SetDaysOfWeek(daysOfWeek)
 
-	return weeklyConfig
+	return weeklyConfig, nil
 }
 
-func createMonthlyConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.MonthlyConfig {
+func createMonthlyConfig(data *BackupPolicyResourceModel) (*externalEonSdkAPI.MonthlyConfig, error) {
 	monthlyConfig := externalEonSdkAPI.NewMonthlyConfigWithDefaults()
 
-	if timeOfDay := createTimeOfDay(data); timeOfDay != nil {
+	timeOfDay, err := createTimeOfDay(data)
+	if err != nil {
+		return nil, err
+	}
+	if timeOfDay != nil {
 		monthlyConfig.SetTimeOfDay(*timeOfDay)
 	}
 
-	if startWindow := getStartWindowMinutes(data); startWindow != nil {
+	startWindow, err := getStartWindowMinutes(data)
+	if err != nil {
+		return nil, err
+	}
+	if startWindow != nil {
 		monthlyConfig.SetStartWindowMinutes(*startWindow)
 	}
 
 	daysOfMonth := []int32{1}
 	monthlyConfig.SetDaysOfMonth(daysOfMonth)
 
-	return monthlyConfig
+	return monthlyConfig, nil
 }
 
-func createAnnuallyConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.AnnuallyConfig {
+func createAnnuallyConfig(data *BackupPolicyResourceModel) (*externalEonSdkAPI.AnnuallyConfig, error) {
 	annuallyConfig := externalEonSdkAPI.NewAnnuallyConfigWithDefaults()
 
-	if timeOfDay := createTimeOfDay(data); timeOfDay != nil {
+	timeOfDay, err := createTimeOfDay(data)
+	if err != nil {
+		return nil, err
+	}
+	if timeOfDay != nil {
 		annuallyConfig.SetTimeOfDay(*timeOfDay)
 	}
 
-	if startWindow := getStartWindowMinutes(data); startWindow != nil {
+	startWindow, err := getStartWindowMinutes(data)
+	if err != nil {
+		return nil, err
+	}
+	if startWindow != nil {
 		annuallyConfig.SetStartWindowMinutes(*startWindow)
 	}
 
@@ -605,14 +684,18 @@ func createAnnuallyConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.An
 	timeOfYear := externalEonSdkAPI.NewTimeOfYear(1, 1) // January 1st
 	annuallyConfig.SetTimeOfYear(*timeOfYear)
 
-	return annuallyConfig
+	return annuallyConfig, nil
 }
 
-func createIntervalConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.StandardIntervalConfig {
+func createIntervalConfig(data *BackupPolicyResourceModel) (*externalEonSdkAPI.StandardIntervalConfig, error) {
 	// API only allows 6, 8, or 12 hours for STANDARD/PITR interval configs
 	intervalHours := int32(6) // Default to 6 hours
 	if !data.IntervalMinutes.IsNull() {
-		requestedHours := int32(data.IntervalMinutes.ValueInt64() / 60)
+		intervalMinutes, err := SafeInt32Conversion(data.IntervalMinutes.ValueInt64())
+		if err != nil {
+			return nil, err
+		}
+		requestedHours := intervalMinutes / 60
 		switch {
 		case requestedHours <= 6:
 			intervalHours = 6
@@ -623,16 +706,20 @@ func createIntervalConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.St
 		}
 	}
 
-	return externalEonSdkAPI.NewStandardIntervalConfig(intervalHours)
+	return externalEonSdkAPI.NewStandardIntervalConfig(intervalHours), nil
 }
 
-func createHighFrequencyIntervalConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.HighFrequencyIntervalConfig {
+func createHighFrequencyIntervalConfig(data *BackupPolicyResourceModel) (*externalEonSdkAPI.HighFrequencyIntervalConfig, error) {
 	intervalMinutes := int32(30)
 	if !data.IntervalMinutes.IsNull() {
-		intervalMinutes = int32(data.IntervalMinutes.ValueInt64())
+		var err error
+		intervalMinutes, err = SafeInt32Conversion(data.IntervalMinutes.ValueInt64())
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return externalEonSdkAPI.NewHighFrequencyIntervalConfig(intervalMinutes)
+	return externalEonSdkAPI.NewHighFrequencyIntervalConfig(intervalMinutes), nil
 }
 
 // createHighFrequencyResourceTypes creates the required resource types for HIGH_FREQUENCY policies
@@ -672,7 +759,7 @@ func createHighFrequencyResourceTypes(ctx context.Context, data *BackupPolicyRes
 }
 
 // createStandardScheduleConfig creates a StandardBackupScheduleConfig based on the policy type and frequency
-func createStandardScheduleConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.StandardBackupScheduleConfig {
+func createStandardScheduleConfig(data *BackupPolicyResourceModel) (*externalEonSdkAPI.StandardBackupScheduleConfig, error) {
 	var scheduleConfig *externalEonSdkAPI.StandardBackupScheduleConfig
 
 	switch data.ScheduleFrequency.ValueString() {
@@ -680,72 +767,107 @@ func createStandardScheduleConfig(data *BackupPolicyResourceModel) *externalEonS
 		scheduleConfig = externalEonSdkAPI.NewStandardBackupScheduleConfig(
 			externalEonSdkAPI.STANDARD_BACKUP_SCHEDULE_DAILY,
 		)
-		scheduleConfig.SetDailyConfig(*createDailyConfig(data))
+		dailyConfig, err := createDailyConfig(data)
+		if err != nil {
+			return nil, err
+		}
+		scheduleConfig.SetDailyConfig(*dailyConfig)
 
 	case "WEEKLY":
 		scheduleConfig = externalEonSdkAPI.NewStandardBackupScheduleConfig(
 			externalEonSdkAPI.STANDARD_BACKUP_SCHEDULE_WEEKLY,
 		)
-		scheduleConfig.SetWeeklyConfig(*createWeeklyConfig(data))
+		weeklyConfig, err := createWeeklyConfig(data)
+		if err != nil {
+			return nil, err
+		}
+		scheduleConfig.SetWeeklyConfig(*weeklyConfig)
 
 	case "MONTHLY":
 		scheduleConfig = externalEonSdkAPI.NewStandardBackupScheduleConfig(
 			externalEonSdkAPI.STANDARD_BACKUP_SCHEDULE_MONTHLY,
 		)
-		scheduleConfig.SetMonthlyConfig(*createMonthlyConfig(data))
+		monthlyConfig, err := createMonthlyConfig(data)
+		if err != nil {
+			return nil, err
+		}
+		scheduleConfig.SetMonthlyConfig(*monthlyConfig)
 
 	case "ANNUALLY":
 		scheduleConfig = externalEonSdkAPI.NewStandardBackupScheduleConfig(
 			externalEonSdkAPI.STANDARD_BACKUP_SCHEDULE_ANNUALLY,
 		)
-		scheduleConfig.SetAnnuallyConfig(*createAnnuallyConfig(data))
+		annuallyConfig, err := createAnnuallyConfig(data)
+		if err != nil {
+			return nil, err
+		}
+		scheduleConfig.SetAnnuallyConfig(*annuallyConfig)
 
 	case "INTERVAL":
 		scheduleConfig = externalEonSdkAPI.NewStandardBackupScheduleConfig(
 			externalEonSdkAPI.STANDARD_BACKUP_SCHEDULE_INTERVAL,
 		)
-		scheduleConfig.SetIntervalConfig(*createIntervalConfig(data))
+		intervalConfig, err := createIntervalConfig(data)
+		if err != nil {
+			return nil, err
+		}
+		scheduleConfig.SetIntervalConfig(*intervalConfig)
 
 	default:
-		return nil // Unsupported frequency
+		return nil, fmt.Errorf("unsupported schedule frequency: %s", data.ScheduleFrequency.ValueString())
 	}
 
-	return scheduleConfig
+	return scheduleConfig, nil
 }
 
 // createHighFrequencyScheduleConfig creates a HighFrequencyBackupScheduleConfig based on the policy type and frequency
-func createHighFrequencyScheduleConfig(data *BackupPolicyResourceModel) *externalEonSdkAPI.HighFrequencyBackupScheduleConfig {
+func createHighFrequencyScheduleConfig(data *BackupPolicyResourceModel) (*externalEonSdkAPI.HighFrequencyBackupScheduleConfig, error) {
 	highFreqScheduleConfig := externalEonSdkAPI.NewHighFrequencyBackupScheduleConfig()
 
 	switch data.ScheduleFrequency.ValueString() {
 	case "INTERVAL":
 		highFreqScheduleConfig.SetFrequency(externalEonSdkAPI.HIGH_FREQUENCY_BACKUP_SCHEDULE_INTERVAL)
-		intervalConfig := createHighFrequencyIntervalConfig(data)
+		intervalConfig, err := createHighFrequencyIntervalConfig(data)
+		if err != nil {
+			return nil, err
+		}
 		highFreqScheduleConfig.SetIntervalConfig(*intervalConfig)
 
 	case "DAILY":
 		highFreqScheduleConfig.SetFrequency(externalEonSdkAPI.HIGH_FREQUENCY_BACKUP_SCHEDULE_DAILY)
-		dailyConfig := createDailyConfig(data)
+		dailyConfig, err := createDailyConfig(data)
+		if err != nil {
+			return nil, err
+		}
 		highFreqScheduleConfig.SetDailyConfig(*dailyConfig)
 
 	case "WEEKLY":
 		highFreqScheduleConfig.SetFrequency(externalEonSdkAPI.HIGH_FREQUENCY_BACKUP_SCHEDULE_WEEKLY)
-		weeklyConfig := createWeeklyConfig(data)
+		weeklyConfig, err := createWeeklyConfig(data)
+		if err != nil {
+			return nil, err
+		}
 		highFreqScheduleConfig.SetWeeklyConfig(*weeklyConfig)
 
 	case "MONTHLY":
 		highFreqScheduleConfig.SetFrequency(externalEonSdkAPI.HIGH_FREQUENCY_BACKUP_SCHEDULE_MONTHLY)
-		monthlyConfig := createMonthlyConfig(data)
+		monthlyConfig, err := createMonthlyConfig(data)
+		if err != nil {
+			return nil, err
+		}
 		highFreqScheduleConfig.SetMonthlyConfig(*monthlyConfig)
 
 	case "ANNUALLY":
 		highFreqScheduleConfig.SetFrequency(externalEonSdkAPI.HIGH_FREQUENCY_BACKUP_SCHEDULE_ANNUALLY)
-		annuallyConfig := createAnnuallyConfig(data)
+		annuallyConfig, err := createAnnuallyConfig(data)
+		if err != nil {
+			return nil, err
+		}
 		highFreqScheduleConfig.SetAnnuallyConfig(*annuallyConfig)
 
 	default:
-		return nil // Unsupported frequency
+		return nil, fmt.Errorf("unsupported schedule frequency: %s", data.ScheduleFrequency.ValueString())
 	}
 
-	return highFreqScheduleConfig
+	return highFreqScheduleConfig, nil
 }

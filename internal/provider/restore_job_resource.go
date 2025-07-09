@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
@@ -599,19 +598,17 @@ func (r *RestoreJobResource) createEbsVolumeRestore(ctx context.Context, data Re
 	}
 
 	if !config.Iops.IsNull() {
-		val := config.Iops.ValueInt64()
-		if val < math.MinInt32 || val > math.MaxInt32 {
-			return "", fmt.Errorf("IOPS value %d out of range for int32", val)
+		i32, err := SafeInt32Conversion(config.Iops.ValueInt64())
+		if err != nil {
+			return "", err
 		}
-		i32 := int32(val)
 		volumeSettings.Iops = &i32
 	}
 	if !config.Throughput.IsNull() {
-		val := config.Throughput.ValueInt64()
-		if val < math.MinInt32 || val > math.MaxInt32 {
-			return "", fmt.Errorf("throughput value %d out of range for int32", val)
+		t32, err := SafeInt32Conversion(config.Throughput.ValueInt64())
+		if err != nil {
+			return "", err
 		}
-		t32 := int32(val)
 		volumeSettings.Throughput = &t32
 	}
 
@@ -698,19 +695,17 @@ func (r *RestoreJobResource) createEc2InstanceRestore(ctx context.Context, data 
 			}
 
 			if !volParam.Iops.IsNull() {
-				val := volParam.Iops.ValueInt64()
-				if val < math.MinInt32 || val > math.MaxInt32 {
-					return "", fmt.Errorf("IOPS value %d out of range for int32", val)
+				i32, err := SafeInt32Conversion(volParam.Iops.ValueInt64())
+				if err != nil {
+					return "", err
 				}
-				i32 := int32(val)
 				volumeSettings.Iops = &i32
 			}
 			if !volParam.Throughput.IsNull() {
-				val := volParam.Throughput.ValueInt64()
-				if val < math.MinInt32 || val > math.MaxInt32 {
-					return "", fmt.Errorf("throughput value %d out of range for int32", val)
+				t32, err := SafeInt32Conversion(volParam.Throughput.ValueInt64())
+				if err != nil {
+					return "", err
 				}
-				t32 := int32(val)
 				volumeSettings.Throughput = &t32
 			}
 
