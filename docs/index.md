@@ -11,11 +11,11 @@ The Eon provider allows you to manage your Eon cloud backup and restore infrastr
 
 ## Features
 
-- **Source Account Management**: Connect and manage cloud accounts containing resources to be backed up
-- **Restore Account Management**: Connect and manage cloud accounts where backups can be restored
-- **Snapshots**: Create and manage snapshots of resources in source accounts
-- **Restore Operations**: Restore resources from snapshots to specified restore accounts
-- **Data Sources**: Query existing source and restore accounts
+- **Source account management**: Connect and manage cloud accounts containing resources to be backed up.
+- **Restore account management**: Connect and manage cloud accounts where backups can be restored to.
+- **Snapshots**: Manage snapshots of resources in source accounts.
+- **Restore operations**: Restore resources from snapshots to specified restore accounts.
+- **Data sources**: Query existing source and restore accounts.
 
 ## Example Usage
 
@@ -38,9 +38,33 @@ provider "eon" {
 
 ## Authentication
 
-The provider supports authentication via OAuth2 client credentials. You can configure authentication in several ways:
+The provider supports authentication using your Eon API client credentials.
+You can configure authentication using the `EON_CLIENT_ID` and `EON_CLIENT_SECRET` environment variables, as shown in [Provider Configuration], below.
+
+!> Never hard-code API credentials in your Terraform configuration.
+To keep your API client and secret secure, use environment variables instead.
+
+Generate your API credentials in your global settings in the Eon console.
+
+[Provider Configuration]: #provider-configuration
+
+## Provider Configuration
+
+You can provide your Eon Provider configuration using either environment variables, the `provider` block of your Terraform configuration, or a combination of both.
+
+Examples of both approaches are shown below.
+For descriptions of the configuration options, see the [Schema](#schema) section.
 
 ### Environment Variables
+
+As a secure practice, set the `EON_CLIENT_ID` and `EON_CLIENT_SECRET` API credentials as environment variables.
+You can additionally set the `EON_ENDPOINT` and `EON_PROJECT_ID` environment variables, or you can set them in the `provider` block, shown in the next section.
+
+If all the variables are set as environment variables, as shown here, there's no need to set them in the `provider` block in your Terraform configuration:
+
+```terraform
+provider "eon" {}
+```
 
 ```bash
 export EON_ENDPOINT="https://<your-domain>.console.eon.io"
@@ -50,6 +74,9 @@ export EON_PROJECT_ID="your-project-id"
 ```
 
 ### Provider Configuration
+
+Anything else you don't set as environment variables, you can set in the `provider` block.
+If a value is set in both the environment variable and the `provider` block, the `provider` block takes precedence:
 
 ```terraform
 provider "eon" {
@@ -65,7 +92,7 @@ provider "eon" {
 
 ### Optional
 
-- `client_id` (String, Sensitive) Eon OAuth client ID for authentication. Can also be set via the `EON_CLIENT_ID` environment variable.
-- `client_secret` (String, Sensitive) Eon OAuth client secret for authentication. Can also be set via the `EON_CLIENT_SECRET` environment variable.
-- `endpoint` (String) Eon API endpoint URL. Can also be set via the `EON_ENDPOINT` environment variable.
-- `project_id` (String) Eon project ID. Can also be set via the `EON_PROJECT_ID` environment variable.
+- `client_id` (String, Sensitive) Eon API client ID for authentication. Can also be set with the `EON_CLIENT_ID` environment variable.
+- `client_secret` (String, Sensitive) Eon API client secret for authentication. Can also be set with the `EON_CLIENT_SECRET` environment variable.
+- `endpoint` (String) Eon API base URL. Can also be set with the `EON_ENDPOINT` environment variable.
+- `project_id` (String) Eon project ID. Can also be set with the `EON_PROJECT_ID` environment variable.
