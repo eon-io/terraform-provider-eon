@@ -3,12 +3,12 @@
 page_title: "eon_snapshot Data Source - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Eon snapshot data source
+  Retrieves an Eon snapshot.
 ---
 
 # eon_snapshot (Data Source)
 
-Eon snapshot data source
+Retrieves an Eon snapshot.
 
 ## Example Usage
 
@@ -33,13 +33,13 @@ output "s3_snapshot_info" {
 
 ### Required
 
-- `id` (String) Snapshot identifier
+- `id` (String) Eon snapshot ID.
 
 ### Read-Only
 
-- `created_at` (String) Snapshot creation timestamp
-- `expiration_date` (String) Snapshot expiration timestamp
-- `point_in_time` (String) The point in time the resource was backed up from
-- `project_id` (String) ID of the project that the snapshot belongs to
-- `resource_id` (String) ID of the resource that was snapshotted
-- `vault_id` (String) ID of the vault where the snapshot is stored
+- `created_at` (String) Date and time the snapshot creation was started. This doesn't represent the point in time the resource is backed up from, which is instead represented by the `point_in_time` property.
+- `expiration_date` (String) Date and time the snapshot's retention is expected to expire, after which it's marked for deletion.
+- `point_in_time` (String) Date and time of the resource that's preserved by the snapshot.
+- `project_id` (String) ID of the snapshot's parent project.
+- `resource_id` (String) Eon-assigned ID of the resource the snapshot is backing up.
+- `vault_id` (String) ID of the vault the snapshot is stored in.

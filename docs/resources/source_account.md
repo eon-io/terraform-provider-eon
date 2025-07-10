@@ -3,12 +3,12 @@
 page_title: "eon_source_account Resource - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Eon source account resource for connecting/disconnecting source accounts
+  Connects a source cloud account to the given project.
 ---
 
 # eon_source_account (Resource)
 
-Eon source account resource for connecting/disconnecting source accounts
+Connects a source cloud account to the given project.
 
 ## Example Usage
 
@@ -49,18 +49,18 @@ output "aws_production_account" {
 
 ### Required
 
-- `cloud_provider` (String) Cloud provider (AWS, AZURE, GCP)
-- `name` (String) Display name for the source account
-- `provider_account_id` (String) Cloud provider account ID (e.g., AWS account ID)
-- `role` (String) Role ARN for AWS accounts
+- `cloud_provider` (String) Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.
+- `name` (String) Account display name in Eon.
+- `provider_account_id` (String) Cloud-provider-assigned account ID.
+- `role` (String) ARN of the role Eon assumes to access the account in AWS.
 
 ### Optional
 
-- `external_id` (String) External ID for AWS role assumption
+- `external_id` (String) External ID for AWS role assumption.
 
 ### Read-Only
 
-- `created_at` (String) Creation timestamp
-- `id` (String) Source account identifier
-- `status` (String) Connection status
-- `updated_at` (String) Last update timestamp
+- `created_at` (String) Date and time the source account was connected to the Eon project.
+- `id` (String) Eon-assigned account ID.
+- `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
+- `updated_at` (String) Date and time the source account was last updated.

@@ -45,47 +45,47 @@ func (r *SourceAccountResource) Metadata(ctx context.Context, req resource.Metad
 
 func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Eon source account resource for connecting/disconnecting source accounts",
+		MarkdownDescription: "Connects a source cloud account to the given project.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Source account identifier",
+				MarkdownDescription: "Eon-assigned account ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Display name for the source account",
+				MarkdownDescription: "Account display name in Eon.",
 				Required:            true,
 			},
 			"provider_account_id": schema.StringAttribute{
-				MarkdownDescription: "Cloud provider account ID (e.g., AWS account ID)",
+				MarkdownDescription: "Cloud-provider-assigned account ID.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"cloud_provider": schema.StringAttribute{
-				MarkdownDescription: "Cloud provider (AWS, AZURE, GCP)",
+				MarkdownDescription: "Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"role": schema.StringAttribute{
-				MarkdownDescription: "Role ARN for AWS accounts",
+				MarkdownDescription: "ARN of the role Eon assumes to access the account in AWS.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"external_id": schema.StringAttribute{
-				MarkdownDescription: "External ID for AWS role assumption",
+				MarkdownDescription: "External ID for AWS role assumption.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"status": schema.StringAttribute{
-				MarkdownDescription: "Connection status",
+				MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
-				MarkdownDescription: "Creation timestamp",
+				MarkdownDescription: "Date and time the source account was connected to the Eon project.",
 				Computed:            true,
 			},
 			"updated_at": schema.StringAttribute{
-				MarkdownDescription: "Last update timestamp",
+				MarkdownDescription: "Date and time the source account was last updated.",
 				Computed:            true,
 			},
 		},

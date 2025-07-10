@@ -40,40 +40,40 @@ func (d *RestoreAccountsDataSource) Metadata(ctx context.Context, req datasource
 
 func (d *RestoreAccountsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Eon restore accounts data source",
+		MarkdownDescription: "Retrieves a list of restore accounts for the given project.",
 		Attributes: map[string]schema.Attribute{
 			"accounts": schema.ListNestedAttribute{
-				MarkdownDescription: "List of restore accounts",
+				MarkdownDescription: "List of restore accounts.",
 				Computed:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							MarkdownDescription: "Restore account ID",
+							MarkdownDescription: "Eon-assigned restore account ID.",
 							Computed:            true,
 						},
 						"provider": schema.StringAttribute{
-							MarkdownDescription: "Cloud provider for the restore account (e.g., AWS, GCP)",
+							MarkdownDescription: "Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.",
 							Computed:            true,
 						},
 						"provider_account_id": schema.StringAttribute{
-							MarkdownDescription: "Cloud provider account ID",
+							MarkdownDescription: "Cloud-provider-assigned account ID.",
 							Computed:            true,
 						},
 						"status": schema.StringAttribute{
-							MarkdownDescription: "Connection status of the account",
+							MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
 							Computed:            true,
 						},
 						"regions": schema.ListAttribute{
-							MarkdownDescription: "List of regions associated with the restore account",
+							MarkdownDescription: "List of regions associated with the restore account.",
 							Computed:            true,
 							ElementType:         types.StringType,
 						},
 						"created_at": schema.StringAttribute{
-							MarkdownDescription: "Account creation timestamp",
+							MarkdownDescription: "Date and time the restore account was connected to the Eon project.",
 							Computed:            true,
 						},
 						"updated_at": schema.StringAttribute{
-							MarkdownDescription: "Account update timestamp",
+							MarkdownDescription: "Date and time the restore account was last updated.",
 							Computed:            true,
 						},
 					},

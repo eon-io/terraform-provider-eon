@@ -3,12 +3,12 @@
 page_title: "eon_restore_accounts Data Source - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Eon restore accounts data source
+  Retrieves a list of restore accounts for the given project.
 ---
 
 # eon_restore_accounts (Data Source)
 
-Eon restore accounts data source
+Retrieves a list of restore accounts for the given project.
 
 ## Example Usage
 
@@ -55,17 +55,17 @@ output "connected_restore_accounts" {
 
 ### Read-Only
 
-- `accounts` (Attributes List) List of restore accounts (see [below for nested schema](#nestedatt--accounts))
+- `accounts` (Attributes List) List of restore accounts. (see [below for nested schema](#nestedatt--accounts))
 
 <a id="nestedatt--accounts"></a>
 ### Nested Schema for `accounts`
 
 Read-Only:
 
-- `created_at` (String) Account creation timestamp
-- `id` (String) Restore account ID
-- `provider` (String) Cloud provider for the restore account (e.g., AWS, GCP)
-- `provider_account_id` (String) Cloud provider account ID
-- `regions` (List of String) List of regions associated with the restore account
-- `status` (String) Connection status of the account
-- `updated_at` (String) Account update timestamp
+- `created_at` (String) Date and time the restore account was connected to the Eon project.
+- `id` (String) Eon-assigned restore account ID.
+- `provider` (String) Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.
+- `provider_account_id` (String) Cloud-provider-assigned account ID.
+- `regions` (List of String) List of regions associated with the restore account.
+- `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
+- `updated_at` (String) Date and time the restore account was last updated.
