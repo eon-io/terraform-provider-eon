@@ -62,5 +62,5 @@ output "aws_production_account" {
 
 - `created_at` (String) Date and time the source account was connected to the Eon project.
 - `id` (String) Eon-assigned account ID.
-- `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. For an explanation of statuses, see [Source Account Statuses](/docs/user-guide/backing-up/connect-sources/source-account-statuses). Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
+- `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
 - `updated_at` (String) Date and time the source account was last updated.
