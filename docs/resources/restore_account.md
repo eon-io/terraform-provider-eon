@@ -3,12 +3,12 @@
 page_title: "eon_restore_account Resource - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Connects a restore account to the given project.
+  Connects a restore account to the Eon project.
 ---
 
 # eon_restore_account (Resource)
 
-Connects a restore account to the given project.
+Connects a restore account to the Eon project.
 
 ## Example Usage
 

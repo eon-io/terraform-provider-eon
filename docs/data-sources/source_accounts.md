@@ -3,12 +3,12 @@
 page_title: "eon_source_accounts Data Source - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Retrieves a list of source accounts for the given project.
+  Retrieves a list of source accounts for the Eon project.
 ---
 
 # eon_source_accounts (Data Source)
 
-Retrieves a list of source accounts for the given project.
+Retrieves a list of source accounts for the Eon project.
 
 ## Example Usage
 

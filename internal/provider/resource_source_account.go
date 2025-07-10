@@ -45,7 +45,7 @@ func (r *SourceAccountResource) Metadata(ctx context.Context, req resource.Metad
 
 func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Connects a source cloud account to the given project.",
+		MarkdownDescription: "Connects a source cloud account to the Eon project.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,

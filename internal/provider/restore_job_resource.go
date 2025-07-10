@@ -172,11 +172,11 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Default:             booldefault.StaticBool(true),
 			},
 			"job_id": schema.StringAttribute{
-				MarkdownDescription: "Restore job ID.",
+				MarkdownDescription: "Job ID.",
 				Computed:            true,
 			},
 			"status": schema.StringAttribute{
-				MarkdownDescription: "Current status of the restore job. Possible values: `JOB_PENDING`, `JOB_RUNNING`, `JOB_COMPLETED`, `JOB_FAILED`, `JOB_PARTIAL`.",
+				MarkdownDescription: "Current status of the restore job. Possible values: `JOB_UNSPECIFIED`, `JOB_PENDING`, `JOB_RUNNING`, `JOB_COMPLETED`, `JOB_FAILED`, `JOB_PARTIAL`.",
 				Computed:            true,
 			},
 			"status_message": schema.StringAttribute{

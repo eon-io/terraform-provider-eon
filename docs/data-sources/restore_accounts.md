@@ -3,12 +3,12 @@
 page_title: "eon_restore_accounts Data Source - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Retrieves a list of restore accounts for the given project.
+  Retrieves a list of restore accounts for the Eon project.
 ---
 
 # eon_restore_accounts (Data Source)
 
-Retrieves a list of restore accounts for the given project.
+Retrieves a list of restore accounts for the Eon project.
 
 ## Example Usage
 
@@ -67,5 +67,5 @@ Read-Only:
 - `provider` (String) Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.
 - `provider_account_id` (String) Cloud-provider-assigned account ID.
 - `regions` (List of String) List of regions associated with the restore account.
-- `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
+- `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. For an explanation of statuses, see [Restore Account Statuses](/docs/user-guide/restoring/connect-restore-accounts/restore-account-statuses). Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
 - `updated_at` (String) Date and time the restore account was last updated.

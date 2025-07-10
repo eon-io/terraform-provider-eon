@@ -40,7 +40,7 @@ func (d *RestoreAccountsDataSource) Metadata(ctx context.Context, req datasource
 
 func (d *RestoreAccountsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Retrieves a list of restore accounts for the given project.",
+		MarkdownDescription: "Retrieves a list of restore accounts for the Eon project.",
 		Attributes: map[string]schema.Attribute{
 			"accounts": schema.ListNestedAttribute{
 				MarkdownDescription: "List of restore accounts.",
@@ -60,7 +60,7 @@ func (d *RestoreAccountsDataSource) Schema(ctx context.Context, req datasource.S
 							Computed:            true,
 						},
 						"status": schema.StringAttribute{
-							MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
+							MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. For an explanation of statuses, see [Restore Account Statuses](/docs/user-guide/restoring/connect-restore-accounts/restore-account-statuses). Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
 							Computed:            true,
 						},
 						"regions": schema.ListAttribute{

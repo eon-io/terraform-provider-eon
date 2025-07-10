@@ -216,9 +216,9 @@ output "s3_files_restore_info" {
 - `created_at` (String) Date and time the job was created.
 - `duration_seconds` (Number) How long the job took, in seconds.
 - `id` (String) Restore job ID.
-- `job_id` (String) Restore job ID.
+- `job_id` (String) Job ID.
 - `started_at` (String) Date and time the job started.
-- `status` (String) Current status of the restore job. Possible values: `JOB_PENDING`, `JOB_RUNNING`, `JOB_COMPLETED`, `JOB_FAILED`, `JOB_PARTIAL`.
+- `status` (String) Current status of the restore job. Possible values: `JOB_UNSPECIFIED`, `JOB_PENDING`, `JOB_RUNNING`, `JOB_COMPLETED`, `JOB_FAILED`, `JOB_PARTIAL`.
 - `status_message` (String) Message that gives additional details about the job status, if applicable.
 
 <a id="nestedblock--ebs_config"></a>

@@ -40,7 +40,7 @@ func (d *SourceAccountsDataSource) Metadata(ctx context.Context, req datasource.
 
 func (d *SourceAccountsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Retrieves a list of source accounts for the given project.",
+		MarkdownDescription: "Retrieves a list of source accounts for the Eon project.",
 		Attributes: map[string]schema.Attribute{
 			"accounts": schema.ListNestedAttribute{
 				MarkdownDescription: "List of source accounts.",
