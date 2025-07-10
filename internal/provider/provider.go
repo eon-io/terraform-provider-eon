@@ -51,21 +51,21 @@ func (p *EonProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 		MarkdownDescription: "The Eon provider allows you to manage your Eon cloud backup and restore infrastructure using Terraform. Configure your cloud accounts, manage backup policies, and orchestrate disaster recovery workflows.",
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Eon API endpoint URL. Can also be set via the `EON_ENDPOINT` environment variable.",
+				MarkdownDescription: "Eon API base URL in the format `https://<your-domain>.console.eon.io` (no trailing slash). Can also be set with the `EON_ENDPOINT` environment variable.",
 				Optional:            true,
 			},
 			"client_id": schema.StringAttribute{
-				MarkdownDescription: "Eon OAuth client ID for authentication. Can also be set via the `EON_CLIENT_ID` environment variable.",
+				MarkdownDescription: "Eon API client ID for authentication. Can also be set with the `EON_CLIENT_ID` environment variable.",
 				Optional:            true,
 				Sensitive:           true,
 			},
 			"client_secret": schema.StringAttribute{
-				MarkdownDescription: "Eon OAuth client secret for authentication. Can also be set via the `EON_CLIENT_SECRET` environment variable.",
+				MarkdownDescription: "Eon API client secret for authentication. Can also be set with the `EON_CLIENT_SECRET` environment variable.",
 				Optional:            true,
 				Sensitive:           true,
 			},
 			"project_id": schema.StringAttribute{
-				MarkdownDescription: "Eon project ID. Can also be set via the `EON_PROJECT_ID` environment variable.",
+				MarkdownDescription: "Eon project ID. Can also be set with the `EON_PROJECT_ID` environment variable.",
 				Optional:            true,
 			},
 		},
@@ -107,7 +107,7 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		resp.Diagnostics.AddAttributeError(
 			path.Root("endpoint"),
 			"Missing Eon API Endpoint",
-			"The provider requires an endpoint URL. Set the endpoint value in the configuration or use the EON_ENDPOINT environment variable.",
+			"The provider requires an endpoint URL. Set the endpoint value in the configuration or use the `EON_ENDPOINT` environment variable.",
 		)
 	}
 
@@ -115,7 +115,7 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		resp.Diagnostics.AddAttributeError(
 			path.Root("client_id"),
 			"Missing Eon Client ID",
-			"The provider requires a client ID. Set the client_id value in the configuration or use the EON_CLIENT_ID environment variable.",
+			"The provider requires a client ID. Set the client_id value in the configuration or use the `EON_CLIENT_ID` environment variable.",
 		)
 	}
 
@@ -123,7 +123,7 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		resp.Diagnostics.AddAttributeError(
 			path.Root("client_secret"),
 			"Missing Eon Client Secret",
-			"The provider requires a client secret. Set the client_secret value in the configuration or use the EON_CLIENT_SECRET environment variable.",
+			"The provider requires a client secret. Set the client_secret value in the configuration or use the `EON_CLIENT_SECRET` environment variable.",
 		)
 	}
 
@@ -131,7 +131,7 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		resp.Diagnostics.AddAttributeError(
 			path.Root("project_id"),
 			"Missing Eon Project ID",
-			"The provider requires a project ID. Set the project_id value in the configuration or use the EON_PROJECT_ID environment variable.",
+			"The provider requires a project ID. Set the project_id value in the configuration or use the `EON_PROJECT_ID` environment variable.",
 		)
 	}
 

@@ -3,12 +3,12 @@
 page_title: "eon_backup_policies Data Source - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Eon backup policies data source
+  Retrieves a list of backup policies in the Eon project.
 ---
 
 # eon_backup_policies (Data Source)
 
-Eon backup policies data source
+Retrieves a list of backup policies in the Eon project.
 
 ## Example Usage
 
@@ -68,17 +68,17 @@ resource "local_file" "backup_policy_report" {
 
 ### Read-Only
 
-- `policies` (Attributes List) List of backup policies (see [below for nested schema](#nestedatt--policies))
+- `policies` (Attributes List) List of backup policies. (see [below for nested schema](#nestedatt--policies))
 
 <a id="nestedatt--policies"></a>
 ### Nested Schema for `policies`
 
 Read-Only:
 
-- `backup_policy_type` (String) Backup policy type (STANDARD, HIGH_FREQUENCY, PITR)
-- `enabled` (Boolean) Whether the backup policy is enabled
-- `id` (String) Backup policy identifier
-- `name` (String) Backup policy name
-- `resource_exclusion_override` (List of String) List of resource IDs to exclude
-- `resource_inclusion_override` (List of String) List of resource IDs to include
-- `resource_selection_mode` (String) Resource selection mode (ALL, CONDITIONAL, NONE)
+- `backup_policy_type` (String) The type of the policy. Possible values: `UNSPECIFIED`, `STANDARD`, `HIGH_FREQUENCY`.
+- `enabled` (Boolean) Whether the backup policy is enabled.
+- `id` (String) Backup policy ID.
+- `name` (String) Backup policy display name.
+- `resource_exclusion_override` (List of String) List of cloud-provider-assigned resource IDs to exclude from the backup policy, regardless of whether they're included by `resource_selection_mode`.
+- `resource_inclusion_override` (List of String) List of cloud-provider-assigned resource IDs to include in the backup policy, regardless of whether they're excluded by `resource_selection_mode`.
+- `resource_selection_mode` (String) Mode that determines how resources are selected for inclusion in the backup policy. To include or exclude all resources from the policy, set to `ALL` or `NONE`, respectively. For conditional selection, set to `CONDITIONAL`. Possible values: `ALL`, `NONE`, `CONDITIONAL`.
