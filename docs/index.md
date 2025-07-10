@@ -29,11 +29,10 @@ terraform {
 }
 
 provider "eon" {
-  endpoint       = var.eon_endpoint
-  client_id      = var.eon_client_id
-  client_secret  = var.eon_client_secret
-  project_id     = var.eon_project_id
-  eon_account_id = var.eon_account_id
+  endpoint      = var.eon_endpoint
+  client_id     = var.eon_client_id
+  client_secret = var.eon_client_secret
+  project_id    = var.eon_project_id
 }
 ```
 
@@ -48,18 +47,16 @@ export EON_ENDPOINT="https://<your-domain>.console.eon.io"
 export EON_CLIENT_ID="your-client-id"
 export EON_CLIENT_SECRET="your-client-secret"
 export EON_PROJECT_ID="your-project-id"
-export EON_ACCOUNT_ID="your-account-id"
 ```
 
 ### Provider Configuration
 
 ```terraform
 provider "eon" {
-  endpoint       = "https://<your-domain>.console.eon.io"
-  client_id      = "your-client-id"
-  client_secret  = "your-client-secret"
-  project_id     = "your-project-id"
-  eon_account_id = "your-account-id"
+  endpoint      = "https://<your-domain>.console.eon.io"
+  client_id     = "your-client-id"
+  client_secret = "your-client-secret"
+  project_id    = "your-project-id"
 }
 ```
 
@@ -71,5 +68,4 @@ provider "eon" {
 - `client_id` (String, Sensitive) Eon OAuth client ID for authentication. Can also be set via the `EON_CLIENT_ID` environment variable.
 - `client_secret` (String, Sensitive) Eon OAuth client secret for authentication. Can also be set via the `EON_CLIENT_SECRET` environment variable.
 - `endpoint` (String) Eon API endpoint URL. Can also be set via the `EON_ENDPOINT` environment variable.
-- `eon_account_id` (String) Eon account ID. Can also be set via the `EON_ACCOUNT_ID` environment variable.
 - `project_id` (String) Eon project ID. Can also be set via the `EON_PROJECT_ID` environment variable.

@@ -30,7 +30,6 @@ type EonProviderModel struct {
 	ClientId     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
 	ProjectId    types.String `tfsdk:"project_id"`
-	EonAccountId types.String `tfsdk:"eon_account_id"`
 }
 
 // New creates a new provider instance.
@@ -69,10 +68,6 @@ func (p *EonProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 				MarkdownDescription: "Eon project ID. Can also be set via the `EON_PROJECT_ID` environment variable.",
 				Optional:            true,
 			},
-			"eon_account_id": schema.StringAttribute{
-				MarkdownDescription: "Eon account ID. Can also be set via the `EON_ACCOUNT_ID` environment variable.",
-				Optional:            true,
-			},
 		},
 	}
 }
@@ -90,7 +85,6 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 	clientId := os.Getenv("EON_CLIENT_ID")
 	clientSecret := os.Getenv("EON_CLIENT_SECRET")
 	projectId := os.Getenv("EON_PROJECT_ID")
-	eonAccountId := os.Getenv("EON_ACCOUNT_ID")
 
 	if !data.Endpoint.IsNull() {
 		endpoint = data.Endpoint.ValueString()
@@ -106,10 +100,6 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 
 	if !data.ProjectId.IsNull() {
 		projectId = data.ProjectId.ValueString()
-	}
-
-	if !data.EonAccountId.IsNull() {
-		eonAccountId = data.EonAccountId.ValueString()
 	}
 
 	// Validate required fields
@@ -145,20 +135,12 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		)
 	}
 
-	if eonAccountId == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("eon_account_id"),
-			"Missing Eon Account ID",
-			"The provider requires an account ID. Set the eon_account_id value in the configuration or use the EON_ACCOUNT_ID environment variable.",
-		)
-	}
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Create Eon client
-	eonClient, err := client.NewEonClient(endpoint, clientId, clientSecret, projectId, eonAccountId)
+	eonClient, err := client.NewEonClient(endpoint, clientId, clientSecret, projectId)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Eon API Client",

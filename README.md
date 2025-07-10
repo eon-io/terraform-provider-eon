@@ -47,18 +47,16 @@ export EON_ENDPOINT="https://your-eon-instance.eon.io"
 export EON_CLIENT_ID="your-client-id"
 export EON_CLIENT_SECRET="your-client-secret"
 export EON_PROJECT_ID="your-project-id"
-export EON_ACCOUNT_ID="your-account-id"
 ```
 
 ### Provider Configuration
 
 ```hcl
 provider "eon" {
-  endpoint       = "https://your-eon-instance.eon.io"
-  client_id      = "your-client-id"
-  client_secret  = "your-client-secret"
-  project_id     = "your-project-id"
-  eon_account_id = "your-account-id"
+  endpoint      = "https://your-eon-instance.eon.io"
+  client_id     = "your-client-id"
+  client_secret = "your-client-secret"
+  project_id    = "your-project-id"
 }
 ```
 

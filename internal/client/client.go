@@ -14,7 +14,6 @@ import (
 type EonClient struct {
 	client       *externalEonSdkAPI.APIClient
 	ProjectID    string
-	EonAccountID string
 	authToken    string
 	tokenExpiry  time.Time
 	clientID     string
@@ -23,7 +22,7 @@ type EonClient struct {
 }
 
 // NewEonClient creates a new Eon API client with the provided configuration
-func NewEonClient(endpoint, clientID, clientSecret, projectID, eonAccountID string) (*EonClient, error) {
+func NewEonClient(endpoint, clientID, clientSecret, projectID string) (*EonClient, error) {
 	config := externalEonSdkAPI.NewConfiguration()
 	config.Servers = []externalEonSdkAPI.ServerConfiguration{
 		{
@@ -34,7 +33,6 @@ func NewEonClient(endpoint, clientID, clientSecret, projectID, eonAccountID stri
 	client := &EonClient{
 		client:       externalEonSdkAPI.NewAPIClient(config),
 		ProjectID:    projectID,
-		EonAccountID: eonAccountID,
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		endpoint:     endpoint,
