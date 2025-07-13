@@ -40,40 +40,40 @@ func (d *BackupPoliciesDataSource) Metadata(ctx context.Context, req datasource.
 
 func (d *BackupPoliciesDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Eon backup policies data source",
+		MarkdownDescription: "Retrieves a list of backup policies in the Eon project.",
 		Attributes: map[string]schema.Attribute{
 			"policies": schema.ListNestedAttribute{
-				MarkdownDescription: "List of backup policies",
+				MarkdownDescription: "List of backup policies.",
 				Computed:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							MarkdownDescription: "Backup policy identifier",
+							MarkdownDescription: "Backup policy ID.",
 							Computed:            true,
 						},
 						"name": schema.StringAttribute{
-							MarkdownDescription: "Backup policy name",
+							MarkdownDescription: "Backup policy display name.",
 							Computed:            true,
 						},
 						"enabled": schema.BoolAttribute{
-							MarkdownDescription: "Whether the backup policy is enabled",
+							MarkdownDescription: "Whether the backup policy is enabled.",
 							Computed:            true,
 						},
 						"backup_policy_type": schema.StringAttribute{
-							MarkdownDescription: "Backup policy type (STANDARD, HIGH_FREQUENCY, PITR)",
+							MarkdownDescription: "The type of the policy. Possible values: `UNSPECIFIED`, `STANDARD`, `HIGH_FREQUENCY`.",
 							Computed:            true,
 						},
 						"resource_selection_mode": schema.StringAttribute{
-							MarkdownDescription: "Resource selection mode (ALL, CONDITIONAL, NONE)",
+							MarkdownDescription: "Mode that determines how resources are selected for inclusion in the backup policy. To include or exclude all resources from the policy, set to `ALL` or `NONE`, respectively. For conditional selection, set to `CONDITIONAL`. Possible values: `ALL`, `NONE`, `CONDITIONAL`.",
 							Computed:            true,
 						},
 						"resource_inclusion_override": schema.ListAttribute{
-							MarkdownDescription: "List of resource IDs to include",
+							MarkdownDescription: "List of cloud-provider-assigned resource IDs to include in the backup policy, regardless of whether they're excluded by `resource_selection_mode`.",
 							Computed:            true,
 							ElementType:         types.StringType,
 						},
 						"resource_exclusion_override": schema.ListAttribute{
-							MarkdownDescription: "List of resource IDs to exclude",
+							MarkdownDescription: "List of cloud-provider-assigned resource IDs to exclude from the backup policy, regardless of whether they're included by `resource_selection_mode`.",
 							Computed:            true,
 							ElementType:         types.StringType,
 						},

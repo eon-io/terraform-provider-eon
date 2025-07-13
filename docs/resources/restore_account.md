@@ -3,12 +3,12 @@
 page_title: "eon_restore_account Resource - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Eon restore account resource for connecting/disconnecting restore accounts
+  Connects a restore account to the Eon project.
 ---
 
 # eon_restore_account (Resource)
 
-Eon restore account resource for connecting/disconnecting restore accounts
+Connects a restore account to the Eon project.
 
 ## Example Usage
 
@@ -48,14 +48,14 @@ output "aws_disaster_recovery_account" {
 
 ### Required
 
-- `cloud_provider` (String) Cloud provider (AWS, AZURE, GCP)
-- `name` (String) Display name for the restore account
-- `provider_account_id` (String) Cloud provider account ID (e.g., AWS account ID)
-- `role` (String) Role ARN for AWS accounts
+- `cloud_provider` (String) Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.
+- `name` (String) Account display name in Eon.
+- `provider_account_id` (String) Cloud-provider-assigned account ID.
+- `role` (String) ARN of the role Eon assumes to access the account in AWS.
 
 ### Read-Only
 
-- `created_at` (String) Creation timestamp
-- `id` (String) Restore account identifier
-- `status` (String) Connection status
-- `updated_at` (String) Last update timestamp
+- `created_at` (String) Date and time the restore account was connected to the Eon project.
+- `id` (String) Eon-assigned restore account ID.
+- `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
+- `updated_at` (String) Date and time the restore account was last updated.

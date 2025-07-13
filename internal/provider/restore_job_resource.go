@@ -131,181 +131,181 @@ func (r *RestoreJobResource) Metadata(ctx context.Context, req resource.Metadata
 
 func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Eon restore job resource - supports EBS volume restore operations",
+		MarkdownDescription: "Triggers a restore job to restore data from an Eon snapshot. This operation is asynchronous and returns a job ID that can be used to track the progress of the restore job.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Terraform resource identifier (same as job_id)",
+				MarkdownDescription: "Restore job ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"restore_type": schema.StringAttribute{
-				MarkdownDescription: "Type of restore job: 'full' for full resource restore, 'partial' for partial restore",
+				MarkdownDescription: "Type of restore job: `full` for full resource restore, `partial` for partial restore.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"snapshot_id": schema.StringAttribute{
-				MarkdownDescription: "Eon snapshot ID to restore from",
+				MarkdownDescription: "ID of the Eon snapshot to restore from.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"resource_id": schema.StringAttribute{
-				MarkdownDescription: "Eon resource ID to restore from (defaults to snapshot_id if not provided)",
+				MarkdownDescription: "Eon-assigned ID of the resource to restore from (defaults to snapshot_id if not provided).",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"restore_account_id": schema.StringAttribute{
-				MarkdownDescription: "Eon restore account ID",
+				MarkdownDescription: "Eon-assigned ID of the restore account.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"timeout_minutes": schema.Int64Attribute{
-				MarkdownDescription: "Timeout in minutes for restore operation",
+				MarkdownDescription: "Timeout in minutes for restore operation.",
 				Optional:            true,
 				Computed:            true,
 				Default:             int64default.StaticInt64(60),
 			},
 			"wait_for_completion": schema.BoolAttribute{
-				MarkdownDescription: "Whether to wait for completion",
+				MarkdownDescription: "Whether to wait for completion.",
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(true),
 			},
 			"job_id": schema.StringAttribute{
-				MarkdownDescription: "Restore job ID",
+				MarkdownDescription: "Job ID.",
 				Computed:            true,
 			},
 			"status": schema.StringAttribute{
-				MarkdownDescription: "Current status of the restore job",
+				MarkdownDescription: "Current status of the restore job. Possible values: `JOB_UNSPECIFIED`, `JOB_PENDING`, `JOB_RUNNING`, `JOB_COMPLETED`, `JOB_FAILED`, `JOB_PARTIAL`.",
 				Computed:            true,
 			},
 			"status_message": schema.StringAttribute{
-				MarkdownDescription: "Status message with additional details",
+				MarkdownDescription: "Message that gives additional details about the job status, if applicable.",
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
-				MarkdownDescription: "Job creation timestamp",
+				MarkdownDescription: "Date and time the job was created.",
 				Computed:            true,
 			},
 			"started_at": schema.StringAttribute{
-				MarkdownDescription: "Job start timestamp",
+				MarkdownDescription: "Date and time the job started.",
 				Computed:            true,
 			},
 			"completed_at": schema.StringAttribute{
-				MarkdownDescription: "Job completion timestamp",
+				MarkdownDescription: "Date and time the job finished.",
 				Computed:            true,
 			},
 			"duration_seconds": schema.Int64Attribute{
-				MarkdownDescription: "Job duration in seconds",
+				MarkdownDescription: "How long the job took, in seconds.",
 				Computed:            true,
 			},
 		},
 		Blocks: map[string]schema.Block{
 			"ebs_config": schema.SingleNestedBlock{
-				MarkdownDescription: "EBS volume restore configuration (required when restoring AWS EC2 volume with partial restore)",
+				MarkdownDescription: "EBS volume restore configuration. Required when restoring AWS EC2 volume with `partial` restore type.",
 				Attributes: map[string]schema.Attribute{
 					"provider_volume_id": schema.StringAttribute{
-						MarkdownDescription: "AWS volume ID to restore (e.g., vol-12345678)",
+						MarkdownDescription: "Cloud-provider-assigned ID of the volume to restore.",
 						Optional:            true,
 					},
 					"availability_zone": schema.StringAttribute{
-						MarkdownDescription: "AWS availability zone for restored volume",
+						MarkdownDescription: "Availability zone to restore the volume to.",
 						Optional:            true,
 					},
 					"volume_type": schema.StringAttribute{
-						MarkdownDescription: "EBS volume type (gp2, gp3, io1, io2, etc.)",
+						MarkdownDescription: "EBS volume type (gp2, gp3, io1, io2, etc.).",
 						Optional:            true,
 					},
 					"volume_size": schema.Int64Attribute{
-						MarkdownDescription: "Volume size in bytes",
+						MarkdownDescription: "Volume size in bytes.",
 						Optional:            true,
 					},
 					"iops": schema.Int64Attribute{
-						MarkdownDescription: "IOPS for volume (required for io1/io2)",
+						MarkdownDescription: "IOPS for volume (required for io1/io2).",
 						Optional:            true,
 					},
 					"throughput": schema.Int64Attribute{
-						MarkdownDescription: "Throughput for gp3 volumes",
+						MarkdownDescription: "Throughput for gp3 volumes.",
 						Optional:            true,
 					},
 					"description": schema.StringAttribute{
-						MarkdownDescription: "Description for restored volume",
+						MarkdownDescription: "Description to apply to the restored volume.",
 						Optional:            true,
 					},
 					"volume_encryption_key_id": schema.StringAttribute{
-						MarkdownDescription: "KMS key ID for volume encryption",
+						MarkdownDescription: "ID of the KMS key you want Eon to use for encrypting the restored volume.",
 						Optional:            true,
 						Computed:            true,
 						Default:             stringdefault.StaticString("alias/aws/ebs"),
 					},
 					"environment_encryption_key_id": schema.StringAttribute{
-						MarkdownDescription: "KMS key ID for environment encryption",
+						MarkdownDescription: "KMS key ID for environment encryption.",
 						Optional:            true,
 					},
 					"tags": schema.MapAttribute{
-						MarkdownDescription: "Tags to apply to restored volume",
+						MarkdownDescription: "Tags to apply to the restored volume as key-value pairs, where key and value are both strings.",
 						ElementType:         types.StringType,
 						Optional:            true,
 					},
 				},
 			},
 			"ec2_config": schema.SingleNestedBlock{
-				MarkdownDescription: "EC2 instance restore configuration (required when restoring AWS EC2 instance with full restore)",
+				MarkdownDescription: "EC2 instance restore configuration. Required when restoring AWS EC2 instance with `full` restore type.",
 				Attributes: map[string]schema.Attribute{
 					"region": schema.StringAttribute{
-						MarkdownDescription: "AWS region to restore the instance to",
+						MarkdownDescription: "Region to restore the instance to.",
 						Optional:            true,
 					},
 					"instance_type": schema.StringAttribute{
-						MarkdownDescription: "Instance type to use for the restored instance",
+						MarkdownDescription: "Instance type to use for the restored instance.",
 						Optional:            true,
 					},
 					"subnet_id": schema.StringAttribute{
-						MarkdownDescription: "Subnet ID to associate with the restored instance",
+						MarkdownDescription: "Subnet ID to associate with the restored instance.",
 						Optional:            true,
 					},
 					"security_group_ids": schema.ListAttribute{
-						MarkdownDescription: "List of security group IDs to associate with the restored instance",
+						MarkdownDescription: "List of security group IDs to associate with the restored instance.",
 						ElementType:         types.StringType,
 						Optional:            true,
 					},
 					"tags": schema.MapAttribute{
-						MarkdownDescription: "Tags to apply to the restored instance",
+						MarkdownDescription: "Tags to apply to the restored instance as key-value pairs, where key and value are both strings.",
 						ElementType:         types.StringType,
 						Optional:            true,
 					},
 				},
 				Blocks: map[string]schema.Block{
 					"volume_restore_params": schema.ListNestedBlock{
-						MarkdownDescription: "Volume restore parameters for the instance",
+						MarkdownDescription: "Volumes to restore and attach to the restored instance. Each item corresponds to a volume to be restored, where `provider_volume_id` matches the volume's ID at the time of the snapshot. The root volume must be present in the list.",
 						NestedObject: schema.NestedBlockObject{
 							Attributes: map[string]schema.Attribute{
 								"provider_volume_id": schema.StringAttribute{
-									MarkdownDescription: "Original volume ID from the snapshot",
+									MarkdownDescription: "Cloud-provider-assigned ID of the volume to restore.",
 									Optional:            true,
 								},
 								"volume_type": schema.StringAttribute{
-									MarkdownDescription: "EBS volume type (gp2, gp3, io1, io2, etc.)",
+									MarkdownDescription: "EBS volume type (gp2, gp3, io1, io2, etc.).",
 									Optional:            true,
 								},
 								"volume_size": schema.Int64Attribute{
-									MarkdownDescription: "Volume size in bytes",
+									MarkdownDescription: "Volume size in bytes.",
 									Optional:            true,
 								},
 								"iops": schema.Int64Attribute{
-									MarkdownDescription: "IOPS for volume (required for io1/io2)",
+									MarkdownDescription: "IOPS for volume (required for io1/io2).",
 									Optional:            true,
 								},
 								"throughput": schema.Int64Attribute{
-									MarkdownDescription: "Throughput for gp3 volumes",
+									MarkdownDescription: "Throughput for gp3 volumes.",
 									Optional:            true,
 								},
 								"description": schema.StringAttribute{
-									MarkdownDescription: "Description for the restored volume",
+									MarkdownDescription: "Optional description for the restored volume.",
 									Optional:            true,
 								},
 								"kms_key_id": schema.StringAttribute{
-									MarkdownDescription: "KMS key ID for volume encryption",
+									MarkdownDescription: "ARN of the KMS key for encrypting the restored volume.",
 									Optional:            true,
 								},
 							},
@@ -314,112 +314,112 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 				},
 			},
 			"rds_config": schema.SingleNestedBlock{
-				MarkdownDescription: "RDS database restore configuration (required when restoring AWS RDS database)",
+				MarkdownDescription: "RDS database restore configuration. Required when restoring AWS RDS database.",
 				Attributes: map[string]schema.Attribute{
 					"db_instance_identifier": schema.StringAttribute{
-						MarkdownDescription: "DB instance identifier",
+						MarkdownDescription: "Name to assign to the restored resource.",
 						Optional:            true,
 					},
 					"db_instance_class": schema.StringAttribute{
-						MarkdownDescription: "DB instance class (e.g., db.t3.micro)",
+						MarkdownDescription: "DB instance class (for example, db.t3.micro).",
 						Optional:            true,
 					},
 					"engine": schema.StringAttribute{
-						MarkdownDescription: "Database engine (e.g., mysql, postgres)",
+						MarkdownDescription: "Database engine (for example, mysql, postgres).",
 						Optional:            true,
 					},
 					"region": schema.StringAttribute{
-						MarkdownDescription: "AWS region to restore the database to",
+						MarkdownDescription: "Region to restore to.",
 						Optional:            true,
 					},
 					"subnet_group_name": schema.StringAttribute{
-						MarkdownDescription: "DB subnet group name",
+						MarkdownDescription: "Subnet group ID to associate with the restored resource. Must be in the same VPC of `vpc_security_group_ids`.",
 						Optional:            true,
 					},
 					"vpc_security_group_ids": schema.ListAttribute{
-						MarkdownDescription: "List of VPC security group IDs",
+						MarkdownDescription: "List of security group IDs to associate with the restored resource. Must be in the same VPC of `subnet_group_name`.",
 						ElementType:         types.StringType,
 						Optional:            true,
 					},
 					"allocated_storage": schema.Int64Attribute{
-						MarkdownDescription: "Allocated storage in GiB",
+						MarkdownDescription: "Allocated storage in GiB.",
 						Optional:            true,
 					},
 					"storage_type": schema.StringAttribute{
-						MarkdownDescription: "Storage type (gp2, gp3, io1, etc.)",
+						MarkdownDescription: "Storage type (gp2, gp3, io1, etc.).",
 						Optional:            true,
 					},
 					"backup_retention_period": schema.Int64Attribute{
-						MarkdownDescription: "Backup retention period in days",
+						MarkdownDescription: "Backup retention period in days.",
 						Optional:            true,
 					},
 					"multi_az": schema.BoolAttribute{
-						MarkdownDescription: "Whether to enable Multi-AZ deployment",
+						MarkdownDescription: "Whether to enable Multi-AZ deployment.",
 						Optional:            true,
 					},
 					"publicly_accessible": schema.BoolAttribute{
-						MarkdownDescription: "Whether the database is publicly accessible",
+						MarkdownDescription: "Whether the database is publicly accessible.",
 						Optional:            true,
 					},
 					"storage_encrypted": schema.BoolAttribute{
-						MarkdownDescription: "Whether to enable storage encryption",
+						MarkdownDescription: "Whether to enable storage encryption.",
 						Optional:            true,
 					},
 					"kms_key_id": schema.StringAttribute{
-						MarkdownDescription: "KMS key ID for encryption",
+						MarkdownDescription: "ID of the key you want Eon to use for encrypting the restored resource.",
 						Optional:            true,
 					},
 					"tags": schema.MapAttribute{
-						MarkdownDescription: "Tags to apply to the restored database",
+						MarkdownDescription: "Tags to apply to the restored instance as key-value pairs, where key and value are both strings.",
 						ElementType:         types.StringType,
 						Optional:            true,
 					},
 				},
 			},
 			"s3_bucket_config": schema.SingleNestedBlock{
-				MarkdownDescription: "S3 bucket restore configuration (required when restoring AWS S3 bucket with full restore)",
+				MarkdownDescription: "S3 bucket restore configuration. Required when restoring AWS S3 bucket with `full` restore type.",
 				Attributes: map[string]schema.Attribute{
 					"bucket_name": schema.StringAttribute{
-						MarkdownDescription: "S3 bucket name to restore to",
+						MarkdownDescription: "Name of an existing bucket to restore the data to.",
 						Optional:            true,
 					},
 					"key_prefix": schema.StringAttribute{
-						MarkdownDescription: "Key prefix for restored objects",
+						MarkdownDescription: "Prefix to add to the restore path. If you don't specify a prefix, the files are restored to their respective folders in the original file tree, starting from the root of the bucket.",
 						Optional:            true,
 					},
 					"kms_key_id": schema.StringAttribute{
-						MarkdownDescription: "KMS key ID for encryption",
+						MarkdownDescription: "ID of the key you want Eon to use for encrypting the restored files.",
 						Optional:            true,
 					},
 				},
 			},
 			"s3_file_config": schema.SingleNestedBlock{
-				MarkdownDescription: "S3 file restore configuration (required when restoring AWS S3 files with partial restore)",
+				MarkdownDescription: "S3 file restore configuration. Required when restoring AWS S3 files with partial restore type.",
 				Attributes: map[string]schema.Attribute{
 					"bucket_name": schema.StringAttribute{
-						MarkdownDescription: "S3 bucket name to restore to",
+						MarkdownDescription: "Name of an existing bucket to restore the files to.",
 						Optional:            true,
 					},
 					"key_prefix": schema.StringAttribute{
-						MarkdownDescription: "Key prefix for restored objects",
+						MarkdownDescription: "Prefix to add to the restore path. If you don't specify a prefix, the files are restored to their respective folders in the original file tree, starting from the root of the bucket.",
 						Optional:            true,
 					},
 					"kms_key_id": schema.StringAttribute{
-						MarkdownDescription: "KMS key ID for encryption",
+						MarkdownDescription: "ID of the key you want Eon to use for encrypting the restored files.",
 						Optional:            true,
 					},
 				},
 				Blocks: map[string]schema.Block{
 					"files": schema.ListNestedBlock{
-						MarkdownDescription: "List of files to restore",
+						MarkdownDescription: "List of file paths to restore.",
 						NestedObject: schema.NestedBlockObject{
 							Attributes: map[string]schema.Attribute{
 								"path": schema.StringAttribute{
-									MarkdownDescription: "File path to restore",
+									MarkdownDescription: "Absolute path to the file or directory to restore.",
 									Optional:            true,
 								},
 								"is_directory": schema.BoolAttribute{
-									MarkdownDescription: "Whether the path is a directory (true) or file (false)",
+									MarkdownDescription: "Whether `path` is a directory. If `true`, Eon restores all files in all subdirectories under the path. If `false`, Eon restores only the file at the path.",
 									Optional:            true,
 								},
 							},

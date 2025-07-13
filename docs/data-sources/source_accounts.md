@@ -3,12 +3,12 @@
 page_title: "eon_source_accounts Data Source - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Eon source accounts data source
+  Retrieves a list of source accounts for the Eon project.
 ---
 
 # eon_source_accounts (Data Source)
 
-Eon source accounts data source
+Retrieves a list of source accounts for the Eon project.
 
 ## Example Usage
 
@@ -55,17 +55,17 @@ output "connected_source_accounts" {
 
 ### Read-Only
 
-- `accounts` (Attributes List) List of source accounts (see [below for nested schema](#nestedatt--accounts))
+- `accounts` (Attributes List) List of source accounts. (see [below for nested schema](#nestedatt--accounts))
 
 <a id="nestedatt--accounts"></a>
 ### Nested Schema for `accounts`
 
 Read-Only:
 
-- `created_at` (String) Account creation timestamp
-- `id` (String) Source account ID
-- `name` (String) Name of the account
-- `provider` (String) Cloud provider (e.g., AWS, Azure, GCP)
-- `provider_account_id` (String) Cloud provider account ID
-- `status` (String) Connection status of the account
-- `updated_at` (String) Account update timestamp
+- `created_at` (String) Date and time the source account was connected to the Eon project.
+- `id` (String) Eon-assigned account ID.
+- `name` (String) Account display name in Eon.
+- `provider` (String) Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.
+- `provider_account_id` (String) Cloud-provider-assigned account ID.
+- `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
+- `updated_at` (String) Date and time the source account was last updated.

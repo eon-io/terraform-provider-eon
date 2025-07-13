@@ -40,39 +40,39 @@ func (d *SourceAccountsDataSource) Metadata(ctx context.Context, req datasource.
 
 func (d *SourceAccountsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Eon source accounts data source",
+		MarkdownDescription: "Retrieves a list of source accounts for the Eon project.",
 		Attributes: map[string]schema.Attribute{
 			"accounts": schema.ListNestedAttribute{
-				MarkdownDescription: "List of source accounts",
+				MarkdownDescription: "List of source accounts.",
 				Computed:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							MarkdownDescription: "Source account ID",
+							MarkdownDescription: "Eon-assigned account ID.",
 							Computed:            true,
 						},
 						"name": schema.StringAttribute{
-							MarkdownDescription: "Name of the account",
+							MarkdownDescription: "Account display name in Eon.",
 							Computed:            true,
 						},
 						"provider_account_id": schema.StringAttribute{
-							MarkdownDescription: "Cloud provider account ID",
+							MarkdownDescription: "Cloud-provider-assigned account ID.",
 							Computed:            true,
 						},
 						"provider": schema.StringAttribute{
-							MarkdownDescription: "Cloud provider (e.g., AWS, Azure, GCP)",
+							MarkdownDescription: "Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.",
 							Computed:            true,
 						},
 						"status": schema.StringAttribute{
-							MarkdownDescription: "Connection status of the account",
+							MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
 							Computed:            true,
 						},
 						"created_at": schema.StringAttribute{
-							MarkdownDescription: "Account creation timestamp",
+							MarkdownDescription: "Date and time the source account was connected to the Eon project.",
 							Computed:            true,
 						},
 						"updated_at": schema.StringAttribute{
-							MarkdownDescription: "Account update timestamp",
+							MarkdownDescription: "Date and time the source account was last updated.",
 							Computed:            true,
 						},
 					},

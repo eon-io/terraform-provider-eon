@@ -39,35 +39,35 @@ func (d *SnapshotDataSource) Metadata(ctx context.Context, req datasource.Metada
 
 func (d *SnapshotDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Eon snapshot data source",
+		MarkdownDescription: "Retrieves an Eon snapshot.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "Snapshot identifier",
+				MarkdownDescription: "Eon snapshot ID.",
 				Required:            true,
 			},
 			"project_id": schema.StringAttribute{
-				MarkdownDescription: "ID of the project that the snapshot belongs to",
+				MarkdownDescription: "ID of the snapshot's parent project.",
 				Computed:            true,
 			},
 			"vault_id": schema.StringAttribute{
-				MarkdownDescription: "ID of the vault where the snapshot is stored",
+				MarkdownDescription: "ID of the vault the snapshot is stored in.",
 				Computed:            true,
 			},
 			"resource_id": schema.StringAttribute{
-				MarkdownDescription: "ID of the resource that was snapshotted",
+				MarkdownDescription: "Eon-assigned ID of the resource the snapshot is backing up.",
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
-				MarkdownDescription: "Snapshot creation timestamp",
+				MarkdownDescription: "Date and time the snapshot creation was started. This doesn't represent the point in time the resource is backed up from, which is instead represented by the `point_in_time` property.",
 				Computed:            true,
 			},
 			"expiration_date": schema.StringAttribute{
-				MarkdownDescription: "Snapshot expiration timestamp",
+				MarkdownDescription: "Date and time the snapshot's retention is expected to expire, after which it's marked for deletion.",
 				Computed:            true,
 			},
 			"point_in_time": schema.StringAttribute{
-				MarkdownDescription: "The point in time the resource was backed up from",
+				MarkdownDescription: "Date and time of the resource that's preserved by the snapshot.",
 				Computed:            true,
 			},
 		},
