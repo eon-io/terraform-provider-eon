@@ -20,6 +20,16 @@ resource "eon_backup_policy" "daily_backup" {
   resource_selection_mode = "ALL"
   backup_policy_type      = "STANDARD"
 
+  backup_schedules {
+    vault_id       = "vault-12345678-1234-1234-1234-123456789012"
+    retention_days = 30
+  }
+
+  schedule_frequency   = "DAILY"
+  time_of_day_hour     = 2
+  time_of_day_minutes  = 0
+  start_window_minutes = 240
+
   resource_inclusion_override = []
   resource_exclusion_override = []
 }
@@ -31,24 +41,44 @@ resource "eon_backup_policy" "high_frequency_backup" {
   resource_selection_mode = "ALL"
   backup_policy_type      = "HIGH_FREQUENCY"
 
+  backup_schedules {
+    vault_id       = "vault-12345678-1234-1234-1234-123456789012"
+    retention_days = 7
+  }
+
+  schedule_frequency = "INTERVAL"
+  interval_minutes   = 30
+
+  high_frequency_resource_types = ["AWS_S3", "AWS_DYNAMO_DB"]
+
   resource_inclusion_override = []
   resource_exclusion_override = []
 }
 
-# Example: Backup policy with specific resource inclusions
-resource "eon_backup_policy" "specific_resources" {
-  name                    = "Specific Resources Backup"
+# Example: Multi-vault backup policy
+resource "eon_backup_policy" "multi_vault_backup" {
+  name                    = "Multi-Vault Production Backup"
   enabled                 = true
-  resource_selection_mode = "CONDITIONAL"
+  resource_selection_mode = "ALL"
   backup_policy_type      = "STANDARD"
 
-  resource_inclusion_override = [
-    "i-1234567890abcdef0"
-  ]
+  backup_schedules {
+    vault_id       = "vault-12345678-1234-1234-1234-123456789012"
+    retention_days = 30
+  }
 
-  resource_exclusion_override = [
-    "i-0987654321fedcba0"
-  ]
+  backup_schedules {
+    vault_id       = "vault-87654321-4321-4321-4321-210987654321"
+    retention_days = 90
+  }
+
+  schedule_frequency   = "WEEKLY"
+  time_of_day_hour     = 3
+  time_of_day_minutes  = 30
+  start_window_minutes = 360
+
+  resource_inclusion_override = []
+  resource_exclusion_override = []
 }
 
 # Output examples
@@ -72,6 +102,12 @@ output "backup_policies_summary" {
       enabled = eon_backup_policy.high_frequency_backup.enabled
       type    = eon_backup_policy.high_frequency_backup.backup_policy_type
     }
+    multi_vault_backup = {
+      id      = eon_backup_policy.multi_vault_backup.id
+      name    = eon_backup_policy.multi_vault_backup.name
+      enabled = eon_backup_policy.multi_vault_backup.enabled
+      type    = eon_backup_policy.multi_vault_backup.backup_policy_type
+    }
   }
 }
 ```
@@ -85,12 +121,12 @@ output "backup_policies_summary" {
 - `enabled` (Boolean) Whether the backup policy is enabled
 - `name` (String) Display name for the backup policy
 - `resource_selection_mode` (String) Resource selection mode: 'ALL', 'NONE', or 'CONDITIONAL'
-- `retention_days` (Number) Number of days to retain backups
 - `schedule_frequency` (String) Frequency for the backup schedule. For STANDARD and PITR: 'DAILY', 'INTERVAL', 'WEEKLY', 'MONTHLY', 'ANNUALLY'. For HIGH_FREQUENCY: 'INTERVAL', 'DAILY', 'WEEKLY', 'MONTHLY', 'ANNUALLY'
-- `vault_id` (String) Vault ID to associate with the backup policy
 
 ### Optional
 
+- `backup_schedules` (Block List) List of backup schedules, each containing a vault_id and retention_days (see [below for nested schema](#nestedblock--backup_schedules))
+- `conditional_expression` (Attributes) Conditional expression for CONDITIONAL resource selection mode (see [below for nested schema](#nestedatt--conditional_expression))
 - `high_frequency_resource_types` (List of String) List of resource types for HIGH_FREQUENCY backup policies. Supported values: 'AWS_S3', 'AWS_DYNAMO_DB'. Required for HIGH_FREQUENCY policies.
 - `interval_minutes` (Number) Interval in minutes for backup schedule. For HIGH_FREQUENCY INTERVAL: any minute value. For STANDARD/PITR INTERVAL: will be converted to hours and must result in 6, 8, or 12 hours (360, 480, or 720 minutes).
 - `resource_exclusion_override` (List of String) List of resource IDs to exclude regardless of selection mode
@@ -104,3 +140,52 @@ output "backup_policies_summary" {
 - `created_at` (String) Creation timestamp
 - `id` (String) Backup policy identifier
 - `updated_at` (String) Last update timestamp
+
+<a id="nestedblock--backup_schedules"></a>
+### Nested Schema for `backup_schedules`
+
+Required:
+
+- `retention_days` (Number) Number of days to retain backups for this schedule
+- `vault_id` (String) Vault ID to associate with the backup schedule
+
+
+<a id="nestedatt--conditional_expression"></a>
+### Nested Schema for `conditional_expression`
+
+Required:
+
+- `group` (Attributes) Group condition with logical operator and operands (see [below for nested schema](#nestedatt--conditional_expression--group))
+
+<a id="nestedatt--conditional_expression--group"></a>
+### Nested Schema for `conditional_expression.group`
+
+Required:
+
+- `operands` (Attributes List) List of conditions (see [below for nested schema](#nestedatt--conditional_expression--group--operands))
+- `operator` (String) Logical operator: 'AND' or 'OR'
+
+<a id="nestedatt--conditional_expression--group--operands"></a>
+### Nested Schema for `conditional_expression.group.operands`
+
+Optional:
+
+- `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--conditional_expression--group--operands--environment))
+- `resource_type` (Attributes) Resource type condition (see [below for nested schema](#nestedatt--conditional_expression--group--operands--resource_type))
+
+<a id="nestedatt--conditional_expression--group--operands--environment"></a>
+### Nested Schema for `conditional_expression.group.operands.environment`
+
+Required:
+
+- `environments` (List of String) List of environments (e.g., 'PROD', 'DEV', 'STAGING')
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--conditional_expression--group--operands--resource_type"></a>
+### Nested Schema for `conditional_expression.group.operands.resource_type`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `resource_types` (List of String) List of resource types (e.g., 'AWS_EC2', 'AWS_S3')

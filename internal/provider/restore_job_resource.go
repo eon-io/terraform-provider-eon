@@ -62,7 +62,7 @@ type EbsRestoreConfig struct {
 	ProviderVolumeId           types.String `tfsdk:"provider_volume_id"`
 	AvailabilityZone           types.String `tfsdk:"availability_zone"`
 	VolumeType                 types.String `tfsdk:"volume_type"`
-	VolumeSize                 types.Int64  `tfsdk:"volume_size"`
+	VolumeSize                 types.Int64  `tfsdk:"volume_size"` // Size in bytes
 	Iops                       types.Int64  `tfsdk:"iops"`
 	Throughput                 types.Int64  `tfsdk:"throughput"`
 	Description                types.String `tfsdk:"description"`
@@ -113,7 +113,7 @@ type S3FileRestoreConfig struct {
 type VolumeRestoreParam struct {
 	ProviderVolumeId types.String `tfsdk:"provider_volume_id"`
 	VolumeType       types.String `tfsdk:"volume_type"`
-	VolumeSize       types.Int64  `tfsdk:"volume_size"`
+	VolumeSize       types.Int64  `tfsdk:"volume_size"` // Size in bytes
 	Iops             types.Int64  `tfsdk:"iops"`
 	Throughput       types.Int64  `tfsdk:"throughput"`
 	Description      types.String `tfsdk:"description"`
@@ -217,7 +217,7 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 						Optional:            true,
 					},
 					"volume_size": schema.Int64Attribute{
-						MarkdownDescription: "Volume size in GiB",
+						MarkdownDescription: "Volume size in bytes",
 						Optional:            true,
 					},
 					"iops": schema.Int64Attribute{
@@ -289,7 +289,7 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 									Optional:            true,
 								},
 								"volume_size": schema.Int64Attribute{
-									MarkdownDescription: "Volume size in GiB",
+									MarkdownDescription: "Volume size in bytes",
 									Optional:            true,
 								},
 								"iops": schema.Int64Attribute{

@@ -96,6 +96,12 @@ resource "eon_backup_policy" "daily_production" {
   resource_selection_mode = "ALL"
   backup_policy_type      = "STANDARD"
   
+  vault_id           = "vault-12345678-1234-1234-1234-123456789012"
+  schedule_frequency = "DAILY"
+  time_of_day_hour   = 2
+  time_of_day_minutes = 0
+  retention_days     = 30
+  
   resource_inclusion_override = []
   resource_exclusion_override = []
 }
@@ -133,7 +139,6 @@ Manages source accounts for backup operations.
 - `cloud_provider` (Required) - Cloud provider (AWS, AZURE, GCP)
 - `provider_account_id` (Required) - Cloud provider account ID
 - `role` (Required) - IAM role ARN (AWS), service principal (Azure), or service account email (GCP)
-- `external_id` (Optional) - External ID for AWS role assumption
 
 **Attributes:**
 - `id` - Source account identifier
@@ -150,7 +155,6 @@ Manages restore accounts for restore operations.
 - `cloud_provider` (Required) - Cloud provider (AWS, AZURE, GCP)
 - `provider_account_id` (Required) - Cloud provider account ID
 - `role` (Required) - IAM role ARN (AWS), service principal (Azure), or service account email (GCP)
-- `external_id` (Optional) - External ID for AWS role assumption
 
 **Attributes:**
 - `id` - Restore account identifier
@@ -167,6 +171,9 @@ Manages backup policies for automated backup operations.
 - `enabled` (Required) - Whether the backup policy is enabled
 - `resource_selection_mode` (Required) - Resource selection mode: 'ALL', 'NONE', or 'CONDITIONAL'
 - `backup_policy_type` (Required) - Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', or 'PITR'
+- `vault_id` (Required) - Vault ID to associate with the backup policy
+- `schedule_frequency` (Required) - Frequency for the backup schedule
+- `retention_days` (Required) - Number of days to retain backups
 - `resource_inclusion_override` (Optional) - List of resource IDs to include regardless of selection mode
 - `resource_exclusion_override` (Optional) - List of resource IDs to exclude regardless of selection mode
 

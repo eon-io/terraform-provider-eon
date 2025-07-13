@@ -33,7 +33,6 @@ type SourceAccountResourceModel struct {
 	ProviderAccountId types.String `tfsdk:"provider_account_id"`
 	CloudProvider     types.String `tfsdk:"cloud_provider"`
 	Role              types.String `tfsdk:"role"`
-	ExternalId        types.String `tfsdk:"external_id"`
 	Status            types.String `tfsdk:"status"`
 	CreatedAt         types.String `tfsdk:"created_at"`
 	UpdatedAt         types.String `tfsdk:"updated_at"`
@@ -69,11 +68,6 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 			"role": schema.StringAttribute{
 				MarkdownDescription: "Role ARN for AWS accounts",
 				Required:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"external_id": schema.StringAttribute{
-				MarkdownDescription: "External ID for AWS role assumption",
-				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"status": schema.StringAttribute{
@@ -161,6 +155,7 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 
 	tflog.Debug(ctx, "Source account connected", map[string]interface{}{
 		"id":     data.Id.ValueString(),
+		"name":   data.Name.ValueString(),
 		"status": data.Status.ValueString(),
 	})
 

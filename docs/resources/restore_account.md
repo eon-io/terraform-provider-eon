@@ -19,7 +19,6 @@ resource "eon_restore_account" "aws_disaster_recovery" {
   cloud_provider      = "AWS"
   provider_account_id = "555666777888"
   role                = "arn:aws:iam::555666777888:role/EonRestoreRole"
-  external_id         = "unique-restore-external-id-456" # Optional
 }
 
 # Example: Connect an AWS restore account for testing
@@ -53,10 +52,6 @@ output "aws_disaster_recovery_account" {
 - `name` (String) Display name for the restore account
 - `provider_account_id` (String) Cloud provider account ID (e.g., AWS account ID)
 - `role` (String) Role ARN for AWS accounts
-
-### Optional
-
-- `external_id` (String) External ID for AWS role assumption
 
 ### Read-Only
 

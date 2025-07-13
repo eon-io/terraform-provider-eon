@@ -234,7 +234,7 @@ Optional:
 - `tags` (Map of String) Tags to apply to restored volume
 - `throughput` (Number) Throughput for gp3 volumes
 - `volume_encryption_key_id` (String) KMS key ID for volume encryption
-- `volume_size` (Number) Volume size in GiB
+- `volume_size` (Number) Volume size in bytes
 - `volume_type` (String) EBS volume type (gp2, gp3, io1, io2, etc.)
 
 
@@ -260,7 +260,7 @@ Optional:
 - `kms_key_id` (String) KMS key ID for volume encryption
 - `provider_volume_id` (String) Original volume ID from the snapshot
 - `throughput` (Number) Throughput for gp3 volumes
-- `volume_size` (Number) Volume size in GiB
+- `volume_size` (Number) Volume size in bytes
 - `volume_type` (String) EBS volume type (gp2, gp3, io1, io2, etc.)
 
 
