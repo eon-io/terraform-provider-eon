@@ -7,12 +7,15 @@ import (
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 	"github.com/eon-io/terraform-provider-eon/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -34,17 +37,46 @@ type BackupPolicyResourceModel struct {
 	ResourceSelectionMode      types.String `tfsdk:"resource_selection_mode"`
 	ResourceInclusionOverride  types.List   `tfsdk:"resource_inclusion_override"`
 	ResourceExclusionOverride  types.List   `tfsdk:"resource_exclusion_override"`
+	ConditionalExpression      types.Object `tfsdk:"conditional_expression"`
 	BackupPolicyType           types.String `tfsdk:"backup_policy_type"`
-	VaultId                    types.String `tfsdk:"vault_id"`
+	BackupSchedules            types.List   `tfsdk:"backup_schedules"`
 	ScheduleFrequency          types.String `tfsdk:"schedule_frequency"`
 	TimeOfDayHour              types.Int64  `tfsdk:"time_of_day_hour"`
 	TimeOfDayMinutes           types.Int64  `tfsdk:"time_of_day_minutes"`
-	RetentionDays              types.Int64  `tfsdk:"retention_days"`
 	IntervalMinutes            types.Int64  `tfsdk:"interval_minutes"`
 	StartWindowMinutes         types.Int64  `tfsdk:"start_window_minutes"`
 	HighFrequencyResourceTypes types.List   `tfsdk:"high_frequency_resource_types"`
 	CreatedAt                  types.String `tfsdk:"created_at"`
 	UpdatedAt                  types.String `tfsdk:"updated_at"`
+}
+
+type BackupScheduleModel struct {
+	VaultId       types.String `tfsdk:"vault_id"`
+	RetentionDays types.Int64  `tfsdk:"retention_days"`
+}
+
+type ConditionalExpressionModel struct {
+	Group types.Object `tfsdk:"group"`
+}
+
+type GroupConditionModel struct {
+	Operator types.String `tfsdk:"operator"`
+	Operands types.List   `tfsdk:"operands"`
+}
+
+type OperandModel struct {
+	ResourceType types.Object `tfsdk:"resource_type"`
+	Environment  types.Object `tfsdk:"environment"`
+}
+
+type ResourceTypeConditionModel struct {
+	Operator      types.String `tfsdk:"operator"`
+	ResourceTypes types.List   `tfsdk:"resource_types"`
+}
+
+type EnvironmentConditionModel struct {
+	Operator     types.String `tfsdk:"operator"`
+	Environments types.List   `tfsdk:"environments"`
 }
 
 func (r *BackupPolicyResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -82,12 +114,62 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 				ElementType:         types.StringType,
 				Optional:            true,
 			},
+			"conditional_expression": schema.SingleNestedAttribute{
+				MarkdownDescription: "Conditional expression for CONDITIONAL resource selection mode",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"group": schema.SingleNestedAttribute{
+						MarkdownDescription: "Group condition with logical operator and operands",
+						Required:            true,
+						Attributes: map[string]schema.Attribute{
+							"operator": schema.StringAttribute{
+								MarkdownDescription: "Logical operator: 'AND' or 'OR'",
+								Required:            true,
+							},
+							"operands": schema.ListNestedAttribute{
+								MarkdownDescription: "List of conditions",
+								Required:            true,
+								NestedObject: schema.NestedAttributeObject{
+									Attributes: map[string]schema.Attribute{
+										"resource_type": schema.SingleNestedAttribute{
+											MarkdownDescription: "Resource type condition",
+											Optional:            true,
+											Attributes: map[string]schema.Attribute{
+												"operator": schema.StringAttribute{
+													MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+													Required:            true,
+												},
+												"resource_types": schema.ListAttribute{
+													MarkdownDescription: "List of resource types (e.g., 'AWS_EC2', 'AWS_S3')",
+													ElementType:         types.StringType,
+													Required:            true,
+												},
+											},
+										},
+										"environment": schema.SingleNestedAttribute{
+											MarkdownDescription: "Environment condition",
+											Optional:            true,
+											Attributes: map[string]schema.Attribute{
+												"operator": schema.StringAttribute{
+													MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+													Required:            true,
+												},
+												"environments": schema.ListAttribute{
+													MarkdownDescription: "List of environments (e.g., 'PROD', 'DEV', 'STAGING')",
+													ElementType:         types.StringType,
+													Required:            true,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 			"backup_policy_type": schema.StringAttribute{
 				MarkdownDescription: "Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', or 'PITR'",
-				Required:            true,
-			},
-			"vault_id": schema.StringAttribute{
-				MarkdownDescription: "Vault ID to associate with the backup policy",
 				Required:            true,
 			},
 			"schedule_frequency": schema.StringAttribute{
@@ -101,10 +183,6 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 			"time_of_day_minutes": schema.Int64Attribute{
 				MarkdownDescription: "Minutes of the hour for the backup schedule (0-59). Used for DAILY, WEEKLY, MONTHLY, and ANNUALLY frequencies",
 				Optional:            true,
-			},
-			"retention_days": schema.Int64Attribute{
-				MarkdownDescription: "Number of days to retain backups",
-				Required:            true,
 			},
 			"interval_minutes": schema.Int64Attribute{
 				MarkdownDescription: "Interval in minutes for backup schedule. For HIGH_FREQUENCY INTERVAL: any minute value. For STANDARD/PITR INTERVAL: will be converted to hours and must result in 6, 8, or 12 hours (360, 480, or 720 minutes).",
@@ -126,6 +204,26 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "Last update timestamp",
 				Computed:            true,
+			},
+		},
+		Blocks: map[string]schema.Block{
+			"backup_schedules": schema.ListNestedBlock{
+				MarkdownDescription: "List of backup schedules, each containing a vault_id and retention_days",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"vault_id": schema.StringAttribute{
+							MarkdownDescription: "Vault ID to associate with the backup schedule",
+							Required:            true,
+						},
+						"retention_days": schema.Int64Attribute{
+							MarkdownDescription: "Number of days to retain backups for this schedule",
+							Required:            true,
+						},
+					},
+				},
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
 			},
 		},
 	}
@@ -156,6 +254,15 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 	resourceSelector := externalEonSdkAPI.NewBackupPolicyResourceSelector(
 		externalEonSdkAPI.ResourceSelectorMode(data.ResourceSelectionMode.ValueString()),
 	)
+
+	if data.ResourceSelectionMode.ValueString() == "CONDITIONAL" && !data.ConditionalExpression.IsNull() {
+		expression, err := createBackupPolicyExpression(ctx, &data)
+		if err != nil {
+			resp.Diagnostics.AddError("Invalid Conditional Expression", fmt.Sprintf("Failed to create conditional expression: %s", err))
+			return
+		}
+		resourceSelector.SetExpression(*expression)
+	}
 
 	if !data.ResourceInclusionOverride.IsNull() {
 		var inclusionOverride []string
@@ -192,25 +299,33 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 			return
 		}
 
-		retentionDays, err := SafeInt32Conversion(data.RetentionDays.ValueInt64())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Invalid Retention Days",
-				fmt.Sprintf("Failed to validate retention days: %s", err),
-			)
+		var backupSchedules []externalEonSdkAPI.StandardBackupSchedules
+		var schedules []BackupScheduleModel
+		diags := data.BackupSchedules.ElementsAs(ctx, &schedules, false)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
 			return
 		}
 
-		backupSchedule := externalEonSdkAPI.NewStandardBackupSchedules(
-			data.VaultId.ValueString(),
-			*scheduleConfig,
-			retentionDays,
-		)
+		for _, schedule := range schedules {
+			retentionDays, err := SafeInt32Conversion(schedule.RetentionDays.ValueInt64())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Invalid Retention Days",
+					fmt.Sprintf("Failed to validate retention days: %s", err),
+				)
+				return
+			}
 
-		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(
-			[]externalEonSdkAPI.StandardBackupSchedules{*backupSchedule},
-		)
+			backupSchedule := externalEonSdkAPI.NewStandardBackupSchedules(
+				schedule.VaultId.ValueString(),
+				*scheduleConfig,
+				retentionDays,
+			)
+			backupSchedules = append(backupSchedules, *backupSchedule)
+		}
 
+		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(backupSchedules)
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
@@ -223,20 +338,31 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 			return
 		}
 
-		retentionDays, err := SafeInt32Conversion(data.RetentionDays.ValueInt64())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Invalid Retention Days",
-				fmt.Sprintf("Failed to validate retention days: %s", err),
-			)
+		var backupSchedules []externalEonSdkAPI.HighFrequencyBackupSchedules
+		var schedules []BackupScheduleModel
+		diags := data.BackupSchedules.ElementsAs(ctx, &schedules, false)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
 			return
 		}
 
-		backupSchedule := externalEonSdkAPI.NewHighFrequencyBackupSchedules(
-			data.VaultId.ValueString(),
-			*highFreqScheduleConfig,
-			retentionDays,
-		)
+		for _, schedule := range schedules {
+			retentionDays, err := SafeInt32Conversion(schedule.RetentionDays.ValueInt64())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Invalid Retention Days",
+					fmt.Sprintf("Failed to validate retention days: %s", err),
+				)
+				return
+			}
+
+			backupSchedule := externalEonSdkAPI.NewHighFrequencyBackupSchedules(
+				schedule.VaultId.ValueString(),
+				*highFreqScheduleConfig,
+				retentionDays,
+			)
+			backupSchedules = append(backupSchedules, *backupSchedule)
+		}
 
 		resourceTypes, err := createHighFrequencyResourceTypes(ctx, &data)
 		if err != nil {
@@ -245,7 +371,7 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		}
 		highFreqPlan := externalEonSdkAPI.NewHighFrequencyBackupPolicyPlan(
 			resourceTypes,
-			[]externalEonSdkAPI.HighFrequencyBackupSchedules{*backupSchedule},
+			backupSchedules,
 		)
 
 		backupPlan.SetHighFrequencyPlan(*highFreqPlan)
@@ -383,6 +509,15 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		externalEonSdkAPI.ResourceSelectorMode(data.ResourceSelectionMode.ValueString()),
 	)
 
+	if data.ResourceSelectionMode.ValueString() == "CONDITIONAL" && !data.ConditionalExpression.IsNull() {
+		expression, err := createBackupPolicyExpression(ctx, &data)
+		if err != nil {
+			resp.Diagnostics.AddError("Invalid Conditional Expression", fmt.Sprintf("Failed to create conditional expression: %s", err))
+			return
+		}
+		resourceSelector.SetExpression(*expression)
+	}
+
 	if !data.ResourceInclusionOverride.IsNull() {
 		var inclusionOverride []string
 		diags := data.ResourceInclusionOverride.ElementsAs(ctx, &inclusionOverride, false)
@@ -418,25 +553,33 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 			return
 		}
 
-		retentionDays, err := SafeInt32Conversion(data.RetentionDays.ValueInt64())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Invalid Retention Days",
-				fmt.Sprintf("Failed to validate retention days: %s", err),
-			)
+		var backupSchedules []externalEonSdkAPI.StandardBackupSchedules
+		var schedules []BackupScheduleModel
+		diags := data.BackupSchedules.ElementsAs(ctx, &schedules, false)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
 			return
 		}
 
-		backupSchedule := externalEonSdkAPI.NewStandardBackupSchedules(
-			data.VaultId.ValueString(),
-			*scheduleConfig,
-			retentionDays,
-		)
+		for _, schedule := range schedules {
+			retentionDays, err := SafeInt32Conversion(schedule.RetentionDays.ValueInt64())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Invalid Retention Days",
+					fmt.Sprintf("Failed to validate retention days: %s", err),
+				)
+				return
+			}
 
-		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(
-			[]externalEonSdkAPI.StandardBackupSchedules{*backupSchedule},
-		)
+			backupSchedule := externalEonSdkAPI.NewStandardBackupSchedules(
+				schedule.VaultId.ValueString(),
+				*scheduleConfig,
+				retentionDays,
+			)
+			backupSchedules = append(backupSchedules, *backupSchedule)
+		}
 
+		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(backupSchedules)
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
@@ -449,20 +592,31 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 			return
 		}
 
-		retentionDays, err := SafeInt32Conversion(data.RetentionDays.ValueInt64())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Invalid Retention Days",
-				fmt.Sprintf("Failed to validate retention days: %s", err),
-			)
+		var backupSchedules []externalEonSdkAPI.HighFrequencyBackupSchedules
+		var schedules []BackupScheduleModel
+		diags := data.BackupSchedules.ElementsAs(ctx, &schedules, false)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
 			return
 		}
 
-		backupSchedule := externalEonSdkAPI.NewHighFrequencyBackupSchedules(
-			data.VaultId.ValueString(),
-			*highFreqScheduleConfig,
-			retentionDays,
-		)
+		for _, schedule := range schedules {
+			retentionDays, err := SafeInt32Conversion(schedule.RetentionDays.ValueInt64())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Invalid Retention Days",
+					fmt.Sprintf("Failed to validate retention days: %s", err),
+				)
+				return
+			}
+
+			backupSchedule := externalEonSdkAPI.NewHighFrequencyBackupSchedules(
+				schedule.VaultId.ValueString(),
+				*highFreqScheduleConfig,
+				retentionDays,
+			)
+			backupSchedules = append(backupSchedules, *backupSchedule)
+		}
 
 		resourceTypes, err := createHighFrequencyResourceTypes(ctx, &data)
 		if err != nil {
@@ -471,7 +625,7 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 		highFreqPlan := externalEonSdkAPI.NewHighFrequencyBackupPolicyPlan(
 			resourceTypes,
-			[]externalEonSdkAPI.HighFrequencyBackupSchedules{*backupSchedule},
+			backupSchedules,
 		)
 
 		backupPlan.SetHighFrequencyPlan(*highFreqPlan)
@@ -870,4 +1024,98 @@ func createHighFrequencyScheduleConfig(data *BackupPolicyResourceModel) (*extern
 	}
 
 	return highFreqScheduleConfig, nil
+}
+
+func createBackupPolicyExpression(ctx context.Context, data *BackupPolicyResourceModel) (*externalEonSdkAPI.BackupPolicyExpression, error) {
+	if data.ConditionalExpression.IsNull() {
+		return nil, fmt.Errorf("conditional_expression is required for CONDITIONAL resource selection mode")
+	}
+
+	var conditionalExpr ConditionalExpressionModel
+	diags := data.ConditionalExpression.As(ctx, &conditionalExpr, basetypes.ObjectAsOptions{})
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to parse conditional_expression")
+	}
+
+	if conditionalExpr.Group.IsNull() {
+		return nil, fmt.Errorf("group is required in conditional_expression")
+	}
+
+	var groupCondition GroupConditionModel
+	diags = conditionalExpr.Group.As(ctx, &groupCondition, basetypes.ObjectAsOptions{})
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to parse group condition")
+	}
+
+	logicalOperator := externalEonSdkAPI.LogicalOperator(groupCondition.Operator.ValueString())
+
+	var operands []OperandModel
+	diags = groupCondition.Operands.ElementsAs(ctx, &operands, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to parse operands")
+	}
+
+	var expressions []externalEonSdkAPI.BackupPolicyExpression
+	for _, operand := range operands {
+		expr := externalEonSdkAPI.NewBackupPolicyExpression()
+
+		if !operand.ResourceType.IsNull() {
+			var resourceTypeCond ResourceTypeConditionModel
+			diags = operand.ResourceType.As(ctx, &resourceTypeCond, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, fmt.Errorf("failed to parse resource_type condition")
+			}
+
+			var resourceTypes []string
+			diags = resourceTypeCond.ResourceTypes.ElementsAs(ctx, &resourceTypes, false)
+			if diags.HasError() {
+				return nil, fmt.Errorf("failed to parse resource_types")
+			}
+
+			var resourceTypeEnums []externalEonSdkAPI.ResourceType
+			for _, rt := range resourceTypes {
+				resourceTypeEnums = append(resourceTypeEnums, externalEonSdkAPI.ResourceType(rt))
+			}
+
+			resourceTypeCondition := externalEonSdkAPI.NewResourceTypeCondition(
+				externalEonSdkAPI.ScalarOperators(resourceTypeCond.Operator.ValueString()),
+				resourceTypeEnums,
+			)
+			expr.SetResourceType(*resourceTypeCondition)
+		}
+
+		if !operand.Environment.IsNull() {
+			var environmentCond EnvironmentConditionModel
+			diags = operand.Environment.As(ctx, &environmentCond, basetypes.ObjectAsOptions{})
+			if diags.HasError() {
+				return nil, fmt.Errorf("failed to parse environment condition")
+			}
+
+			var environments []string
+			diags = environmentCond.Environments.ElementsAs(ctx, &environments, false)
+			if diags.HasError() {
+				return nil, fmt.Errorf("failed to parse environments")
+			}
+
+			var environmentEnums []externalEonSdkAPI.Environment
+			for _, env := range environments {
+				environmentEnums = append(environmentEnums, externalEonSdkAPI.Environment(env))
+			}
+
+			environmentCondition := externalEonSdkAPI.NewEnvironmentCondition(
+				externalEonSdkAPI.ScalarOperators(environmentCond.Operator.ValueString()),
+				environmentEnums,
+			)
+			expr.SetEnvironment(*environmentCondition)
+		}
+
+		expressions = append(expressions, *expr)
+	}
+
+	groupConditionApi := externalEonSdkAPI.NewBackupPolicyGroupCondition(logicalOperator, expressions)
+
+	mainExpression := externalEonSdkAPI.NewBackupPolicyExpression()
+	mainExpression.SetGroup(*groupConditionApi)
+
+	return mainExpression, nil
 }

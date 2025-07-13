@@ -3,12 +3,12 @@
 page_title: "eon_restore_job Resource - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Triggers a restore job to restore data from an Eon snapshot. This operation is asynchronous and returns a job ID that can be used to track the progress of the restore job.
+  Eon restore job resource - supports EBS volume restore operations
 ---
 
 # eon_restore_job (Resource)
 
-Triggers a restore job to restore data from an Eon snapshot. This operation is asynchronous and returns a job ID that can be used to track the progress of the restore job.
+Eon restore job resource - supports EBS volume restore operations
 
 ## Example Usage
 
@@ -195,47 +195,47 @@ output "s3_files_restore_info" {
 
 ### Required
 
-- `restore_account_id` (String) Eon-assigned ID of the restore account.
-- `restore_type` (String) Type of restore job: `full` for full resource restore, `partial` for partial restore.
-- `snapshot_id` (String) ID of the Eon snapshot to restore from.
+- `restore_account_id` (String) Eon restore account ID
+- `restore_type` (String) Type of restore job: 'full' for full resource restore, 'partial' for partial restore
+- `snapshot_id` (String) Eon snapshot ID to restore from
 
 ### Optional
 
-- `ebs_config` (Block, Optional) EBS volume restore configuration. Required when restoring AWS EC2 volume with `partial` restore type. (see [below for nested schema](#nestedblock--ebs_config))
-- `ec2_config` (Block, Optional) EC2 instance restore configuration. Required when restoring AWS EC2 instance with `full` restore type. (see [below for nested schema](#nestedblock--ec2_config))
-- `rds_config` (Block, Optional) RDS database restore configuration. Required when restoring AWS RDS database. (see [below for nested schema](#nestedblock--rds_config))
-- `resource_id` (String) Eon-assigned ID of the resource to restore from (defaults to snapshot_id if not provided).
-- `s3_bucket_config` (Block, Optional) S3 bucket restore configuration. Required when restoring AWS S3 bucket with `full` restore type. (see [below for nested schema](#nestedblock--s3_bucket_config))
-- `s3_file_config` (Block, Optional) S3 file restore configuration. Required when restoring AWS S3 files with partial restore type. (see [below for nested schema](#nestedblock--s3_file_config))
-- `timeout_minutes` (Number) Timeout in minutes for restore operation.
-- `wait_for_completion` (Boolean) Whether to wait for completion.
+- `ebs_config` (Block, Optional) EBS volume restore configuration (required when restoring AWS EC2 volume with partial restore) (see [below for nested schema](#nestedblock--ebs_config))
+- `ec2_config` (Block, Optional) EC2 instance restore configuration (required when restoring AWS EC2 instance with full restore) (see [below for nested schema](#nestedblock--ec2_config))
+- `rds_config` (Block, Optional) RDS database restore configuration (required when restoring AWS RDS database) (see [below for nested schema](#nestedblock--rds_config))
+- `resource_id` (String) Eon resource ID to restore from (defaults to snapshot_id if not provided)
+- `s3_bucket_config` (Block, Optional) S3 bucket restore configuration (required when restoring AWS S3 bucket with full restore) (see [below for nested schema](#nestedblock--s3_bucket_config))
+- `s3_file_config` (Block, Optional) S3 file restore configuration (required when restoring AWS S3 files with partial restore) (see [below for nested schema](#nestedblock--s3_file_config))
+- `timeout_minutes` (Number) Timeout in minutes for restore operation
+- `wait_for_completion` (Boolean) Whether to wait for completion
 
 ### Read-Only
 
-- `completed_at` (String) Date and time the job finished.
-- `created_at` (String) Date and time the job was created.
-- `duration_seconds` (Number) How long the job took, in seconds.
-- `id` (String) Restore job ID.
-- `job_id` (String) Job ID.
-- `started_at` (String) Date and time the job started.
-- `status` (String) Current status of the restore job. Possible values: `JOB_UNSPECIFIED`, `JOB_PENDING`, `JOB_RUNNING`, `JOB_COMPLETED`, `JOB_FAILED`, `JOB_PARTIAL`.
-- `status_message` (String) Message that gives additional details about the job status, if applicable.
+- `completed_at` (String) Job completion timestamp
+- `created_at` (String) Job creation timestamp
+- `duration_seconds` (Number) Job duration in seconds
+- `id` (String) Terraform resource identifier (same as job_id)
+- `job_id` (String) Restore job ID
+- `started_at` (String) Job start timestamp
+- `status` (String) Current status of the restore job
+- `status_message` (String) Status message with additional details
 
 <a id="nestedblock--ebs_config"></a>
 ### Nested Schema for `ebs_config`
 
 Optional:
 
-- `availability_zone` (String) Availability zone to restore the volume to.
-- `description` (String) Description to apply to the restored volume.
-- `environment_encryption_key_id` (String) KMS key ID for environment encryption.
-- `iops` (Number) IOPS for volume (required for io1/io2).
-- `provider_volume_id` (String) Cloud-provider-assigned ID of the volume to restore.
-- `tags` (Map of String) Tags to apply to the restored volume as key-value pairs, where key and value are both strings.
-- `throughput` (Number) Throughput for gp3 volumes.
-- `volume_encryption_key_id` (String) ID of the KMS key you want Eon to use for encrypting the restored volume.
-- `volume_size` (Number) Volume size in GiB.
-- `volume_type` (String) EBS volume type (gp2, gp3, io1, io2, etc.).
+- `availability_zone` (String) AWS availability zone for restored volume
+- `description` (String) Description for restored volume
+- `environment_encryption_key_id` (String) KMS key ID for environment encryption
+- `iops` (Number) IOPS for volume (required for io1/io2)
+- `provider_volume_id` (String) AWS volume ID to restore (e.g., vol-12345678)
+- `tags` (Map of String) Tags to apply to restored volume
+- `throughput` (Number) Throughput for gp3 volumes
+- `volume_encryption_key_id` (String) KMS key ID for volume encryption
+- `volume_size` (Number) Volume size in bytes
+- `volume_type` (String) EBS volume type (gp2, gp3, io1, io2, etc.)
 
 
 <a id="nestedblock--ec2_config"></a>
@@ -243,25 +243,25 @@ Optional:
 
 Optional:
 
-- `instance_type` (String) Instance type to use for the restored instance.
-- `region` (String) Region to restore the instance to.
-- `security_group_ids` (List of String) List of security group IDs to associate with the restored instance.
-- `subnet_id` (String) Subnet ID to associate with the restored instance.
-- `tags` (Map of String) Tags to apply to the restored instance as key-value pairs, where key and value are both strings.
-- `volume_restore_params` (Block List) Volumes to restore and attach to the restored instance. Each item corresponds to a volume to be restored, where `provider_volume_id` matches the volume's ID at the time of the snapshot. The root volume must be present in the list. (see [below for nested schema](#nestedblock--ec2_config--volume_restore_params))
+- `instance_type` (String) Instance type to use for the restored instance
+- `region` (String) AWS region to restore the instance to
+- `security_group_ids` (List of String) List of security group IDs to associate with the restored instance
+- `subnet_id` (String) Subnet ID to associate with the restored instance
+- `tags` (Map of String) Tags to apply to the restored instance
+- `volume_restore_params` (Block List) Volume restore parameters for the instance (see [below for nested schema](#nestedblock--ec2_config--volume_restore_params))
 
 <a id="nestedblock--ec2_config--volume_restore_params"></a>
 ### Nested Schema for `ec2_config.volume_restore_params`
 
 Optional:
 
-- `description` (String) Optional description for the restored volume.
-- `iops` (Number) IOPS for volume (required for io1/io2).
-- `kms_key_id` (String) ARN of the KMS key for encrypting the restored volume.
-- `provider_volume_id` (String) Cloud-provider-assigned ID of the volume to restore.
-- `throughput` (Number) Throughput for gp3 volumes.
-- `volume_size` (Number) Volume size in GiB.
-- `volume_type` (String) EBS volume type (gp2, gp3, io1, io2, etc.).
+- `description` (String) Description for the restored volume
+- `iops` (Number) IOPS for volume (required for io1/io2)
+- `kms_key_id` (String) KMS key ID for volume encryption
+- `provider_volume_id` (String) Original volume ID from the snapshot
+- `throughput` (Number) Throughput for gp3 volumes
+- `volume_size` (Number) Volume size in bytes
+- `volume_type` (String) EBS volume type (gp2, gp3, io1, io2, etc.)
 
 
 
@@ -270,20 +270,20 @@ Optional:
 
 Optional:
 
-- `allocated_storage` (Number) Allocated storage in GiB.
-- `backup_retention_period` (Number) Backup retention period in days.
-- `db_instance_class` (String) DB instance class (for example, db.t3.micro).
-- `db_instance_identifier` (String) Name to assign to the restored resource.
-- `engine` (String) Database engine (for example, mysql, postgres).
-- `kms_key_id` (String) ID of the key you want Eon to use for encrypting the restored resource.
-- `multi_az` (Boolean) Whether to enable Multi-AZ deployment.
-- `publicly_accessible` (Boolean) Whether the database is publicly accessible.
-- `region` (String) Region to restore to.
-- `storage_encrypted` (Boolean) Whether to enable storage encryption.
-- `storage_type` (String) Storage type (gp2, gp3, io1, etc.).
-- `subnet_group_name` (String) Subnet group ID to associate with the restored resource. Must be in the same VPC of `vpc_security_group_ids`.
-- `tags` (Map of String) Tags to apply to the restored instance as key-value pairs, where key and value are both strings.
-- `vpc_security_group_ids` (List of String) List of security group IDs to associate with the restored resource. Must be in the same VPC of `subnet_group_name`.
+- `allocated_storage` (Number) Allocated storage in GiB
+- `backup_retention_period` (Number) Backup retention period in days
+- `db_instance_class` (String) DB instance class (e.g., db.t3.micro)
+- `db_instance_identifier` (String) DB instance identifier
+- `engine` (String) Database engine (e.g., mysql, postgres)
+- `kms_key_id` (String) KMS key ID for encryption
+- `multi_az` (Boolean) Whether to enable Multi-AZ deployment
+- `publicly_accessible` (Boolean) Whether the database is publicly accessible
+- `region` (String) AWS region to restore the database to
+- `storage_encrypted` (Boolean) Whether to enable storage encryption
+- `storage_type` (String) Storage type (gp2, gp3, io1, etc.)
+- `subnet_group_name` (String) DB subnet group name
+- `tags` (Map of String) Tags to apply to the restored database
+- `vpc_security_group_ids` (List of String) List of VPC security group IDs
 
 
 <a id="nestedblock--s3_bucket_config"></a>
@@ -291,9 +291,9 @@ Optional:
 
 Optional:
 
-- `bucket_name` (String) Name of an existing bucket to restore the data to.
-- `key_prefix` (String) Prefix to add to the restore path. If you don't specify a prefix, the files are restored to their respective folders in the original file tree, starting from the root of the bucket.
-- `kms_key_id` (String) ID of the key you want Eon to use for encrypting the restored files.
+- `bucket_name` (String) S3 bucket name to restore to
+- `key_prefix` (String) Key prefix for restored objects
+- `kms_key_id` (String) KMS key ID for encryption
 
 
 <a id="nestedblock--s3_file_config"></a>
@@ -301,15 +301,15 @@ Optional:
 
 Optional:
 
-- `bucket_name` (String) Name of an existing bucket to restore the files to.
-- `files` (Block List) List of file paths to restore. (see [below for nested schema](#nestedblock--s3_file_config--files))
-- `key_prefix` (String) Prefix to add to the restore path. If you don't specify a prefix, the files are restored to their respective folders in the original file tree, starting from the root of the bucket.
-- `kms_key_id` (String) ID of the key you want Eon to use for encrypting the restored files.
+- `bucket_name` (String) S3 bucket name to restore to
+- `files` (Block List) List of files to restore (see [below for nested schema](#nestedblock--s3_file_config--files))
+- `key_prefix` (String) Key prefix for restored objects
+- `kms_key_id` (String) KMS key ID for encryption
 
 <a id="nestedblock--s3_file_config--files"></a>
 ### Nested Schema for `s3_file_config.files`
 
 Optional:
 
-- `is_directory` (Boolean) Whether `path` is a directory. If `true`, Eon restores all files in all subdirectories under the path. If `false`, Eon restores only the file at the path.
-- `path` (String) Absolute path to the file or directory to restore.
+- `is_directory` (Boolean) Whether the path is a directory (true) or file (false)
+- `path` (String) File path to restore

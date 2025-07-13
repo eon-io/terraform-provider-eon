@@ -3,12 +3,12 @@
 page_title: "eon_restore_account Resource - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Connects a restore account to the Eon project.
+  Eon restore account resource for connecting/disconnecting restore accounts
 ---
 
 # eon_restore_account (Resource)
 
-Connects a restore account to the Eon project.
+Eon restore account resource for connecting/disconnecting restore accounts
 
 ## Example Usage
 
@@ -19,7 +19,6 @@ resource "eon_restore_account" "aws_disaster_recovery" {
   cloud_provider      = "AWS"
   provider_account_id = "555666777888"
   role                = "arn:aws:iam::555666777888:role/EonRestoreRole"
-  external_id         = "unique-restore-external-id-456" # Optional
 }
 
 # Example: Connect an AWS restore account for testing
@@ -49,18 +48,14 @@ output "aws_disaster_recovery_account" {
 
 ### Required
 
-- `cloud_provider` (String) Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.
-- `name` (String) Account display name in Eon.
-- `provider_account_id` (String) Cloud-provider-assigned account ID.
-- `role` (String) ARN of the role Eon assumes to access the account in AWS.
-
-### Optional
-
-- `external_id` (String) External ID for AWS role assumption.
+- `cloud_provider` (String) Cloud provider (AWS, AZURE, GCP)
+- `name` (String) Display name for the restore account
+- `provider_account_id` (String) Cloud provider account ID (e.g., AWS account ID)
+- `role` (String) Role ARN for AWS accounts
 
 ### Read-Only
 
-- `created_at` (String) Date and time the restore account was connected to the Eon project.
-- `id` (String) Eon-assigned restore account ID.
-- `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
-- `updated_at` (String) Date and time the restore account was last updated.
+- `created_at` (String) Creation timestamp
+- `id` (String) Restore account identifier
+- `status` (String) Connection status
+- `updated_at` (String) Last update timestamp

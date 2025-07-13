@@ -4,10 +4,9 @@ resource "eon_source_account" "aws_production" {
   cloud_provider      = "AWS"
   provider_account_id = "123456789012"
   role                = "arn:aws:iam::123456789012:role/EonBackupRole"
-  external_id         = "unique-external-id-123" # Optional
 }
 
-# Example: Connect an AWS source account without external ID
+# Example: Connect an AWS source account
 resource "eon_source_account" "aws_staging" {
   name                = "Staging AWS Account"
   cloud_provider      = "AWS"
