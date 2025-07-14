@@ -51,6 +51,11 @@ type StandardPlanModel struct {
 	BackupSchedules types.List `tfsdk:"backup_schedules"`
 }
 
+type HighFrequencyPlanModel struct {
+	ResourceTypes   types.List `tfsdk:"resource_types"`
+	BackupSchedules types.List `tfsdk:"backup_schedules"`
+}
+
 type BackupScheduleModel struct {
 	VaultId        types.String `tfsdk:"vault_id"`
 	RetentionDays  types.Int64  `tfsdk:"retention_days"`
@@ -70,7 +75,6 @@ type ExpressionModel struct {
 	DataClasses    types.Object `tfsdk:"data_classes"`
 	TagKeyValues   types.Object `tfsdk:"tag_key_values"`
 	TagKeys        types.Object `tfsdk:"tag_keys"`
-	TagValues      types.Object `tfsdk:"tag_values"`
 	ResourceNames  types.Object `tfsdk:"resource_names"`
 	ResourceIds    types.Object `tfsdk:"resource_ids"`
 	ResourceLabels types.Object `tfsdk:"resource_labels"`
@@ -92,8 +96,20 @@ type GroupConditionModel struct {
 }
 
 type OperandModel struct {
-	ResourceType types.Object `tfsdk:"resource_type"`
-	Environment  types.Object `tfsdk:"environment"`
+	ResourceType      types.Object `tfsdk:"resource_type"`
+	Environment       types.Object `tfsdk:"environment"`
+	TagKeys           types.Object `tfsdk:"tag_keys"`
+	TagKeyValues      types.Object `tfsdk:"tag_key_values"`
+	DataClasses       types.Object `tfsdk:"data_classes"`
+	Apps              types.Object `tfsdk:"apps"`
+	CloudProvider     types.Object `tfsdk:"cloud_provider"`
+	AccountId         types.Object `tfsdk:"account_id"`
+	SourceRegion      types.Object `tfsdk:"source_region"`
+	Vpc               types.Object `tfsdk:"vpc"`
+	Subnets           types.Object `tfsdk:"subnets"`
+	ResourceGroupName types.Object `tfsdk:"resource_group_name"`
+	ResourceName      types.Object `tfsdk:"resource_name"`
+	ResourceId        types.Object `tfsdk:"resource_id"`
 }
 
 type ResourceTypeConditionModel struct {
@@ -104,6 +120,71 @@ type ResourceTypeConditionModel struct {
 type EnvironmentConditionModel struct {
 	Operator     types.String `tfsdk:"operator"`
 	Environments types.List   `tfsdk:"environments"`
+}
+
+type TagKeyValuesConditionModel struct {
+	Operator     types.String `tfsdk:"operator"`
+	TagKeyValues types.List   `tfsdk:"tag_key_values"`
+}
+
+type TagKeyValueModel struct {
+	Key   types.String `tfsdk:"key"`
+	Value types.String `tfsdk:"value"`
+}
+
+type DataClassesConditionModel struct {
+	Operator    types.String `tfsdk:"operator"`
+	DataClasses types.List   `tfsdk:"data_classes"`
+}
+
+type AppsConditionModel struct {
+	Operator types.String `tfsdk:"operator"`
+	Apps     types.List   `tfsdk:"apps"`
+}
+
+type CloudProviderConditionModel struct {
+	Operator       types.String `tfsdk:"operator"`
+	CloudProviders types.List   `tfsdk:"cloud_providers"`
+}
+
+type AccountIdConditionModel struct {
+	Operator   types.String `tfsdk:"operator"`
+	AccountIds types.List   `tfsdk:"account_ids"`
+}
+
+type SourceRegionConditionModel struct {
+	Operator      types.String `tfsdk:"operator"`
+	SourceRegions types.List   `tfsdk:"source_regions"`
+}
+
+type VpcConditionModel struct {
+	Operator types.String `tfsdk:"operator"`
+	Vpcs     types.List   `tfsdk:"vpcs"`
+}
+
+type SubnetsConditionModel struct {
+	Operator types.String `tfsdk:"operator"`
+	Subnets  types.List   `tfsdk:"subnets"`
+}
+
+type ResourceGroupNameConditionModel struct {
+	Operator           types.String `tfsdk:"operator"`
+	ResourceGroupNames types.List   `tfsdk:"resource_group_names"`
+}
+
+type ResourceNameConditionModel struct {
+	Operator      types.String `tfsdk:"operator"`
+	ResourceNames types.List   `tfsdk:"resource_names"`
+}
+
+type ResourceIdConditionModel struct {
+	Operator    types.String `tfsdk:"operator"`
+	ResourceIds types.List   `tfsdk:"resource_ids"`
+}
+
+type TagKeysConditionModel struct {
+	Operator types.String `tfsdk:"operator"`
+	TagKeys  types.List   `tfsdk:"tag_keys"`
 }
 
 func (r *BackupPolicyResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -180,6 +261,286 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 										MarkdownDescription: "List of resource types",
 										ElementType:         types.StringType,
 										Required:            true,
+									},
+								},
+							},
+							"tag_key_values": schema.SingleNestedAttribute{
+								MarkdownDescription: "Tag key-value pairs condition",
+								Optional:            true,
+								Attributes: map[string]schema.Attribute{
+									"operator": schema.StringAttribute{
+										MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+										Required:            true,
+									},
+									"tag_key_values": schema.ListNestedAttribute{
+										MarkdownDescription: "List of tag key-value pairs to match",
+										Required:            true,
+										NestedObject: schema.NestedAttributeObject{
+											Attributes: map[string]schema.Attribute{
+												"key": schema.StringAttribute{
+													MarkdownDescription: "Tag key",
+													Required:            true,
+												},
+												"value": schema.StringAttribute{
+													MarkdownDescription: "Tag value",
+													Required:            true,
+												},
+											},
+										},
+									},
+								},
+							},
+							"tag_keys": schema.SingleNestedAttribute{
+								MarkdownDescription: "Tag keys condition",
+								Optional:            true,
+								Attributes: map[string]schema.Attribute{
+									"operator": schema.StringAttribute{
+										MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+										Required:            true,
+									},
+									"tag_keys": schema.ListAttribute{
+										MarkdownDescription: "List of tag keys to match",
+										ElementType:         types.StringType,
+										Required:            true,
+									},
+								},
+							},
+							"group": schema.SingleNestedAttribute{
+								MarkdownDescription: "Group condition with logical operator and operands",
+								Optional:            true,
+								Attributes: map[string]schema.Attribute{
+									"operator": schema.StringAttribute{
+										MarkdownDescription: "Logical operator: 'AND' or 'OR'",
+										Required:            true,
+									},
+									"operands": schema.ListNestedAttribute{
+										MarkdownDescription: "List of conditions",
+										Required:            true,
+										NestedObject: schema.NestedAttributeObject{
+											Attributes: map[string]schema.Attribute{
+												"resource_type": schema.SingleNestedAttribute{
+													MarkdownDescription: "Resource type condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+															Required:            true,
+														},
+														"resource_types": schema.ListAttribute{
+															MarkdownDescription: "List of resource types",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"environment": schema.SingleNestedAttribute{
+													MarkdownDescription: "Environment condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+															Required:            true,
+														},
+														"environments": schema.ListAttribute{
+															MarkdownDescription: "List of environments",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"tag_keys": schema.SingleNestedAttribute{
+													MarkdownDescription: "Tag keys condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+															Required:            true,
+														},
+														"tag_keys": schema.ListAttribute{
+															MarkdownDescription: "List of tag keys to match",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"tag_key_values": schema.SingleNestedAttribute{
+													MarkdownDescription: "Tag key-value pairs condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+															Required:            true,
+														},
+														"tag_key_values": schema.ListNestedAttribute{
+															MarkdownDescription: "List of tag key-value pairs to match",
+															Required:            true,
+															NestedObject: schema.NestedAttributeObject{
+																Attributes: map[string]schema.Attribute{
+																	"key": schema.StringAttribute{
+																		MarkdownDescription: "Tag key",
+																		Required:            true,
+																	},
+																	"value": schema.StringAttribute{
+																		MarkdownDescription: "Tag value",
+																		Required:            true,
+																	},
+																},
+															},
+														},
+													},
+												},
+												"data_classes": schema.SingleNestedAttribute{
+													MarkdownDescription: "Data classes condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'CONTAINS' or 'NOT_CONTAINS'",
+															Required:            true,
+														},
+														"data_classes": schema.ListAttribute{
+															MarkdownDescription: "List of data classes",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"apps": schema.SingleNestedAttribute{
+													MarkdownDescription: "Apps condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'CONTAINS' or 'NOT_CONTAINS'",
+															Required:            true,
+														},
+														"apps": schema.ListAttribute{
+															MarkdownDescription: "List of apps",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"cloud_provider": schema.SingleNestedAttribute{
+													MarkdownDescription: "Cloud provider condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+															Required:            true,
+														},
+														"cloud_providers": schema.ListAttribute{
+															MarkdownDescription: "List of cloud providers",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"account_id": schema.SingleNestedAttribute{
+													MarkdownDescription: "Account ID condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+															Required:            true,
+														},
+														"account_ids": schema.ListAttribute{
+															MarkdownDescription: "List of account IDs",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"source_region": schema.SingleNestedAttribute{
+													MarkdownDescription: "Source region condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+															Required:            true,
+														},
+														"source_regions": schema.ListAttribute{
+															MarkdownDescription: "List of source regions",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"vpc": schema.SingleNestedAttribute{
+													MarkdownDescription: "VPC condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+															Required:            true,
+														},
+														"vpcs": schema.ListAttribute{
+															MarkdownDescription: "List of VPCs",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"subnets": schema.SingleNestedAttribute{
+													MarkdownDescription: "Subnets condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'CONTAINS' or 'NOT_CONTAINS'",
+															Required:            true,
+														},
+														"subnets": schema.ListAttribute{
+															MarkdownDescription: "List of subnets",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"resource_group_name": schema.SingleNestedAttribute{
+													MarkdownDescription: "Resource group name condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'CONTAINS' or 'NOT_CONTAINS'",
+															Required:            true,
+														},
+														"resource_group_names": schema.ListAttribute{
+															MarkdownDescription: "List of resource group names",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"resource_name": schema.SingleNestedAttribute{
+													MarkdownDescription: "Resource name condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'CONTAINS' or 'NOT_CONTAINS'",
+															Required:            true,
+														},
+														"resource_names": schema.ListAttribute{
+															MarkdownDescription: "List of resource names",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+												"resource_id": schema.SingleNestedAttribute{
+													MarkdownDescription: "Resource ID condition",
+													Optional:            true,
+													Attributes: map[string]schema.Attribute{
+														"operator": schema.StringAttribute{
+															MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+															Required:            true,
+														},
+														"resource_ids": schema.ListAttribute{
+															MarkdownDescription: "List of resource IDs",
+															ElementType:         types.StringType,
+															Required:            true,
+														},
+													},
+												},
+											},
+										},
 									},
 								},
 							},
@@ -279,7 +640,7 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 													MarkdownDescription: "Interval configuration",
 													Required:            true,
 													Attributes: map[string]schema.Attribute{
-														"interval_hours": schema.Int64Attribute{
+														"interval_minutes": schema.Int64Attribute{
 															MarkdownDescription: "Interval in hours",
 															Required:            true,
 														},
@@ -430,10 +791,75 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(backupSchedules)
 		backupPlan.SetStandardPlan(*standardPlan)
 
+	case "HIGH_FREQUENCY":
+		highFrequencyPlanObj := backupPlanAttrs["high_frequency_plan"].(types.Object)
+		var highFrequencyPlanModel HighFrequencyPlanModel
+		diags = highFrequencyPlanObj.As(ctx, &highFrequencyPlanModel, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
+		var resourceTypeStrings []string
+		diags = highFrequencyPlanModel.ResourceTypes.ElementsAs(ctx, &resourceTypeStrings, false)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
+		var resourceTypes []externalEonSdkAPI.HighFrequencyBackupResourceType
+		for _, resourceTypeStr := range resourceTypeStrings {
+			resourceType := externalEonSdkAPI.NewHighFrequencyBackupResourceType()
+			sdkResourceType := externalEonSdkAPI.ResourceType(resourceTypeStr)
+			resourceType.SetResourceType(sdkResourceType)
+			resourceTypes = append(resourceTypes, *resourceType)
+		}
+
+		var backupSchedules []externalEonSdkAPI.HighFrequencyBackupSchedules
+		var schedules []BackupScheduleModel
+		diags = highFrequencyPlanModel.BackupSchedules.ElementsAs(ctx, &schedules, false)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
+		for _, schedule := range schedules {
+			scheduleConfig, err := createHighFrequencyScheduleConfig(&schedule)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Invalid Schedule Configuration",
+					fmt.Sprintf("Failed to create high frequency schedule configuration: %s", err),
+				)
+				return
+			}
+
+			retentionDays, err := SafeInt32Conversion(schedule.RetentionDays.ValueInt64())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Invalid Retention Days",
+					fmt.Sprintf("Failed to validate retention days: %s", err),
+				)
+				return
+			}
+
+			backupSchedule := externalEonSdkAPI.NewHighFrequencyBackupSchedules(
+				schedule.VaultId.ValueString(),
+				*scheduleConfig,
+				retentionDays,
+			)
+			backupSchedules = append(backupSchedules, *backupSchedule)
+		}
+
+		highFrequencyPlan := externalEonSdkAPI.NewHighFrequencyBackupPolicyPlan(
+			resourceTypes,
+			backupSchedules,
+		)
+		backupPlan.SetHighFrequencyPlan(*highFrequencyPlan)
+
 	default:
 		resp.Diagnostics.AddError(
 			"Unsupported Backup Policy Type",
-			fmt.Sprintf("Backup policy type '%s' is not supported. Only STANDARD and PITR are currently supported.",
+			fmt.Sprintf("Backup policy type '%s' is not supported. Only STANDARD, HIGH_FREQUENCY, and PITR are currently supported.",
 				backupPolicyType.ValueString()),
 		)
 		return
@@ -609,6 +1035,71 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(backupSchedules)
 		backupPlan.SetStandardPlan(*standardPlan)
 
+	case "HIGH_FREQUENCY":
+		highFrequencyPlanObj := backupPlanAttrs["high_frequency_plan"].(types.Object)
+		var highFrequencyPlanModel HighFrequencyPlanModel
+		diags := highFrequencyPlanObj.As(ctx, &highFrequencyPlanModel, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
+		var resourceTypeStrings []string
+		diags = highFrequencyPlanModel.ResourceTypes.ElementsAs(ctx, &resourceTypeStrings, false)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
+		var resourceTypes []externalEonSdkAPI.HighFrequencyBackupResourceType
+		for _, resourceTypeStr := range resourceTypeStrings {
+			resourceType := externalEonSdkAPI.NewHighFrequencyBackupResourceType()
+			sdkResourceType := externalEonSdkAPI.ResourceType(resourceTypeStr)
+			resourceType.SetResourceType(sdkResourceType)
+			resourceTypes = append(resourceTypes, *resourceType)
+		}
+
+		var backupSchedules []externalEonSdkAPI.HighFrequencyBackupSchedules
+		var schedules []BackupScheduleModel
+		diags = highFrequencyPlanModel.BackupSchedules.ElementsAs(ctx, &schedules, false)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
+		for _, schedule := range schedules {
+			scheduleConfig, err := createHighFrequencyScheduleConfig(&schedule)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Invalid Schedule Configuration",
+					fmt.Sprintf("Failed to create high frequency schedule configuration: %s", err),
+				)
+				return
+			}
+
+			retentionDays, err := SafeInt32Conversion(schedule.RetentionDays.ValueInt64())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Invalid Retention Days",
+					fmt.Sprintf("Failed to validate retention days: %s", err),
+				)
+				return
+			}
+
+			backupSchedule := externalEonSdkAPI.NewHighFrequencyBackupSchedules(
+				schedule.VaultId.ValueString(),
+				*scheduleConfig,
+				retentionDays,
+			)
+			backupSchedules = append(backupSchedules, *backupSchedule)
+		}
+
+		highFrequencyPlan := externalEonSdkAPI.NewHighFrequencyBackupPolicyPlan(
+			resourceTypes,
+			backupSchedules,
+		)
+		backupPlan.SetHighFrequencyPlan(*highFrequencyPlan)
+
 	default:
 		resp.Diagnostics.AddError(
 			"Unsupported Backup Policy Type",
@@ -754,6 +1245,43 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 	}
 }
 
+func createHighFrequencyScheduleConfig(schedule *BackupScheduleModel) (*externalEonSdkAPI.HighFrequencyBackupScheduleConfig, error) {
+	scheduleConfigAttrs := schedule.ScheduleConfig.Attributes()
+	frequencyObj := scheduleConfigAttrs["frequency"]
+	if frequencyObj == nil {
+		return nil, fmt.Errorf("frequency field is required in schedule config")
+	}
+
+	frequency := frequencyObj.(types.String).ValueString()
+
+	highFreqScheduleConfig := externalEonSdkAPI.NewHighFrequencyBackupScheduleConfig()
+
+	switch frequency {
+	case "INTERVAL":
+		highFreqScheduleConfig.SetFrequency(externalEonSdkAPI.HIGH_FREQUENCY_BACKUP_SCHEDULE_INTERVAL)
+
+		intervalConfigObj := scheduleConfigAttrs["interval_config"]
+		if intervalConfigObj == nil {
+			return nil, fmt.Errorf("interval_config field is required for INTERVAL frequency")
+		}
+
+		intervalConfigAttrs := intervalConfigObj.(types.Object).Attributes()
+
+		intervalHours, err := SafeInt32Conversion(intervalConfigAttrs["interval_minutes"].(types.Int64).ValueInt64())
+		if err != nil {
+			return nil, fmt.Errorf("invalid interval hours: %s", err)
+		}
+
+		intervalConfig := externalEonSdkAPI.NewHighFrequencyIntervalConfig(intervalHours)
+		highFreqScheduleConfig.SetIntervalConfig(*intervalConfig)
+
+		return highFreqScheduleConfig, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported high frequency schedule frequency: %s", frequency)
+	}
+}
+
 func createBackupPolicyExpression(ctx context.Context, data *ResourceSelectorModel) (*externalEonSdkAPI.BackupPolicyExpression, error) {
 	if data.Expression.IsNull() {
 		return nil, fmt.Errorf("expression is required for CONDITIONAL resource selection mode")
@@ -820,5 +1348,386 @@ func createBackupPolicyExpression(ctx context.Context, data *ResourceSelectorMod
 		return expr, nil
 	}
 
-	return nil, fmt.Errorf("expression must have at least one condition (environment, resource_type, etc.)")
+	if tagKeyValuesObj, exists := expressionAttrs["tag_key_values"]; exists && !tagKeyValuesObj.IsNull() {
+		var tagKeyValuesCondition TagKeyValuesConditionModel
+		diags := tagKeyValuesObj.(types.Object).As(ctx, &tagKeyValuesCondition, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			tflog.Error(ctx, "Failed to parse tag key-value condition", map[string]interface{}{
+				"error": diags.Errors(),
+			})
+			return nil, fmt.Errorf("failed to parse tag key-value condition")
+		}
+
+		var tagKeyValues []TagKeyValueModel
+		diags = tagKeyValuesCondition.TagKeyValues.ElementsAs(ctx, &tagKeyValues, false)
+		if diags.HasError() {
+			return nil, fmt.Errorf("failed to parse tag key-value list")
+		}
+
+		var tagKeyValueEnums []externalEonSdkAPI.TagKeyValue
+		for _, kv := range tagKeyValues {
+			tagKeyValue := externalEonSdkAPI.NewTagKeyValue(
+				kv.Key.ValueString(),
+				kv.Value.ValueString(),
+			)
+			tagKeyValueEnums = append(tagKeyValueEnums, *tagKeyValue)
+		}
+
+		operator := externalEonSdkAPI.ListOperators(tagKeyValuesCondition.Operator.ValueString())
+		tagKeyValuesConditionApi := externalEonSdkAPI.NewTagKeyValuesCondition(operator, tagKeyValueEnums)
+		expr.SetTagKeyValues(*tagKeyValuesConditionApi)
+
+		tflog.Debug(ctx, "Successfully created tag key-value condition", map[string]interface{}{
+			"operator":       tagKeyValuesCondition.Operator.ValueString(),
+			"tag_key_values": tagKeyValues,
+		})
+
+		return expr, nil
+	}
+
+	if tagKeysObj, exists := expressionAttrs["tag_keys"]; exists && !tagKeysObj.IsNull() {
+		var tagKeysCondition TagKeysConditionModel
+		diags := tagKeysObj.(types.Object).As(ctx, &tagKeysCondition, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			tflog.Error(ctx, "Failed to parse tag keys condition", map[string]interface{}{
+				"error": diags.Errors(),
+			})
+			return nil, fmt.Errorf("failed to parse tag keys condition")
+		}
+
+		var tagKeys []string
+		diags = tagKeysCondition.TagKeys.ElementsAs(ctx, &tagKeys, false)
+		if diags.HasError() {
+			return nil, fmt.Errorf("failed to parse tag keys list")
+		}
+
+		operator := externalEonSdkAPI.ListOperators(tagKeysCondition.Operator.ValueString())
+		tagKeysConditionApi := externalEonSdkAPI.NewTagKeysCondition(operator, tagKeys)
+		expr.SetTagKeys(*tagKeysConditionApi)
+
+		tflog.Debug(ctx, "Successfully created tag keys condition", map[string]interface{}{
+			"operator": tagKeysCondition.Operator.ValueString(),
+			"tag_keys": tagKeys,
+		})
+
+		return expr, nil
+	}
+
+	if groupObj, exists := expressionAttrs["group"]; exists && !groupObj.IsNull() {
+		var groupCondition GroupConditionModel
+		diags := groupObj.(types.Object).As(ctx, &groupCondition, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			tflog.Error(ctx, "Failed to parse group condition", map[string]interface{}{
+				"error": diags.Errors(),
+			})
+			return nil, fmt.Errorf("failed to parse group condition")
+		}
+
+		var operands []OperandModel
+		diags = groupCondition.Operands.ElementsAs(ctx, &operands, false)
+		if diags.HasError() {
+			return nil, fmt.Errorf("failed to parse operands")
+		}
+
+		var expressions []externalEonSdkAPI.BackupPolicyExpression
+		for _, operand := range operands {
+			operandExpr := externalEonSdkAPI.NewBackupPolicyExpression()
+
+			if !operand.ResourceType.IsNull() {
+				var resourceTypeCondition ResourceTypeConditionModel
+				diags := operand.ResourceType.As(ctx, &resourceTypeCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse resource type condition in operand")
+				}
+
+				var resourceTypes []string
+				diags = resourceTypeCondition.ResourceTypes.ElementsAs(ctx, &resourceTypes, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse resource types in operand")
+				}
+
+				var resourceTypeEnums []externalEonSdkAPI.ResourceType
+				for _, rt := range resourceTypes {
+					resourceTypeEnums = append(resourceTypeEnums, externalEonSdkAPI.ResourceType(rt))
+				}
+
+				operator := externalEonSdkAPI.ScalarOperators(resourceTypeCondition.Operator.ValueString())
+				resourceTypeConditionApi := externalEonSdkAPI.NewResourceTypeCondition(operator, resourceTypeEnums)
+				operandExpr.SetResourceType(*resourceTypeConditionApi)
+			}
+
+			if !operand.Environment.IsNull() {
+				var envCondition EnvironmentConditionModel
+				diags := operand.Environment.As(ctx, &envCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse environment condition in operand")
+				}
+
+				var environments []string
+				diags = envCondition.Environments.ElementsAs(ctx, &environments, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse environments in operand")
+				}
+
+				var environmentEnums []externalEonSdkAPI.Environment
+				for _, env := range environments {
+					environmentEnums = append(environmentEnums, externalEonSdkAPI.Environment(env))
+				}
+
+				operator := externalEonSdkAPI.ScalarOperators(envCondition.Operator.ValueString())
+				envConditionApi := externalEonSdkAPI.NewEnvironmentCondition(operator, environmentEnums)
+				operandExpr.SetEnvironment(*envConditionApi)
+			}
+
+			if !operand.TagKeys.IsNull() {
+				var tagKeysCondition TagKeysConditionModel
+				diags := operand.TagKeys.As(ctx, &tagKeysCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse tag keys condition in operand")
+				}
+
+				var tagKeys []string
+				diags = tagKeysCondition.TagKeys.ElementsAs(ctx, &tagKeys, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse tag keys in operand")
+				}
+
+				operator := externalEonSdkAPI.ListOperators(tagKeysCondition.Operator.ValueString())
+				tagKeysConditionApi := externalEonSdkAPI.NewTagKeysCondition(operator, tagKeys)
+				operandExpr.SetTagKeys(*tagKeysConditionApi)
+			}
+
+			if !operand.TagKeyValues.IsNull() {
+				var tagKeyValuesCondition TagKeyValuesConditionModel
+				diags := operand.TagKeyValues.As(ctx, &tagKeyValuesCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse tag key-values condition in operand")
+				}
+
+				var tagKeyValues []TagKeyValueModel
+				diags = tagKeyValuesCondition.TagKeyValues.ElementsAs(ctx, &tagKeyValues, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse tag key-values in operand")
+				}
+
+				var tagKeyValueEnums []externalEonSdkAPI.TagKeyValue
+				for _, kv := range tagKeyValues {
+					tagKeyValue := externalEonSdkAPI.NewTagKeyValue(
+						kv.Key.ValueString(),
+						kv.Value.ValueString(),
+					)
+					tagKeyValueEnums = append(tagKeyValueEnums, *tagKeyValue)
+				}
+
+				operator := externalEonSdkAPI.ListOperators(tagKeyValuesCondition.Operator.ValueString())
+				tagKeyValuesConditionApi := externalEonSdkAPI.NewTagKeyValuesCondition(operator, tagKeyValueEnums)
+				operandExpr.SetTagKeyValues(*tagKeyValuesConditionApi)
+			}
+
+			if !operand.DataClasses.IsNull() {
+				var dataClassesCondition DataClassesConditionModel
+				diags := operand.DataClasses.As(ctx, &dataClassesCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse data_classes condition in operand")
+				}
+
+				var dataClasses []string
+				diags = dataClassesCondition.DataClasses.ElementsAs(ctx, &dataClasses, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse data_classes list in operand")
+				}
+
+				var dataClassEnums []externalEonSdkAPI.DataClass
+				for _, dc := range dataClasses {
+					dataClassEnums = append(dataClassEnums, externalEonSdkAPI.DataClass(dc))
+				}
+
+				operator := externalEonSdkAPI.ListOperators(dataClassesCondition.Operator.ValueString())
+				dataClassesConditionApi := externalEonSdkAPI.NewDataClassesCondition(operator, dataClassEnums)
+				operandExpr.SetDataClasses(*dataClassesConditionApi)
+			}
+
+			if !operand.Apps.IsNull() {
+				var appsCondition AppsConditionModel
+				diags := operand.Apps.As(ctx, &appsCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse apps condition in operand")
+				}
+
+				var apps []string
+				diags = appsCondition.Apps.ElementsAs(ctx, &apps, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse apps list in operand")
+				}
+
+				operator := externalEonSdkAPI.ListOperators(appsCondition.Operator.ValueString())
+				appsConditionApi := externalEonSdkAPI.NewAppsCondition(operator, apps)
+				operandExpr.SetApps(*appsConditionApi)
+			}
+
+			if !operand.CloudProvider.IsNull() {
+				var cloudProviderCondition CloudProviderConditionModel
+				diags := operand.CloudProvider.As(ctx, &cloudProviderCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse cloud_provider condition in operand")
+				}
+
+				var cloudProviders []string
+				diags = cloudProviderCondition.CloudProviders.ElementsAs(ctx, &cloudProviders, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse cloud_providers list in operand")
+				}
+
+				var providerEnums []externalEonSdkAPI.Provider
+				for _, cp := range cloudProviders {
+					providerEnums = append(providerEnums, externalEonSdkAPI.Provider(cp))
+				}
+
+				operator := externalEonSdkAPI.ScalarOperators(cloudProviderCondition.Operator.ValueString())
+				cloudProviderConditionApi := externalEonSdkAPI.NewCloudProviderCondition(operator, providerEnums)
+				operandExpr.SetCloudProvider(*cloudProviderConditionApi)
+			}
+
+			if !operand.AccountId.IsNull() {
+				var accountIdCondition AccountIdConditionModel
+				diags := operand.AccountId.As(ctx, &accountIdCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse account_id condition in operand")
+				}
+
+				var accountIds []string
+				diags = accountIdCondition.AccountIds.ElementsAs(ctx, &accountIds, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse account_ids list in operand")
+				}
+
+				operator := externalEonSdkAPI.ScalarOperators(accountIdCondition.Operator.ValueString())
+				accountIdConditionApi := externalEonSdkAPI.NewAccountIdCondition(operator, accountIds)
+				operandExpr.SetAccountId(*accountIdConditionApi)
+			}
+
+			if !operand.SourceRegion.IsNull() {
+				var sourceRegionCondition SourceRegionConditionModel
+				diags := operand.SourceRegion.As(ctx, &sourceRegionCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse source_region condition in operand")
+				}
+
+				var sourceRegions []string
+				diags = sourceRegionCondition.SourceRegions.ElementsAs(ctx, &sourceRegions, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse source_regions list in operand")
+				}
+
+				operator := externalEonSdkAPI.ScalarOperators(sourceRegionCondition.Operator.ValueString())
+				sourceRegionConditionApi := externalEonSdkAPI.NewRegionCondition(operator, sourceRegions)
+				operandExpr.SetSourceRegion(*sourceRegionConditionApi)
+			}
+
+			if !operand.Vpc.IsNull() {
+				var vpcCondition VpcConditionModel
+				diags := operand.Vpc.As(ctx, &vpcCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse vpc condition in operand")
+				}
+
+				var vpcs []string
+				diags = vpcCondition.Vpcs.ElementsAs(ctx, &vpcs, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse vpcs list in operand")
+				}
+
+				operator := externalEonSdkAPI.ScalarOperators(vpcCondition.Operator.ValueString())
+				vpcConditionApi := externalEonSdkAPI.NewVpcCondition(operator, vpcs)
+				operandExpr.SetVpc(*vpcConditionApi)
+			}
+
+			if !operand.Subnets.IsNull() {
+				var subnetsCondition SubnetsConditionModel
+				diags := operand.Subnets.As(ctx, &subnetsCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse subnets condition in operand")
+				}
+
+				var subnets []string
+				diags = subnetsCondition.Subnets.ElementsAs(ctx, &subnets, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse subnets list in operand")
+				}
+
+				operator := externalEonSdkAPI.ListOperators(subnetsCondition.Operator.ValueString())
+				subnetsConditionApi := externalEonSdkAPI.NewSubnetsCondition(operator, subnets)
+				operandExpr.SetSubnets(*subnetsConditionApi)
+			}
+
+			if !operand.ResourceGroupName.IsNull() {
+				var resourceGroupNameCondition ResourceGroupNameConditionModel
+				diags := operand.ResourceGroupName.As(ctx, &resourceGroupNameCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse resource_group_name condition in operand")
+				}
+
+				var resourceGroupNames []string
+				diags = resourceGroupNameCondition.ResourceGroupNames.ElementsAs(ctx, &resourceGroupNames, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse resource_group_names list in operand")
+				}
+
+				operator := externalEonSdkAPI.ScalarOperators(resourceGroupNameCondition.Operator.ValueString())
+				resourceGroupNameConditionApi := externalEonSdkAPI.NewResourceGroupNameCondition(operator, resourceGroupNames)
+				operandExpr.SetResourceGroupName(*resourceGroupNameConditionApi)
+			}
+
+			if !operand.ResourceName.IsNull() {
+				var resourceNameCondition ResourceNameConditionModel
+				diags := operand.ResourceName.As(ctx, &resourceNameCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse resource_name condition in operand")
+				}
+
+				var resourceNames []string
+				diags = resourceNameCondition.ResourceNames.ElementsAs(ctx, &resourceNames, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse resource_names list in operand")
+				}
+
+				operator := externalEonSdkAPI.ScalarOperators(resourceNameCondition.Operator.ValueString())
+				resourceNameConditionApi := externalEonSdkAPI.NewResourceNameCondition(operator, resourceNames)
+				operandExpr.SetResourceName(*resourceNameConditionApi)
+			}
+
+			if !operand.ResourceId.IsNull() {
+				var resourceIdCondition ResourceIdConditionModel
+				diags := operand.ResourceId.As(ctx, &resourceIdCondition, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse resource_id condition in operand")
+				}
+
+				var resourceIds []string
+				diags = resourceIdCondition.ResourceIds.ElementsAs(ctx, &resourceIds, false)
+				if diags.HasError() {
+					return nil, fmt.Errorf("failed to parse resource_ids list in operand")
+				}
+
+				operator := externalEonSdkAPI.ScalarOperators(resourceIdCondition.Operator.ValueString())
+				resourceIdConditionApi := externalEonSdkAPI.NewResourceIdCondition(operator, resourceIds)
+				operandExpr.SetResourceId(*resourceIdConditionApi)
+			}
+
+			expressions = append(expressions, *operandExpr)
+		}
+
+		logicalOperator := externalEonSdkAPI.LogicalOperator(groupCondition.Operator.ValueString())
+		groupConditionApi := externalEonSdkAPI.NewBackupPolicyGroupCondition(logicalOperator, expressions)
+		expr.SetGroup(*groupConditionApi)
+
+		tflog.Debug(ctx, "Successfully created group condition", map[string]interface{}{
+			"operator":       groupCondition.Operator.ValueString(),
+			"operands_count": len(operands),
+		})
+
+		return expr, nil
+	}
+
+	return nil, fmt.Errorf("expression must have at least one condition (environment, resource_type, tag_key_values, tag_keys, group, etc.)")
 }
