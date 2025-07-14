@@ -456,7 +456,7 @@ func (c *EonClient) CreateBackupPolicy(ctx context.Context, req externalEonSdkAP
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	policy := resp.GetBackupPolicy()

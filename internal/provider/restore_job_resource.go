@@ -588,13 +588,10 @@ func (r *RestoreJobResource) createEbsVolumeRestore(ctx context.Context, data Re
 		}
 	}
 
-	// Convert GiB to bytes
-	sizeBytes := config.VolumeSize.ValueInt64() * 1024 * 1024 * 1024
-
 	// Build volume settings
 	volumeSettings := externalEonSdkAPI.VolumeSettings{
 		Type:      config.VolumeType.ValueString(),
-		SizeBytes: sizeBytes,
+		SizeBytes: config.VolumeSize.ValueInt64(),
 	}
 
 	if !config.Iops.IsNull() {

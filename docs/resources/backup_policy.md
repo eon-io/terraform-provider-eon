@@ -13,78 +13,373 @@ Eon backup policy resource for managing backup policies
 ## Example Usage
 
 ```terraform
-# Example: Basic backup policy
-resource "eon_backup_policy" "daily_backup" {
-  name                    = "Daily Production Backup"
-  enabled                 = true
-  resource_selection_mode = "ALL"
-  backup_policy_type      = "STANDARD"
+terraform {
+  required_providers {
+    eon = {
+      source = "eon-io/eon"
+    }
+  }
+}
 
-  backup_schedules {
-    vault_id       = "vault-12345678-1234-1234-1234-123456789012"
-    retention_days = 30
+# Example: Basic backup policy with daily schedule
+resource "eon_backup_policy" "daily_backup" {
+  name          = "Daily Production Backup"
+  enabled       = true
+  schedule_mode = "STANDARD"
+
+  resource_selector = {
+    resource_selection_mode = "ALL"
   }
 
-  schedule_frequency   = "DAILY"
-  time_of_day_hour     = 2
-  time_of_day_minutes  = 0
-  start_window_minutes = 240
-
-  resource_inclusion_override = []
-  resource_exclusion_override = []
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      backup_schedules = [
+        {
+          vault_id       = "vault-12345678-1234-1234-1234-123456789012"
+          retention_days = 30
+          schedule_config = {
+            frequency = "DAILY"
+            daily_config = {
+              time_of_day_hour     = 2
+              time_of_day_minutes  = 0
+              start_window_minutes = 240
+            }
+          }
+        }
+      ]
+    }
+  }
 }
 
 # Example: High frequency backup policy
 resource "eon_backup_policy" "high_frequency_backup" {
-  name                    = "High Frequency Backup"
-  enabled                 = true
-  resource_selection_mode = "ALL"
-  backup_policy_type      = "HIGH_FREQUENCY"
+  name          = "High Frequency Critical Data Backup"
+  enabled       = true
+  schedule_mode = "STANDARD"
 
-  backup_schedules {
-    vault_id       = "vault-12345678-1234-1234-1234-123456789012"
-    retention_days = 7
+  resource_selector = {
+    resource_selection_mode = "ALL"
   }
 
-  schedule_frequency = "INTERVAL"
-  interval_minutes   = 30
-
-  high_frequency_resource_types = ["AWS_S3", "AWS_DYNAMO_DB"]
-
-  resource_inclusion_override = []
-  resource_exclusion_override = []
+  backup_plan = {
+    backup_policy_type = "HIGH_FREQUENCY"
+    high_frequency_plan = {
+      resource_types = ["RDS_INSTANCE", "DYNAMO_DB_TABLE"]
+      backup_schedules = [
+        {
+          vault_id       = "vault-12345678-1234-1234-1234-123456789012"
+          retention_days = 7
+          schedule_config = {
+            frequency = "INTERVAL"
+            interval_config = {
+              interval_hours = 1
+            }
+          }
+        }
+      ]
+    }
+  }
 }
 
-# Example: Multi-vault backup policy
-resource "eon_backup_policy" "multi_vault_backup" {
-  name                    = "Multi-Vault Production Backup"
-  enabled                 = true
-  resource_selection_mode = "ALL"
-  backup_policy_type      = "STANDARD"
+# Example: Weekly backup policy
+resource "eon_backup_policy" "weekly_backup" {
+  name          = "Weekly Production Backup"
+  enabled       = true
+  schedule_mode = "STANDARD"
 
-  backup_schedules {
-    vault_id       = "vault-12345678-1234-1234-1234-123456789012"
-    retention_days = 30
+  resource_selector = {
+    resource_selection_mode = "ALL"
   }
 
-  backup_schedules {
-    vault_id       = "vault-87654321-4321-4321-4321-210987654321"
-    retention_days = 90
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      backup_schedules = [
+        {
+          vault_id       = "vault-87654321-4321-4321-4321-210987654321"
+          retention_days = 90
+          schedule_config = {
+            frequency = "WEEKLY"
+            weekly_config = {
+              days_of_week         = ["SUNDAY"]
+              time_of_day_hour     = 3
+              time_of_day_minutes  = 30
+              start_window_minutes = 360
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+# Example: Monthly backup policy
+resource "eon_backup_policy" "monthly_backup" {
+  name          = "Monthly Archive Backup"
+  enabled       = true
+  schedule_mode = "STANDARD"
+
+  resource_selector = {
+    resource_selection_mode = "ALL"
   }
 
-  schedule_frequency   = "WEEKLY"
-  time_of_day_hour     = 3
-  time_of_day_minutes  = 30
-  start_window_minutes = 360
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      backup_schedules = [
+        {
+          vault_id       = "vault-monthly-archive"
+          retention_days = 365
+          schedule_config = {
+            frequency = "MONTHLY"
+            monthly_config = {
+              days_of_month        = [1, 15]
+              time_of_day_hour     = 1
+              time_of_day_minutes  = 0
+              start_window_minutes = 480
+            }
+          }
+        }
+      ]
+    }
+  }
+}
 
-  resource_inclusion_override = []
-  resource_exclusion_override = []
+# Example: Conditional backup policy using new condition types
+resource "eon_backup_policy" "conditional_backup" {
+  name          = "Conditional Production Backup"
+  enabled       = true
+  schedule_mode = "STANDARD"
+
+  resource_selector = {
+    resource_selection_mode = "CONDITIONAL"
+
+    expression = {
+      group = {
+        operator = "AND"
+        operands = [
+          {
+            # Basic resource type condition
+            resource_type = {
+              operator       = "IN"
+              resource_types = ["EC2_INSTANCE", "EBS_VOLUME"]
+            }
+          },
+          {
+            # Environment condition
+            environment = {
+              operator     = "IN"
+              environments = ["production", "staging"]
+            }
+          },
+          {
+            # NEW: Data classes condition
+            data_classes = {
+              operator     = "CONTAINS"
+              data_classes = ["PII", "CONFIDENTIAL"]
+            }
+          },
+          {
+            # NEW: Cloud provider condition
+            cloud_provider = {
+              operator        = "IN"
+              cloud_providers = ["AWS", "AZURE"]
+            }
+          }
+        ]
+      }
+    }
+  }
+
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      backup_schedules = [
+        {
+          vault_id       = "vault-conditional"
+          retention_days = 60
+          schedule_config = {
+            frequency = "DAILY"
+            daily_config = {
+              time_of_day_hour     = 2
+              time_of_day_minutes  = 0
+              start_window_minutes = 240
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+# Example: Comprehensive condition types demonstration
+resource "eon_backup_policy" "all_condition_types" {
+  name          = "All Condition Types Demo"
+  enabled       = true
+  schedule_mode = "STANDARD"
+
+  resource_selector = {
+    resource_selection_mode = "CONDITIONAL"
+
+    expression = {
+      group = {
+        operator = "AND"
+        operands = [
+          {
+            # 1. Resource Type (existing)
+            resource_type = {
+              operator       = "IN"
+              resource_types = ["EC2_INSTANCE", "EBS_VOLUME"]
+            }
+          },
+          {
+            # 2. Environment (existing)
+            environment = {
+              operator     = "IN"
+              environments = ["production"]
+            }
+          },
+          {
+            # 3. Tag Keys (existing)
+            tag_keys = {
+              operator = "CONTAINS"
+              tag_keys = ["Environment", "Owner"]
+            }
+          },
+          {
+            # 4. Tag Key Values (existing)
+            tag_key_values = {
+              operator       = "CONTAINS"
+              tag_key_values = ["production", "critical"]
+            }
+          },
+          {
+            # 5. Data Classes (NEW)
+            data_classes = {
+              operator     = "CONTAINS"
+              data_classes = ["PII", "CONFIDENTIAL"]
+            }
+          },
+          {
+            # 6. Apps (NEW)
+            apps = {
+              operator = "CONTAINS"
+              apps     = ["web-app", "database"]
+            }
+          },
+          {
+            # 7. Cloud Provider (NEW)
+            cloud_provider = {
+              operator        = "IN"
+              cloud_providers = ["AWS"]
+            }
+          },
+          {
+            # 8. Account ID (NEW)
+            account_id = {
+              operator    = "IN"
+              account_ids = ["123456789012"]
+            }
+          },
+          {
+            # 9. Source Region (NEW)
+            source_region = {
+              operator       = "IN"
+              source_regions = ["us-east-1", "us-west-2"]
+            }
+          },
+          {
+            # 10. VPC (NEW)
+            vpc = {
+              operator = "IN"
+              vpcs     = ["vpc-production"]
+            }
+          },
+          {
+            # 11. Subnets (NEW)
+            subnets = {
+              operator = "CONTAINS"
+              subnets  = ["subnet-web-tier", "subnet-db-tier"]
+            }
+          },
+          {
+            # 12. Resource Group Name (NEW)
+            resource_group_name = {
+              operator             = "CONTAINS"
+              resource_group_names = ["production-rg"]
+            }
+          },
+          {
+            # 13. Resource Name (NEW)
+            resource_name = {
+              operator       = "CONTAINS"
+              resource_names = ["prod-", "critical-"]
+            }
+          },
+          {
+            # 14. Resource ID (NEW)
+            resource_id = {
+              operator     = "IN"
+              resource_ids = ["i-123456789abcdef0"]
+            }
+          }
+        ]
+      }
+    }
+  }
+
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      backup_schedules = [
+        {
+          vault_id       = "vault-all-conditions"
+          retention_days = 180
+          schedule_config = {
+            frequency = "WEEKLY"
+            weekly_config = {
+              days_of_week         = ["SUNDAY", "WEDNESDAY"]
+              time_of_day_hour     = 2
+              time_of_day_minutes  = 30
+              start_window_minutes = 180
+            }
+          }
+        }
+      ]
+    }
+  }
 }
 
 # Output examples
 output "daily_backup_policy_id" {
   description = "ID of the daily backup policy"
   value       = eon_backup_policy.daily_backup.id
+}
+
+output "high_frequency_backup_policy_id" {
+  description = "ID of the high frequency backup policy"
+  value       = eon_backup_policy.high_frequency_backup.id
+}
+
+output "weekly_backup_policy_id" {
+  description = "ID of the weekly backup policy"
+  value       = eon_backup_policy.weekly_backup.id
+}
+
+output "monthly_backup_policy_id" {
+  description = "ID of the monthly backup policy"
+  value       = eon_backup_policy.monthly_backup.id
+}
+
+output "conditional_backup_policy_id" {
+  description = "ID of the conditional backup policy"
+  value       = eon_backup_policy.conditional_backup.id
+}
+
+output "all_condition_types_policy_id" {
+  description = "ID of the policy demonstrating all condition types"
+  value       = eon_backup_policy.all_condition_types.id
 }
 
 output "backup_policies_summary" {
@@ -94,19 +389,31 @@ output "backup_policies_summary" {
       id      = eon_backup_policy.daily_backup.id
       name    = eon_backup_policy.daily_backup.name
       enabled = eon_backup_policy.daily_backup.enabled
-      type    = eon_backup_policy.daily_backup.backup_policy_type
     }
     high_frequency_backup = {
       id      = eon_backup_policy.high_frequency_backup.id
       name    = eon_backup_policy.high_frequency_backup.name
       enabled = eon_backup_policy.high_frequency_backup.enabled
-      type    = eon_backup_policy.high_frequency_backup.backup_policy_type
     }
-    multi_vault_backup = {
-      id      = eon_backup_policy.multi_vault_backup.id
-      name    = eon_backup_policy.multi_vault_backup.name
-      enabled = eon_backup_policy.multi_vault_backup.enabled
-      type    = eon_backup_policy.multi_vault_backup.backup_policy_type
+    weekly_backup = {
+      id      = eon_backup_policy.weekly_backup.id
+      name    = eon_backup_policy.weekly_backup.name
+      enabled = eon_backup_policy.weekly_backup.enabled
+    }
+    monthly_backup = {
+      id      = eon_backup_policy.monthly_backup.id
+      name    = eon_backup_policy.monthly_backup.name
+      enabled = eon_backup_policy.monthly_backup.enabled
+    }
+    conditional_backup = {
+      id      = eon_backup_policy.conditional_backup.id
+      name    = eon_backup_policy.conditional_backup.name
+      enabled = eon_backup_policy.conditional_backup.enabled
+    }
+    all_condition_types = {
+      id      = eon_backup_policy.all_condition_types.id
+      name    = eon_backup_policy.all_condition_types.name
+      enabled = eon_backup_policy.all_condition_types.enabled
     }
   }
 }
@@ -117,23 +424,11 @@ output "backup_policies_summary" {
 
 ### Required
 
-- `backup_policy_type` (String) Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', or 'PITR'
+- `backup_plan` (Attributes) Backup plan configuration (see [below for nested schema](#nestedatt--backup_plan))
 - `enabled` (Boolean) Whether the backup policy is enabled
 - `name` (String) Display name for the backup policy
-- `resource_selection_mode` (String) Resource selection mode: 'ALL', 'NONE', or 'CONDITIONAL'
-- `schedule_frequency` (String) Frequency for the backup schedule. For STANDARD and PITR: 'DAILY', 'INTERVAL', 'WEEKLY', 'MONTHLY', 'ANNUALLY'. For HIGH_FREQUENCY: 'INTERVAL', 'DAILY', 'WEEKLY', 'MONTHLY', 'ANNUALLY'
-
-### Optional
-
-- `backup_schedules` (Block List) List of backup schedules, each containing a vault_id and retention_days (see [below for nested schema](#nestedblock--backup_schedules))
-- `conditional_expression` (Attributes) Conditional expression for CONDITIONAL resource selection mode (see [below for nested schema](#nestedatt--conditional_expression))
-- `high_frequency_resource_types` (List of String) List of resource types for HIGH_FREQUENCY backup policies. Supported values: 'AWS_S3', 'AWS_DYNAMO_DB'. Required for HIGH_FREQUENCY policies.
-- `interval_minutes` (Number) Interval in minutes for backup schedule. For HIGH_FREQUENCY INTERVAL: any minute value. For STANDARD/PITR INTERVAL: will be converted to hours and must result in 6, 8, or 12 hours (360, 480, or 720 minutes).
-- `resource_exclusion_override` (List of String) List of resource IDs to exclude regardless of selection mode
-- `resource_inclusion_override` (List of String) List of resource IDs to include regardless of selection mode
-- `start_window_minutes` (Number) Start window in minutes after the scheduled time (240-1320). Minimum 240 minutes (4 hours), maximum 1320 minutes (22 hours). Defaults to 240.
-- `time_of_day_hour` (Number) Hour of the day for the backup schedule (0-23). Used for DAILY, WEEKLY, MONTHLY, and ANNUALLY frequencies
-- `time_of_day_minutes` (Number) Minutes of the hour for the backup schedule (0-59). Used for DAILY, WEEKLY, MONTHLY, and ANNUALLY frequencies
+- `resource_selector` (Attributes) Resource selector configuration (see [below for nested schema](#nestedatt--resource_selector))
+- `schedule_mode` (String) Schedule mode: 'STANDARD'
 
 ### Read-Only
 
@@ -141,51 +436,133 @@ output "backup_policies_summary" {
 - `id` (String) Backup policy identifier
 - `updated_at` (String) Last update timestamp
 
-<a id="nestedblock--backup_schedules"></a>
-### Nested Schema for `backup_schedules`
+<a id="nestedatt--backup_plan"></a>
+### Nested Schema for `backup_plan`
 
 Required:
 
-- `retention_days` (Number) Number of days to retain backups for this schedule
-- `vault_id` (String) Vault ID to associate with the backup schedule
-
-
-<a id="nestedatt--conditional_expression"></a>
-### Nested Schema for `conditional_expression`
-
-Required:
-
-- `group` (Attributes) Group condition with logical operator and operands (see [below for nested schema](#nestedatt--conditional_expression--group))
-
-<a id="nestedatt--conditional_expression--group"></a>
-### Nested Schema for `conditional_expression.group`
-
-Required:
-
-- `operands` (Attributes List) List of conditions (see [below for nested schema](#nestedatt--conditional_expression--group--operands))
-- `operator` (String) Logical operator: 'AND' or 'OR'
-
-<a id="nestedatt--conditional_expression--group--operands"></a>
-### Nested Schema for `conditional_expression.group.operands`
+- `backup_policy_type` (String) Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', or 'PITR'
 
 Optional:
 
-- `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--conditional_expression--group--operands--environment))
-- `resource_type` (Attributes) Resource type condition (see [below for nested schema](#nestedatt--conditional_expression--group--operands--resource_type))
+- `high_frequency_plan` (Attributes) High frequency backup plan configuration (see [below for nested schema](#nestedatt--backup_plan--high_frequency_plan))
+- `standard_plan` (Attributes) Standard backup plan configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan))
 
-<a id="nestedatt--conditional_expression--group--operands--environment"></a>
-### Nested Schema for `conditional_expression.group.operands.environment`
-
-Required:
-
-- `environments` (List of String) List of environments (e.g., 'PROD', 'DEV', 'STAGING')
-- `operator` (String) Operator: 'IN' or 'NOT_IN'
-
-
-<a id="nestedatt--conditional_expression--group--operands--resource_type"></a>
-### Nested Schema for `conditional_expression.group.operands.resource_type`
+<a id="nestedatt--backup_plan--high_frequency_plan"></a>
+### Nested Schema for `backup_plan.high_frequency_plan`
 
 Required:
 
+- `backup_schedules` (Attributes List) List of backup schedules (see [below for nested schema](#nestedatt--backup_plan--high_frequency_plan--backup_schedules))
+- `resource_types` (List of String) List of resource types for high frequency backups
+
+<a id="nestedatt--backup_plan--high_frequency_plan--backup_schedules"></a>
+### Nested Schema for `backup_plan.high_frequency_plan.backup_schedules`
+
+Required:
+
+- `retention_days` (Number) Retention days
+- `schedule_config` (Attributes) Schedule configuration (see [below for nested schema](#nestedatt--backup_plan--high_frequency_plan--backup_schedules--schedule_config))
+- `vault_id` (String) Vault ID
+
+<a id="nestedatt--backup_plan--high_frequency_plan--backup_schedules--schedule_config"></a>
+### Nested Schema for `backup_plan.high_frequency_plan.backup_schedules.schedule_config`
+
+Required:
+
+- `frequency` (String) Frequency: 'INTERVAL'
+- `interval_config` (Attributes) Interval configuration (see [below for nested schema](#nestedatt--backup_plan--high_frequency_plan--backup_schedules--schedule_config--interval_config))
+
+<a id="nestedatt--backup_plan--high_frequency_plan--backup_schedules--schedule_config--interval_config"></a>
+### Nested Schema for `backup_plan.high_frequency_plan.backup_schedules.schedule_config.interval_config`
+
+Required:
+
+- `interval_hours` (Number) Interval in hours
+
+Optional:
+
+- `start_window_minutes` (Number) Start window in minutes
+
+
+
+
+
+<a id="nestedatt--backup_plan--standard_plan"></a>
+### Nested Schema for `backup_plan.standard_plan`
+
+Required:
+
+- `backup_schedules` (Attributes List) List of backup schedules (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules))
+
+<a id="nestedatt--backup_plan--standard_plan--backup_schedules"></a>
+### Nested Schema for `backup_plan.standard_plan.backup_schedules`
+
+Required:
+
+- `retention_days` (Number) Retention days
+- `schedule_config` (Attributes) Schedule configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config))
+- `vault_id` (String) Vault ID
+
+<a id="nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config"></a>
+### Nested Schema for `backup_plan.standard_plan.backup_schedules.schedule_config`
+
+Required:
+
+- `frequency` (String) Frequency: 'DAILY', 'WEEKLY', 'MONTHLY', 'ANNUALLY', 'INTERVAL'
+
+Optional:
+
+- `daily_config` (Attributes) Daily configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--daily_config))
+
+<a id="nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--daily_config"></a>
+### Nested Schema for `backup_plan.standard_plan.backup_schedules.schedule_config.daily_config`
+
+Optional:
+
+- `start_window_minutes` (Number) Start window in minutes
+- `time_of_day_hour` (Number) Hour of day (0-23)
+- `time_of_day_minutes` (Number) Minutes of hour (0-59)
+
+
+
+
+
+
+<a id="nestedatt--resource_selector"></a>
+### Nested Schema for `resource_selector`
+
+Required:
+
+- `resource_selection_mode` (String) Resource selection mode: 'ALL', 'NONE', or 'CONDITIONAL'
+
+Optional:
+
+- `expression` (Attributes) Conditional expression for CONDITIONAL resource selection mode (see [below for nested schema](#nestedatt--resource_selector--expression))
+- `resource_exclusion_override` (List of String) List of resource IDs to exclude regardless of selection mode
+- `resource_inclusion_override` (List of String) List of resource IDs to include regardless of selection mode
+
+<a id="nestedatt--resource_selector--expression"></a>
+### Nested Schema for `resource_selector.expression`
+
+Optional:
+
+- `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--resource_selector--expression--environment))
+- `resource_type` (Attributes) Resource type condition (see [below for nested schema](#nestedatt--resource_selector--expression--resource_type))
+
+<a id="nestedatt--resource_selector--expression--environment"></a>
+### Nested Schema for `resource_selector.expression.environment`
+
+Required:
+
+- `environments` (List of String) List of environments
 - `operator` (String) Operator: 'IN' or 'NOT_IN'
-- `resource_types` (List of String) List of resource types (e.g., 'AWS_EC2', 'AWS_S3')
+
+
+<a id="nestedatt--resource_selector--expression--resource_type"></a>
+### Nested Schema for `resource_selector.expression.resource_type`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `resource_types` (List of String) List of resource types

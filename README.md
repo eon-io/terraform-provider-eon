@@ -90,20 +90,34 @@ resource "eon_restore_account" "aws_disaster_recovery" {
 
 ```hcl
 # Create a backup policy
-resource "eon_backup_policy" "daily_production" {
-  name                    = "Daily Production Backup"
-  enabled                 = true
-  resource_selection_mode = "ALL"
-  backup_policy_type      = "STANDARD"
-  
-  vault_id           = "vault-12345678-1234-1234-1234-123456789012"
-  schedule_frequency = "DAILY"
-  time_of_day_hour   = 2
-  time_of_day_minutes = 0
-  retention_days     = 30
-  
-  resource_inclusion_override = []
-  resource_exclusion_override = []
+resource "eon_backup_policy" "all_resources" {
+  name         = "All Resources Policy"
+  enabled      = true
+  schedule_mode = "STANDARD"
+
+  resource_selector = {
+    resource_selection_mode = "ALL"
+  }
+
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      backup_schedules = [
+        {
+          vault_id = "vault-all"
+          retention_days = 90
+          schedule_config = {
+            frequency = "DAILY"
+            daily_config = {
+              time_of_day_hour = 1
+              time_of_day_minutes = 0
+              start_window_minutes = 360
+            }
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 
