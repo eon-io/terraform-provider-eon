@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
@@ -151,6 +152,11 @@ func (m *MockEonClient) ListBackupPolicies(ctx context.Context) ([]externalEonSd
 	for _, policy := range m.BackupPolicies {
 		policies = append(policies, *policy)
 	}
+
+	// Sort policies by ID for consistent ordering
+	sort.Slice(policies, func(i, j int) bool {
+		return policies[i].Id < policies[j].Id
+	})
 
 	return policies, nil
 }
