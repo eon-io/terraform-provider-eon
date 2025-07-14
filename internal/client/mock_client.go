@@ -3,12 +3,16 @@ package client
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 )
 
 // MockEonClient implements the EonClient interface with mock data
 type MockEonClient struct {
+	// Mutex for thread safety
+	mu sync.RWMutex
+
 	// Storage for mock data
 	BackupPolicies map[string]*externalEonSdkAPI.BackupPolicy
 
@@ -40,6 +44,9 @@ func NewMockEonClient() *MockEonClient {
 
 // CreateBackupPolicy mocks creating a backup policy
 func (m *MockEonClient) CreateBackupPolicy(ctx context.Context, req externalEonSdkAPI.CreateBackupPolicyRequest) (*externalEonSdkAPI.BackupPolicy, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.CreateCalls++
 
 	if m.ShouldFailCreate {
@@ -64,6 +71,9 @@ func (m *MockEonClient) CreateBackupPolicy(ctx context.Context, req externalEonS
 
 // ReadBackupPolicy mocks reading a backup policy
 func (m *MockEonClient) ReadBackupPolicy(ctx context.Context, id string) (*externalEonSdkAPI.BackupPolicy, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.ReadCalls++
 
 	if m.ShouldFailRead {
@@ -80,6 +90,9 @@ func (m *MockEonClient) ReadBackupPolicy(ctx context.Context, id string) (*exter
 
 // UpdateBackupPolicy mocks updating a backup policy
 func (m *MockEonClient) UpdateBackupPolicy(ctx context.Context, id string, req externalEonSdkAPI.UpdateBackupPolicyRequest) (*externalEonSdkAPI.BackupPolicy, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.UpdateCalls++
 
 	if m.ShouldFailUpdate {
@@ -105,6 +118,9 @@ func (m *MockEonClient) UpdateBackupPolicy(ctx context.Context, id string, req e
 
 // DeleteBackupPolicy mocks deleting a backup policy
 func (m *MockEonClient) DeleteBackupPolicy(ctx context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.DeleteCalls++
 
 	if m.ShouldFailDelete {
@@ -122,6 +138,9 @@ func (m *MockEonClient) DeleteBackupPolicy(ctx context.Context, id string) error
 
 // ListBackupPolicies mocks listing backup policies
 func (m *MockEonClient) ListBackupPolicies(ctx context.Context) ([]externalEonSdkAPI.BackupPolicy, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.ListCalls++
 
 	if m.ShouldFailList {
@@ -143,6 +162,9 @@ func (m *MockEonClient) GetBackupPolicy(ctx context.Context, id string) (*extern
 
 // Reset clears all mock data and resets counters
 func (m *MockEonClient) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.BackupPolicies = make(map[string]*externalEonSdkAPI.BackupPolicy)
 	m.CreateCalls = 0
 	m.ReadCalls = 0
@@ -158,11 +180,17 @@ func (m *MockEonClient) Reset() {
 
 // AddMockPolicy adds a pre-defined mock policy for testing
 func (m *MockEonClient) AddMockPolicy(policy *externalEonSdkAPI.BackupPolicy) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.BackupPolicies[policy.Id] = policy
 }
 
 // GetMockPolicy retrieves a mock policy for testing
 func (m *MockEonClient) GetMockPolicy(id string) (*externalEonSdkAPI.BackupPolicy, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	policy, exists := m.BackupPolicies[id]
 	return policy, exists
 }

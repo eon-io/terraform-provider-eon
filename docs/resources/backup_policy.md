@@ -65,79 +65,15 @@ resource "eon_backup_policy" "high_frequency_backup" {
   backup_plan = {
     backup_policy_type = "HIGH_FREQUENCY"
     high_frequency_plan = {
-      resource_types = ["RDS_INSTANCE", "DYNAMO_DB_TABLE"]
+      resource_types = ["AWS_S3", "AWS_DYNAMO_DB"]
       backup_schedules = [
         {
-          vault_id       = "vault-12345678-1234-1234-1234-123456789012"
+          vault_id       = "e19a6ad1-6a97-49a1-b7c9-9620977ea018"
           retention_days = 7
           schedule_config = {
             frequency = "INTERVAL"
             interval_config = {
-              interval_hours = 1
-            }
-          }
-        }
-      ]
-    }
-  }
-}
-
-# Example: Weekly backup policy
-resource "eon_backup_policy" "weekly_backup" {
-  name          = "Weekly Production Backup"
-  enabled       = true
-  schedule_mode = "STANDARD"
-
-  resource_selector = {
-    resource_selection_mode = "ALL"
-  }
-
-  backup_plan = {
-    backup_policy_type = "STANDARD"
-    standard_plan = {
-      backup_schedules = [
-        {
-          vault_id       = "vault-87654321-4321-4321-4321-210987654321"
-          retention_days = 90
-          schedule_config = {
-            frequency = "WEEKLY"
-            weekly_config = {
-              days_of_week         = ["SUNDAY"]
-              time_of_day_hour     = 3
-              time_of_day_minutes  = 30
-              start_window_minutes = 360
-            }
-          }
-        }
-      ]
-    }
-  }
-}
-
-# Example: Monthly backup policy
-resource "eon_backup_policy" "monthly_backup" {
-  name          = "Monthly Archive Backup"
-  enabled       = true
-  schedule_mode = "STANDARD"
-
-  resource_selector = {
-    resource_selection_mode = "ALL"
-  }
-
-  backup_plan = {
-    backup_policy_type = "STANDARD"
-    standard_plan = {
-      backup_schedules = [
-        {
-          vault_id       = "vault-monthly-archive"
-          retention_days = 365
-          schedule_config = {
-            frequency = "MONTHLY"
-            monthly_config = {
-              days_of_month        = [1, 15]
-              time_of_day_hour     = 1
-              time_of_day_minutes  = 0
-              start_window_minutes = 480
+              interval_minutes = 30
             }
           }
         }
@@ -160,31 +96,36 @@ resource "eon_backup_policy" "conditional_backup" {
         operator = "AND"
         operands = [
           {
-            # Basic resource type condition
             resource_type = {
               operator       = "IN"
-              resource_types = ["EC2_INSTANCE", "EBS_VOLUME"]
+              resource_types = ["AWS_EC2", "AWS_RDS"]
             }
           },
           {
-            # Environment condition
             environment = {
               operator     = "IN"
-              environments = ["production", "staging"]
+              environments = ["PROD"]
             }
           },
           {
-            # NEW: Data classes condition
-            data_classes = {
-              operator     = "CONTAINS"
-              data_classes = ["PII", "CONFIDENTIAL"]
+            tag_keys = {
+              operator = "CONTAINS_ANY_OF"
+              tag_keys = ["Environment", "Owner"]
             }
           },
           {
-            # NEW: Cloud provider condition
-            cloud_provider = {
-              operator        = "IN"
-              cloud_providers = ["AWS", "AZURE"]
+            tag_key_values = {
+              operator = "CONTAINS_ANY_OF"
+              tag_key_values = [
+                {
+                  key   = "Environment"
+                  value = "Production"
+                },
+                {
+                  key   = "Critical"
+                  value = "true"
+                }
+              ]
             }
           }
         ]
@@ -197,7 +138,7 @@ resource "eon_backup_policy" "conditional_backup" {
     standard_plan = {
       backup_schedules = [
         {
-          vault_id       = "vault-conditional"
+          vault_id       = "e19a6ad1-6a97-49a1-b7c9-9620977ea018"
           retention_days = 60
           schedule_config = {
             frequency = "DAILY"
@@ -212,7 +153,6 @@ resource "eon_backup_policy" "conditional_backup" {
     }
   }
 }
-
 # Example: Comprehensive condition types demonstration
 resource "eon_backup_policy" "all_condition_types" {
   name          = "All Condition Types Demo"
@@ -227,101 +167,96 @@ resource "eon_backup_policy" "all_condition_types" {
         operator = "AND"
         operands = [
           {
-            # 1. Resource Type (existing)
             resource_type = {
               operator       = "IN"
-              resource_types = ["EC2_INSTANCE", "EBS_VOLUME"]
+              resource_types = ["AWS_EC2", "AWS_RDS"]
             }
           },
           {
-            # 2. Environment (existing)
             environment = {
               operator     = "IN"
-              environments = ["production"]
+              environments = ["PROD"]
             }
           },
           {
-            # 3. Tag Keys (existing)
             tag_keys = {
-              operator = "CONTAINS"
+              operator = "CONTAINS_ANY_OF"
               tag_keys = ["Environment", "Owner"]
             }
           },
           {
-            # 4. Tag Key Values (existing)
-            tag_key_values = {
-              operator       = "CONTAINS"
-              tag_key_values = ["production", "critical"]
-            }
-          },
-          {
-            # 5. Data Classes (NEW)
             data_classes = {
-              operator     = "CONTAINS"
-              data_classes = ["PII", "CONFIDENTIAL"]
+              operator     = "CONTAINS_ANY_OF"
+              data_classes = ["PII", "PHI"]
             }
           },
           {
-            # 6. Apps (NEW)
+            cloud_provider = {
+              operator        = "IN"
+              cloud_providers = ["AWS", "AZURE"]
+            }
+          },
+          {
             apps = {
-              operator = "CONTAINS"
+              operator = "CONTAINS_ANY_OF"
               apps     = ["web-app", "database"]
             }
           },
           {
-            # 7. Cloud Provider (NEW)
-            cloud_provider = {
-              operator        = "IN"
-              cloud_providers = ["AWS"]
-            }
-          },
-          {
-            # 8. Account ID (NEW)
             account_id = {
               operator    = "IN"
               account_ids = ["123456789012"]
             }
           },
           {
-            # 9. Source Region (NEW)
             source_region = {
               operator       = "IN"
               source_regions = ["us-east-1", "us-west-2"]
             }
           },
           {
-            # 10. VPC (NEW)
             vpc = {
               operator = "IN"
               vpcs     = ["vpc-production"]
             }
           },
           {
-            # 11. Subnets (NEW)
             subnets = {
-              operator = "CONTAINS"
+              operator = "CONTAINS_NONE_OF"
               subnets  = ["subnet-web-tier", "subnet-db-tier"]
             }
           },
           {
-            # 12. Resource Group Name (NEW)
             resource_group_name = {
-              operator             = "CONTAINS"
+              operator             = "IN"
               resource_group_names = ["production-rg"]
             }
           },
           {
-            # 13. Resource Name (NEW)
             resource_name = {
-              operator       = "CONTAINS"
+              operator       = "IN"
               resource_names = ["prod-", "critical-"]
             }
           },
           {
-            # 14. Resource ID (NEW)
             resource_id = {
               operator     = "IN"
               resource_ids = ["i-123456789abcdef0"]
+            }
+          },
+          {
+            tag_key_values = {
+              operator = "CONTAINS_ANY_OF"
+              tag_key_values = [
+                {
+                  key   = "Environment"
+                  value = "Production"
+                },
+                {
+                  key   = "Critical"
+                  value = "true"
+                }
+              ]
             }
           }
         ]
@@ -334,15 +269,14 @@ resource "eon_backup_policy" "all_condition_types" {
     standard_plan = {
       backup_schedules = [
         {
-          vault_id       = "vault-all-conditions"
-          retention_days = 180
+          vault_id       = "e19a6ad1-6a97-49a1-b7c9-9620977ea018"
+          retention_days = 60
           schedule_config = {
-            frequency = "WEEKLY"
-            weekly_config = {
-              days_of_week         = ["SUNDAY", "WEDNESDAY"]
+            frequency = "DAILY"
+            daily_config = {
               time_of_day_hour     = 2
-              time_of_day_minutes  = 30
-              start_window_minutes = 180
+              time_of_day_minutes  = 0
+              start_window_minutes = 240
             }
           }
         }
@@ -360,16 +294,6 @@ output "daily_backup_policy_id" {
 output "high_frequency_backup_policy_id" {
   description = "ID of the high frequency backup policy"
   value       = eon_backup_policy.high_frequency_backup.id
-}
-
-output "weekly_backup_policy_id" {
-  description = "ID of the weekly backup policy"
-  value       = eon_backup_policy.weekly_backup.id
-}
-
-output "monthly_backup_policy_id" {
-  description = "ID of the monthly backup policy"
-  value       = eon_backup_policy.monthly_backup.id
 }
 
 output "conditional_backup_policy_id" {
@@ -394,16 +318,6 @@ output "backup_policies_summary" {
       id      = eon_backup_policy.high_frequency_backup.id
       name    = eon_backup_policy.high_frequency_backup.name
       enabled = eon_backup_policy.high_frequency_backup.enabled
-    }
-    weekly_backup = {
-      id      = eon_backup_policy.weekly_backup.id
-      name    = eon_backup_policy.weekly_backup.name
-      enabled = eon_backup_policy.weekly_backup.enabled
-    }
-    monthly_backup = {
-      id      = eon_backup_policy.monthly_backup.id
-      name    = eon_backup_policy.monthly_backup.name
-      enabled = eon_backup_policy.monthly_backup.enabled
     }
     conditional_backup = {
       id      = eon_backup_policy.conditional_backup.id
@@ -478,7 +392,7 @@ Required:
 
 Required:
 
-- `interval_hours` (Number) Interval in hours
+- `interval_minutes` (Number) Interval in hours
 
 Optional:
 
@@ -548,7 +462,10 @@ Optional:
 Optional:
 
 - `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--resource_selector--expression--environment))
+- `group` (Attributes) Group condition with logical operator and operands (see [below for nested schema](#nestedatt--resource_selector--expression--group))
 - `resource_type` (Attributes) Resource type condition (see [below for nested schema](#nestedatt--resource_selector--expression--resource_type))
+- `tag_key_values` (Attributes) Tag key-value pairs condition (see [below for nested schema](#nestedatt--resource_selector--expression--tag_key_values))
+- `tag_keys` (Attributes) Tag keys condition (see [below for nested schema](#nestedatt--resource_selector--expression--tag_keys))
 
 <a id="nestedatt--resource_selector--expression--environment"></a>
 ### Nested Schema for `resource_selector.expression.environment`
@@ -559,6 +476,171 @@ Required:
 - `operator` (String) Operator: 'IN' or 'NOT_IN'
 
 
+<a id="nestedatt--resource_selector--expression--group"></a>
+### Nested Schema for `resource_selector.expression.group`
+
+Required:
+
+- `operands` (Attributes List) List of conditions (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands))
+- `operator` (String) Logical operator: 'AND' or 'OR'
+
+<a id="nestedatt--resource_selector--expression--group--operands"></a>
+### Nested Schema for `resource_selector.expression.group.operands`
+
+Optional:
+
+- `account_id` (Attributes) Account ID condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--account_id))
+- `apps` (Attributes) Apps condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--apps))
+- `cloud_provider` (Attributes) Cloud provider condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--cloud_provider))
+- `data_classes` (Attributes) Data classes condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--data_classes))
+- `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--environment))
+- `resource_group_name` (Attributes) Resource group name condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--resource_group_name))
+- `resource_id` (Attributes) Resource ID condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--resource_id))
+- `resource_name` (Attributes) Resource name condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--resource_name))
+- `resource_type` (Attributes) Resource type condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--resource_type))
+- `source_region` (Attributes) Source region condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--source_region))
+- `subnets` (Attributes) Subnets condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--subnets))
+- `tag_key_values` (Attributes) Tag key-value pairs condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--tag_key_values))
+- `tag_keys` (Attributes) Tag keys condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--tag_keys))
+- `vpc` (Attributes) VPC condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--vpc))
+
+<a id="nestedatt--resource_selector--expression--group--operands--account_id"></a>
+### Nested Schema for `resource_selector.expression.group.operands.account_id`
+
+Required:
+
+- `account_ids` (List of String) List of account IDs
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--apps"></a>
+### Nested Schema for `resource_selector.expression.group.operands.apps`
+
+Required:
+
+- `apps` (List of String) List of apps
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--cloud_provider"></a>
+### Nested Schema for `resource_selector.expression.group.operands.cloud_provider`
+
+Required:
+
+- `cloud_providers` (List of String) List of cloud providers
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--data_classes"></a>
+### Nested Schema for `resource_selector.expression.group.operands.data_classes`
+
+Required:
+
+- `data_classes` (List of String) List of data classes
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--environment"></a>
+### Nested Schema for `resource_selector.expression.group.operands.environment`
+
+Required:
+
+- `environments` (List of String) List of environments
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--resource_group_name"></a>
+### Nested Schema for `resource_selector.expression.group.operands.resource_group_name`
+
+Required:
+
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+- `resource_group_names` (List of String) List of resource group names
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--resource_id"></a>
+### Nested Schema for `resource_selector.expression.group.operands.resource_id`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `resource_ids` (List of String) List of resource IDs
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--resource_name"></a>
+### Nested Schema for `resource_selector.expression.group.operands.resource_name`
+
+Required:
+
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+- `resource_names` (List of String) List of resource names
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--resource_type"></a>
+### Nested Schema for `resource_selector.expression.group.operands.resource_type`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `resource_types` (List of String) List of resource types
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--source_region"></a>
+### Nested Schema for `resource_selector.expression.group.operands.source_region`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `source_regions` (List of String) List of source regions
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--subnets"></a>
+### Nested Schema for `resource_selector.expression.group.operands.subnets`
+
+Required:
+
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+- `subnets` (List of String) List of subnets
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--tag_key_values"></a>
+### Nested Schema for `resource_selector.expression.group.operands.tag_key_values`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `tag_key_values` (Attributes List) List of tag key-value pairs to match (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--tag_key_values--tag_key_values))
+
+<a id="nestedatt--resource_selector--expression--group--operands--tag_key_values--tag_key_values"></a>
+### Nested Schema for `resource_selector.expression.group.operands.tag_key_values.tag_key_values`
+
+Required:
+
+- `key` (String) Tag key
+- `value` (String) Tag value
+
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--tag_keys"></a>
+### Nested Schema for `resource_selector.expression.group.operands.tag_keys`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `tag_keys` (List of String) List of tag keys to match
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--vpc"></a>
+### Nested Schema for `resource_selector.expression.group.operands.vpc`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `vpcs` (List of String) List of VPCs
+
+
+
+
 <a id="nestedatt--resource_selector--expression--resource_type"></a>
 ### Nested Schema for `resource_selector.expression.resource_type`
 
@@ -566,3 +648,30 @@ Required:
 
 - `operator` (String) Operator: 'IN' or 'NOT_IN'
 - `resource_types` (List of String) List of resource types
+
+
+<a id="nestedatt--resource_selector--expression--tag_key_values"></a>
+### Nested Schema for `resource_selector.expression.tag_key_values`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `tag_key_values` (Attributes List) List of tag key-value pairs to match (see [below for nested schema](#nestedatt--resource_selector--expression--tag_key_values--tag_key_values))
+
+<a id="nestedatt--resource_selector--expression--tag_key_values--tag_key_values"></a>
+### Nested Schema for `resource_selector.expression.tag_key_values.tag_key_values`
+
+Required:
+
+- `key` (String) Tag key
+- `value` (String) Tag value
+
+
+
+<a id="nestedatt--resource_selector--expression--tag_keys"></a>
+### Nested Schema for `resource_selector.expression.tag_keys`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `tag_keys` (List of String) List of tag keys to match
