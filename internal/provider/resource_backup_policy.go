@@ -719,19 +719,28 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 		if dailyConfigObj, exists := scheduleConfigAttrs["daily_config"]; exists && !dailyConfigObj.IsNull() {
 			dailyConfigAttrs := dailyConfigObj.(types.Object).Attributes()
 
-			timeOfDayHour := dailyConfigAttrs["time_of_day_hour"].(types.Int64).ValueInt64()
-			timeOfDayMinutes := dailyConfigAttrs["time_of_day_minutes"].(types.Int64).ValueInt64()
+			timeOfDayHour, err := SafeInt32Conversion(dailyConfigAttrs["time_of_day_hour"].(types.Int64).ValueInt64())
+			if err != nil {
+				return nil, fmt.Errorf("invalid time of day hour: %s", err)
+			}
+			timeOfDayMinutes, err := SafeInt32Conversion(dailyConfigAttrs["time_of_day_minutes"].(types.Int64).ValueInt64())
+			if err != nil {
+				return nil, fmt.Errorf("invalid time of day minutes: %s", err)
+			}
 
 			timeOfDay := externalEonSdkAPI.NewTimeOfDay(
-				int32(timeOfDayHour),
-				int32(timeOfDayMinutes),
+				timeOfDayHour,
+				timeOfDayMinutes,
 			)
 
 			dailyConfig := externalEonSdkAPI.NewDailyConfig()
 			dailyConfig.SetTimeOfDay(*timeOfDay)
 
 			if startWindowObj, exists := dailyConfigAttrs["start_window_minutes"]; exists && !startWindowObj.IsNull() {
-				startWindow := int32(startWindowObj.(types.Int64).ValueInt64())
+				startWindow, err := SafeInt32Conversion(startWindowObj.(types.Int64).ValueInt64())
+				if err != nil {
+					return nil, fmt.Errorf("invalid start window minutes: %s", err)
+				}
 				dailyConfig.SetStartWindowMinutes(startWindow)
 			}
 

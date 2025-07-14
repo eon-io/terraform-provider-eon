@@ -90,7 +90,15 @@ func TestBackupPoliciesDataSource_ListWithMockClient(t *testing.T) {
 				// Verify policy names if any
 				for i, policy := range result {
 					if i < len(tt.expectedNames) {
-						assert.Equal(t, tt.expectedNames[i], policy.Name, "Policy name should match")
+						// Check if the policy name is in the expected names (order doesn't matter)
+						found := false
+						for _, expectedName := range tt.expectedNames {
+							if policy.Name == expectedName {
+								found = true
+								break
+							}
+						}
+						assert.True(t, found, "Policy name %s should be in expected names %v", policy.Name, tt.expectedNames)
 					}
 				}
 			}
