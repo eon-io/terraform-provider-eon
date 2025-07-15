@@ -8,8 +8,8 @@ terraform {
 
 # Example: Basic backup policy with daily schedule
 resource "eon_backup_policy" "daily_backup" {
-  name          = "Daily Production Backup"
-  enabled       = true
+  name    = "Daily Production Backup"
+  enabled = true
   resource_selector = {
     resource_selection_mode = "ALL"
   }
@@ -37,8 +37,8 @@ resource "eon_backup_policy" "daily_backup" {
 
 # Example: High frequency backup policy
 resource "eon_backup_policy" "high_frequency_backup" {
-  name          = "High Frequency Critical Data Backup"
-  enabled       = true
+  name    = "High Frequency Critical Data Backup"
+  enabled = true
   resource_selector = {
     resource_selection_mode = "ALL"
   }
@@ -65,8 +65,8 @@ resource "eon_backup_policy" "high_frequency_backup" {
 
 # Example: Conditional backup policy using new condition types
 resource "eon_backup_policy" "conditional_backup" {
-  name          = "Conditional Production Backup"
-  enabled       = true
+  name    = "Conditional Production Backup"
+  enabled = true
   resource_selector = {
     resource_selection_mode = "CONDITIONAL"
 
@@ -134,8 +134,8 @@ resource "eon_backup_policy" "conditional_backup" {
 }
 # Example: Comprehensive condition types demonstration
 resource "eon_backup_policy" "all_condition_types" {
-  name          = "All Condition Types Demo"
-  enabled       = true
+  name    = "All Condition Types Demo"
+  enabled = true
   resource_selector = {
     resource_selection_mode = "CONDITIONAL"
 
