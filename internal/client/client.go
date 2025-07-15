@@ -77,6 +77,20 @@ func (c *EonClient) ensureValidToken() error {
 	return nil
 }
 
+// handleAPIError processes API errors and extracts detailed error information from HTTP responses
+func (c *EonClient) handleAPIError(err error, httpResp *http.Response, baseErrorMsg string) error {
+	if err != nil && httpResp != nil {
+		defer httpResp.Body.Close()
+		if body, readErr := io.ReadAll(httpResp.Body); readErr == nil && len(body) > 0 {
+			return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+		}
+		return fmt.Errorf("%s: %w", baseErrorMsg, err)
+	} else if err != nil {
+		return fmt.Errorf("%s: %w", baseErrorMsg, err)
+	}
+	return nil
+}
+
 // ListSourceAccounts retrieves all source accounts for the project
 func (c *EonClient) ListSourceAccounts(ctx context.Context) ([]externalEonSdkAPI.SourceAccount, error) {
 	if err := c.ensureValidToken(); err != nil {
@@ -84,14 +98,15 @@ func (c *EonClient) ListSourceAccounts(ctx context.Context) ([]externalEonSdkAPI
 	}
 
 	resp, httpResp, err := c.client.AccountsAPI.ListSourceAccounts(ctx, c.ProjectID).ListSourceAccountsRequest(externalEonSdkAPI.ListSourceAccountsRequest{}).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list source accounts: %w", err)
+
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list source accounts"); apiErr != nil {
+		return nil, apiErr
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	if resp.GetAccounts() == nil {
@@ -108,14 +123,15 @@ func (c *EonClient) ListRestoreAccounts(ctx context.Context) ([]externalEonSdkAP
 	}
 
 	resp, httpResp, err := c.client.AccountsAPI.ListRestoreAccounts(ctx, c.ProjectID).ListRestoreAccountsRequest(externalEonSdkAPI.ListRestoreAccountsRequest{}).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list restore accounts: %w", err)
+
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list restore accounts"); apiErr != nil {
+		return nil, apiErr
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	if resp.GetAccounts() == nil {
@@ -132,14 +148,14 @@ func (c *EonClient) ConnectSourceAccount(ctx context.Context, req externalEonSdk
 	}
 
 	resp, httpResp, err := c.client.AccountsAPI.ConnectSourceAccount(ctx, c.ProjectID).ConnectSourceAccountRequest(req).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect source account: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to connect source account"); apiErr != nil {
+		return nil, apiErr
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	account := resp.GetSourceAccount()
@@ -153,14 +169,14 @@ func (c *EonClient) DisconnectSourceAccount(ctx context.Context, accountId strin
 	}
 
 	_, httpResp, err := c.client.AccountsAPI.DisconnectSourceAccount(ctx, c.ProjectID, accountId).Execute()
-	if err != nil {
-		return fmt.Errorf("failed to disconnect source account: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to disconnect source account"); apiErr != nil {
+		return apiErr
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(httpResp.Body)
-		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	return nil
@@ -173,14 +189,14 @@ func (c *EonClient) ConnectRestoreAccount(ctx context.Context, req externalEonSd
 	}
 
 	resp, httpResp, err := c.client.AccountsAPI.ConnectRestoreAccount(ctx, c.ProjectID).ConnectRestoreAccountRequest(req).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect restore account: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to connect restore account"); apiErr != nil {
+		return nil, apiErr
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	account := resp.GetRestoreAccount()
@@ -194,14 +210,14 @@ func (c *EonClient) DisconnectRestoreAccount(ctx context.Context, accountId stri
 	}
 
 	_, httpResp, err := c.client.AccountsAPI.DisconnectRestoreAccount(ctx, c.ProjectID, accountId).Execute()
-	if err != nil {
-		return fmt.Errorf("failed to disconnect restore account: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to disconnect restore account"); apiErr != nil {
+		return apiErr
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(httpResp.Body)
-		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	return nil
@@ -214,13 +230,15 @@ func (c *EonClient) GetRestoreJob(ctx context.Context, jobId string) (*externalE
 	}
 
 	resp, httpResp, err := c.client.JobsAPI.GetRestoreJob(ctx, jobId, c.ProjectID).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get restore job: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get restore job"); apiErr != nil {
+		return nil, apiErr
 	}
+
+	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	job := resp.GetJob()
@@ -234,31 +252,36 @@ func (c *EonClient) StartVolumeRestore(ctx context.Context, resourceId, snapshot
 	}
 
 	resp, httpResp, err := c.client.SnapshotsAPI.RestoreEbsVolume(ctx, c.ProjectID, resourceId, snapshotId).RestoreVolumeToEbsRequest(req).Execute()
-	if err != nil {
-		return "", fmt.Errorf("failed to start volume restore: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start volume restore"); apiErr != nil {
+		return "", apiErr
 	}
+
+	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	return resp.GetJobId(), nil
 }
 
+// GetResourceById retrieves a resource by ID
 func (c *EonClient) GetResourceById(ctx context.Context, resourceId string) (*externalEonSdkAPI.InventoryResource, error) {
 	if err := c.ensureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
 	resp, httpResp, err := c.client.ResourcesAPI.GetResource(ctx, resourceId, c.ProjectID).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get resource: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get resource"); apiErr != nil {
+		return nil, apiErr
 	}
+
+	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	resource := resp.GetResource()
@@ -272,13 +295,15 @@ func (c *EonClient) StartRdsRestore(ctx context.Context, resourceId, snapshotId 
 	}
 
 	resp, httpResp, err := c.client.SnapshotsAPI.RestoreDatabase(ctx, c.ProjectID, resourceId, snapshotId).RestoreDbToRdsInstanceRequest(req).Execute()
-	if err != nil {
-		return "", fmt.Errorf("failed to start RDS restore: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start RDS restore"); apiErr != nil {
+		return "", apiErr
 	}
+
+	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	return resp.GetJobId(), nil
@@ -291,13 +316,15 @@ func (c *EonClient) StartEc2InstanceRestore(ctx context.Context, resourceId, sna
 	}
 
 	resp, httpResp, err := c.client.SnapshotsAPI.RestoreEc2Instance(ctx, c.ProjectID, resourceId, snapshotId).RestoreInstanceInput(req).Execute()
-	if err != nil {
-		return "", fmt.Errorf("failed to start EC2 instance restore: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start EC2 instance restore"); apiErr != nil {
+		return "", apiErr
 	}
+
+	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	return resp.GetJobId(), nil
@@ -310,13 +337,15 @@ func (c *EonClient) StartS3BucketRestore(ctx context.Context, resourceId, snapsh
 	}
 
 	resp, httpResp, err := c.client.SnapshotsAPI.RestoreBucket(ctx, c.ProjectID, resourceId, snapshotId).RestoreBucketRequest(req).Execute()
-	if err != nil {
-		return "", fmt.Errorf("failed to start S3 bucket restore: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start S3 bucket restore"); apiErr != nil {
+		return "", apiErr
 	}
+
+	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	return resp.GetJobId(), nil
@@ -329,13 +358,15 @@ func (c *EonClient) StartS3FileRestore(ctx context.Context, resourceId, snapshot
 	}
 
 	resp, httpResp, err := c.client.SnapshotsAPI.RestoreFiles(ctx, c.ProjectID, resourceId, snapshotId).RestoreFilesRequest(req).Execute()
-	if err != nil {
-		return "", fmt.Errorf("failed to start S3 file restore: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start S3 file restore"); apiErr != nil {
+		return "", apiErr
 	}
+
+	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	return resp.GetJobId(), nil
@@ -348,13 +379,15 @@ func (c *EonClient) GetSnapshot(ctx context.Context, snapshotId string) (*extern
 	}
 
 	resp, httpResp, err := c.client.SnapshotsAPI.GetSnapshot(ctx, snapshotId, c.ProjectID).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get snapshot: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get snapshot"); apiErr != nil {
+		return nil, apiErr
 	}
+
+	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	snapshot := resp.GetSnapshot()
@@ -404,18 +437,15 @@ func (c *EonClient) ListBackupPolicies(ctx context.Context) ([]externalEonSdkAPI
 	}
 
 	resp, httpResp, err := c.client.BackupPoliciesAPI.ListBackupPolicies(ctx, c.ProjectID).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list backup policies: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list backup policies"); apiErr != nil {
+		return nil, apiErr
 	}
+
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
-	}
-
-	if resp.GetBackupPolicies() == nil {
-		return []externalEonSdkAPI.BackupPolicy{}, nil
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	return resp.GetBackupPolicies(), nil
@@ -428,14 +458,15 @@ func (c *EonClient) GetBackupPolicy(ctx context.Context, policyId string) (*exte
 	}
 
 	resp, httpResp, err := c.client.BackupPoliciesAPI.GetBackupPolicy(ctx, policyId, c.ProjectID).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get backup policy: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get backup policy"); apiErr != nil {
+		return nil, apiErr
 	}
+
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	policy := resp.GetBackupPolicy()
@@ -449,9 +480,10 @@ func (c *EonClient) CreateBackupPolicy(ctx context.Context, req externalEonSdkAP
 	}
 
 	resp, httpResp, err := c.client.BackupPoliciesAPI.CreateBackupPolicy(ctx, c.ProjectID).CreateBackupPolicyRequest(req).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create backup policy: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to create backup policy"); apiErr != nil {
+		return nil, apiErr
 	}
+
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
@@ -470,14 +502,14 @@ func (c *EonClient) UpdateBackupPolicy(ctx context.Context, policyId string, req
 	}
 
 	resp, httpResp, err := c.client.BackupPoliciesAPI.UpdateBackupPolicy(ctx, policyId, c.ProjectID).UpdateBackupPolicyRequest(req).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to update backup policy: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to update backup policy"); apiErr != nil {
+		return nil, apiErr
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	policy := resp.GetBackupPolicy()
@@ -491,14 +523,14 @@ func (c *EonClient) DeleteBackupPolicy(ctx context.Context, policyId string) err
 	}
 
 	httpResp, err := c.client.BackupPoliciesAPI.DeleteBackupPolicy(ctx, policyId, c.ProjectID).Execute()
-	if err != nil {
-		return fmt.Errorf("failed to delete backup policy: %w", err)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to delete backup policy"); apiErr != nil {
+		return apiErr
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(httpResp.Body)
-		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
 
 	return nil

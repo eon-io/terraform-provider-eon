@@ -33,7 +33,6 @@ type BackupPolicyResourceModel struct {
 	Id               types.String `tfsdk:"id"`
 	Name             types.String `tfsdk:"name"`
 	Enabled          types.Bool   `tfsdk:"enabled"`
-	ScheduleMode     types.String `tfsdk:"schedule_mode"`
 	ResourceSelector types.Object `tfsdk:"resource_selector"`
 	BackupPlan       types.Object `tfsdk:"backup_plan"`
 	CreatedAt        types.String `tfsdk:"created_at"`
@@ -206,10 +205,6 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"enabled": schema.BoolAttribute{
 				MarkdownDescription: "Whether the backup policy is enabled",
-				Required:            true,
-			},
-			"schedule_mode": schema.StringAttribute{
-				MarkdownDescription: "Schedule mode: 'STANDARD'",
 				Required:            true,
 			},
 			"resource_selector": schema.SingleNestedAttribute{
@@ -877,9 +872,8 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	tflog.Debug(ctx, "Creating backup policy", map[string]interface{}{
-		"name":          data.Name.ValueString(),
-		"enabled":       data.Enabled.ValueBool(),
-		"schedule_mode": data.ScheduleMode.ValueString(),
+		"name":    data.Name.ValueString(),
+		"enabled": data.Enabled.ValueBool(),
 	})
 
 	policy, err := r.client.CreateBackupPolicy(ctx, *createReq)
@@ -891,7 +885,6 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 	data.Id = types.StringValue(policy.Id)
 	data.Name = types.StringValue(policy.Name)
 	data.Enabled = types.BoolValue(policy.Enabled)
-	data.ScheduleMode = types.StringValue("STANDARD")
 	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 
@@ -917,9 +910,11 @@ func (r *BackupPolicyResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
+	data.Id = types.StringValue(policy.Id)
 	data.Name = types.StringValue(policy.Name)
 	data.Enabled = types.BoolValue(policy.Enabled)
-	data.ScheduleMode = types.StringValue("STANDARD")
+	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -1121,12 +1116,11 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	tflog.Debug(ctx, "Updating backup policy", map[string]interface{}{
-		"name":          plan.Name.ValueString(),
-		"enabled":       plan.Enabled.ValueBool(),
-		"schedule_mode": plan.ScheduleMode.ValueString(),
+		"name":    plan.Name.ValueString(),
+		"enabled": plan.Enabled.ValueBool(),
 	})
 
-	policy, err := r.client.UpdateBackupPolicy(ctx, state.Id.ValueString(), *updateReq)
+	updatedPolicy, err := r.client.UpdateBackupPolicy(ctx, state.Id.ValueString(), *updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating backup policy",
@@ -1135,10 +1129,9 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	plan.Id = types.StringValue(policy.Id)
-	plan.Name = types.StringValue(policy.Name)
-	plan.Enabled = types.BoolValue(policy.Enabled)
-	plan.ScheduleMode = types.StringValue("STANDARD") // Default assumption
+	plan.Id = types.StringValue(updatedPolicy.Id)
+	plan.Name = types.StringValue(updatedPolicy.Name)
+	plan.Enabled = types.BoolValue(updatedPolicy.Enabled)
 	plan.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	plan.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 
@@ -1366,10 +1359,8 @@ func createBackupPolicyExpression(ctx context.Context, data *ResourceSelectorMod
 
 		var tagKeyValueEnums []externalEonSdkAPI.TagKeyValue
 		for _, kv := range tagKeyValues {
-			tagKeyValue := externalEonSdkAPI.NewTagKeyValue(
-				kv.Key.ValueString(),
-				kv.Value.ValueString(),
-			)
+			tagKeyValue := externalEonSdkAPI.NewTagKeyValue(kv.Key.ValueString())
+			tagKeyValue.SetValue(kv.Value.ValueString())
 			tagKeyValueEnums = append(tagKeyValueEnums, *tagKeyValue)
 		}
 
@@ -1512,10 +1503,8 @@ func createBackupPolicyExpression(ctx context.Context, data *ResourceSelectorMod
 
 				var tagKeyValueEnums []externalEonSdkAPI.TagKeyValue
 				for _, kv := range tagKeyValues {
-					tagKeyValue := externalEonSdkAPI.NewTagKeyValue(
-						kv.Key.ValueString(),
-						kv.Value.ValueString(),
-					)
+					tagKeyValue := externalEonSdkAPI.NewTagKeyValue(kv.Key.ValueString())
+					tagKeyValue.SetValue(kv.Value.ValueString())
 					tagKeyValueEnums = append(tagKeyValueEnums, *tagKeyValue)
 				}
 

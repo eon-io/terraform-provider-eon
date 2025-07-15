@@ -93,8 +93,6 @@ resource "eon_restore_account" "aws_disaster_recovery" {
 resource "eon_backup_policy" "all_resources" {
   name         = "All Resources Policy"
   enabled      = true
-  schedule_mode = "STANDARD"
-
   resource_selector = {
     resource_selection_mode = "ALL"
   }
