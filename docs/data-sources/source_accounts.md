@@ -60,6 +60,10 @@ output "connected_source_accounts" {
 <a id="nestedatt--accounts"></a>
 ### Nested Schema for `accounts`
 
+Required:
+
+- `role` (String) ARN of the role Eon assumes to access the account.
+
 Read-Only:
 
 - `created_at` (String) Date and time the source account was connected to the Eon project.

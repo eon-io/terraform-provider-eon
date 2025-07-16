@@ -66,21 +66,24 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"role": schema.StringAttribute{
-				MarkdownDescription: "ARN of the role Eon assumes to access the account in AWS.",
+				MarkdownDescription: "ARN of the role Eon assumes to access the account in AWS. **Required when creating new accounts**. Optional for imported accounts that already have a role configured in Eon.",
 				Optional:            true,
 				Computed:            true,
 			},
 			"status": schema.StringAttribute{
 				MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Date and time the source account was connected to the Eon project.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "Date and time the source account was last updated.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -197,6 +200,13 @@ func (r *SourceAccountResource) Read(ctx context.Context, req resource.ReadReque
 				data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
 			}
 
+			if data.CreatedAt.IsNull() || data.CreatedAt.IsUnknown() {
+				data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+			}
+			if data.UpdatedAt.IsNull() || data.UpdatedAt.IsUnknown() {
+				data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+			}
+
 			break
 		}
 	}
@@ -246,5 +256,50 @@ func (r *SourceAccountResource) Delete(ctx context.Context, req resource.DeleteR
 }
 
 func (r *SourceAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+
+	accounts, err := r.client.ListSourceAccounts(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read source accounts during import: %s", err))
+		return
+	}
+
+	var found bool
+	var data SourceAccountResourceModel
+
+	for _, account := range accounts {
+		if account.Id == req.ID {
+			found = true
+
+			data.Id = types.StringValue(account.Id)
+			data.Name = types.StringValue(account.GetName())
+			data.Status = types.StringValue(string(account.Status))
+			data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
+
+			if account.SourceAccountAttributes.HasCloudProvider() {
+				data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
+			}
+
+			data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+			data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+
+			break
+		}
+	}
+
+	if !found {
+		resp.Diagnostics.AddError(
+			"Resource Not Found",
+			fmt.Sprintf("Source account with ID %s not found", req.ID),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+
+	tflog.Info(ctx, "Successfully imported source account", map[string]interface{}{
+		"id":     data.Id.ValueString(),
+		"name":   data.Name.ValueString(),
+		"status": data.Status.ValueString(),
+	})
 }

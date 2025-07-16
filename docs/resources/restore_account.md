@@ -51,7 +51,10 @@ output "aws_disaster_recovery_account" {
 - `cloud_provider` (String) Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.
 - `name` (String) Account display name in Eon.
 - `provider_account_id` (String) Cloud-provider-assigned account ID.
-- `role` (String) ARN of the role Eon assumes to access the account in AWS.
+
+### Optional
+
+- `role` (String) ARN of the role Eon assumes to access the account in AWS. **Required when creating new accounts**. Optional for imported accounts that already have a role configured in Eon.
 
 ### Read-Only
 

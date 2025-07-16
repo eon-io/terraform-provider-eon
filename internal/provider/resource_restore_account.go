@@ -66,21 +66,24 @@ func (r *RestoreAccountResource) Schema(ctx context.Context, req resource.Schema
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"role": schema.StringAttribute{
-				MarkdownDescription: "ARN of the role Eon assumes to access the account in AWS.",
+				MarkdownDescription: "ARN of the role Eon assumes to access the account in AWS. **Required when creating new accounts**. Optional for imported accounts that already have a role configured in Eon.",
 				Optional:            true,
 				Computed:            true,
 			},
 			"status": schema.StringAttribute{
 				MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Date and time the restore account was connected to the Eon project.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "Date and time the restore account was last updated.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -196,6 +199,13 @@ func (r *RestoreAccountResource) Read(ctx context.Context, req resource.ReadRequ
 				data.CloudProvider = types.StringValue(string(account.RestoreAccountAttributes.GetCloudProvider()))
 			}
 
+			if data.CreatedAt.IsNull() || data.CreatedAt.IsUnknown() {
+				data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+			}
+			if data.UpdatedAt.IsNull() || data.UpdatedAt.IsUnknown() {
+				data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+			}
+
 			break
 		}
 	}
@@ -246,5 +256,48 @@ func (r *RestoreAccountResource) Delete(ctx context.Context, req resource.Delete
 }
 
 func (r *RestoreAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+
+	accounts, err := r.client.ListRestoreAccounts(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read restore accounts during import: %s", err))
+		return
+	}
+
+	var found bool
+	var data RestoreAccountResourceModel
+
+	for _, account := range accounts {
+		if account.Id == req.ID {
+			found = true
+			data.Id = types.StringValue(account.Id)
+
+			data.Status = types.StringValue(string(account.Status))
+			data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
+
+			if account.RestoreAccountAttributes.HasCloudProvider() {
+				data.CloudProvider = types.StringValue(string(account.RestoreAccountAttributes.GetCloudProvider()))
+			}
+
+			data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+			data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+
+			break
+		}
+	}
+
+	if !found {
+		resp.Diagnostics.AddError(
+			"Resource Not Found",
+			fmt.Sprintf("Restore account with ID %s not found", req.ID),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+
+	tflog.Info(ctx, "Successfully imported restore account", map[string]interface{}{
+		"id":     data.Id.ValueString(),
+		"status": data.Status.ValueString(),
+	})
 }
