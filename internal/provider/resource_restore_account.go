@@ -67,8 +67,8 @@ func (r *RestoreAccountResource) Schema(ctx context.Context, req resource.Schema
 			},
 			"role": schema.StringAttribute{
 				MarkdownDescription: "ARN of the role Eon assumes to access the account in AWS.",
-				Required:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				Computed:            true,
 			},
 			"status": schema.StringAttribute{
 				MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
@@ -105,6 +105,15 @@ func (r *RestoreAccountResource) Create(ctx context.Context, req resource.Create
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Validate role is provided for new account creation
+	if data.Role.IsNull() || data.Role.ValueString() == "" {
+		resp.Diagnostics.AddError(
+			"Missing Role",
+			"The 'role' attribute is required when creating a new restore account. Please provide the ARN of the IAM role that Eon should assume.",
+		)
 		return
 	}
 

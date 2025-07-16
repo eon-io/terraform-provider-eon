@@ -29,6 +29,7 @@ type RestoreAccountModel struct {
 	Provider          types.String `tfsdk:"provider"`
 	ProviderAccountId types.String `tfsdk:"provider_account_id"`
 	Status            types.String `tfsdk:"status"`
+	Role              types.String `tfsdk:"role"`
 	Regions           types.List   `tfsdk:"regions"`
 	CreatedAt         types.String `tfsdk:"created_at"`
 	UpdatedAt         types.String `tfsdk:"updated_at"`
@@ -58,6 +59,10 @@ func (d *RestoreAccountsDataSource) Schema(ctx context.Context, req datasource.S
 						"provider_account_id": schema.StringAttribute{
 							MarkdownDescription: "Cloud-provider-assigned account ID.",
 							Computed:            true,
+						},
+						"role": schema.StringAttribute{
+							MarkdownDescription: "ARN of the role Eon assumes to access the account.",
+							Required:            true,
 						},
 						"status": schema.StringAttribute{
 							MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. For an explanation of statuses, see [Restore Account Statuses](/docs/user-guide/restoring/connect-restore-accounts/restore-account-statuses). Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",

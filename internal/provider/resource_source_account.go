@@ -67,8 +67,8 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 			},
 			"role": schema.StringAttribute{
 				MarkdownDescription: "ARN of the role Eon assumes to access the account in AWS.",
-				Required:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				Computed:            true,
 			},
 			"status": schema.StringAttribute{
 				MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
@@ -105,6 +105,15 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Validate role is provided for new account creation
+	if data.Role.IsNull() || data.Role.ValueString() == "" {
+		resp.Diagnostics.AddError(
+			"Missing Role",
+			"The 'role' attribute is required when creating a new source account. Please provide the ARN of the IAM role that Eon should assume.",
+		)
 		return
 	}
 

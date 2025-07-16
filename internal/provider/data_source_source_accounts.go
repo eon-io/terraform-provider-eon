@@ -29,6 +29,7 @@ type SourceAccountModel struct {
 	Name              types.String `tfsdk:"name"`
 	Provider          types.String `tfsdk:"provider"`
 	ProviderAccountId types.String `tfsdk:"provider_account_id"`
+	Role              types.String `tfsdk:"role"`
 	Status            types.String `tfsdk:"status"`
 	CreatedAt         types.String `tfsdk:"created_at"`
 	UpdatedAt         types.String `tfsdk:"updated_at"`
@@ -62,6 +63,10 @@ func (d *SourceAccountsDataSource) Schema(ctx context.Context, req datasource.Sc
 						"provider": schema.StringAttribute{
 							MarkdownDescription: "Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.",
 							Computed:            true,
+						},
+						"role": schema.StringAttribute{
+							MarkdownDescription: "ARN of the role Eon assumes to access the account.",
+							Required:            true,
 						},
 						"status": schema.StringAttribute{
 							MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
