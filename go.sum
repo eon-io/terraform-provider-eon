@@ -3,8 +3,8 @@ github.com/bufbuild/protocompile v0.4.0/go.mod h1:3v93+mbWn/v3xzN+31nwkJfrEpAUwp
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/eon-io/eon-sdk-go v1.19.0 h1:4gdlkOd+atZsDnGYerHedSaW1JXyan5xq7jcR24TAYk=
-github.com/eon-io/eon-sdk-go v1.19.0/go.mod h1:NWrS3rllESPQ7vzryT7+bHkOpNrXbXcnRtaPlv0LScw=
+github.com/eon-io/eon-sdk-go v1.20.0 h1:sS2jAVE2RmE4SK/20tjHF0hE8cNWujNWsUkA6++SEAI=
+github.com/eon-io/eon-sdk-go v1.20.0/go.mod h1:NWrS3rllESPQ7vzryT7+bHkOpNrXbXcnRtaPlv0LScw=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
 github.com/fatih/color v1.16.0 h1:zmkK9Ngbjj+K0yRhTVONQh1p/HknKYSlNT+vZCzyokM=
 github.com/fatih/color v1.16.0/go.mod h1:fL2Sau1YI5c0pdGEVCbKQbLXB6edEj1ZgiY4NijnWvE=
