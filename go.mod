@@ -5,7 +5,7 @@ go 1.23.7
 toolchain go1.24.2
 
 require (
-	github.com/eon-io/eon-sdk-go v1.21.0
+	github.com/eon-io/eon-sdk-go v1.22.0
 	github.com/hashicorp/terraform-plugin-framework v1.13.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/stretchr/testify v1.10.0
