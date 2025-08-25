@@ -130,13 +130,13 @@ func (r *RestoreAccountResource) Create(ctx context.Context, req resource.Create
 	}
 
 	// Build AWS account config
-	config := externalEonSdkAPI.NewAccountConfigInput(externalEonSdkAPI.AWS)
-	awsConfig := externalEonSdkAPI.NewAwsAccountConfigInput(data.Role.ValueString())
+	config := externalEonSdkAPI.NewRestoreAccountAttributesInput(externalEonSdkAPI.AWS)
+	awsConfig := externalEonSdkAPI.NewAwsRestoreAccountAttributesInput(data.Role.ValueString())
 
 	config.SetAws(*awsConfig)
 
 	connectReq := externalEonSdkAPI.ConnectRestoreAccountRequest{
-		Name:                     data.Name.ValueString(),
+		Name:                     data.Name.ValueStringPointer(),
 		RestoreAccountAttributes: *config,
 	}
 

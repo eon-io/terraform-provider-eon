@@ -128,13 +128,13 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	config := externalEonSdkAPI.NewAccountConfigInput(externalEonSdkAPI.AWS)
-	awsConfig := externalEonSdkAPI.NewAwsAccountConfigInput(data.Role.ValueString())
+	config := externalEonSdkAPI.NewSourceAccountAttributesInput(externalEonSdkAPI.AWS)
+	awsConfig := externalEonSdkAPI.NewAwsSourceAccountAttributesInput(data.Role.ValueString())
 
 	config.SetAws(*awsConfig)
 
 	connectReq := externalEonSdkAPI.ConnectSourceAccountRequest{
-		Name:                    data.Name.ValueString(),
+		Name:                    data.Name.ValueStringPointer(),
 		SourceAccountAttributes: *config,
 	}
 

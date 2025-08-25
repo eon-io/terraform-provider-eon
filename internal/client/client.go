@@ -419,7 +419,7 @@ func (c *EonClient) WaitForRestoreJobCompletion(ctx context.Context, jobId strin
 			switch job.GetJobExecutionDetails().Status {
 			case externalEonSdkAPI.JOB_COMPLETED, externalEonSdkAPI.JOB_PARTIAL:
 				return job, nil
-			case externalEonSdkAPI.JOB_FAILED, externalEonSdkAPI.JOB_CANCELLED:
+			case externalEonSdkAPI.JOB_FAILED, externalEonSdkAPI.JOB_CANCELED:
 				errorMsg := "unknown error"
 				if job.GetJobExecutionDetails().StatusMessage != nil {
 					errorMsg = *job.GetJobExecutionDetails().StatusMessage
