@@ -310,12 +310,12 @@ func (c *EonClient) StartRdsRestore(ctx context.Context, resourceId, snapshotId 
 }
 
 // StartEc2InstanceRestore starts an EC2 instance restore job
-func (c *EonClient) StartEc2InstanceRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreInstanceInput) (string, error) {
+func (c *EonClient) StartEc2InstanceRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreAwsEc2InstanceRequest) (string, error) {
 	if err := c.ensureValidToken(); err != nil {
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreEc2Instance(ctx, c.ProjectID, resourceId, snapshotId).RestoreInstanceInput(req).Execute()
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreEc2Instance(ctx, c.ProjectID, resourceId, snapshotId).RestoreAwsEc2InstanceRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start EC2 instance restore"); apiErr != nil {
 		return "", apiErr
 	}

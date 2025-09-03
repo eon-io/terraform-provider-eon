@@ -724,7 +724,7 @@ func (r *RestoreJobResource) createEc2InstanceRestore(ctx context.Context, data 
 		}
 	}
 
-	ec2Target := &externalEonSdkAPI.Ec2InstanceRestoreTarget{
+	ec2Target := &externalEonSdkAPI.AwsEc2InstanceRestoreTarget{
 		Region:                  config.Region.ValueString(),
 		InstanceType:            config.InstanceType.ValueString(),
 		SubnetId:                config.SubnetId.ValueString(),
@@ -738,9 +738,9 @@ func (r *RestoreJobResource) createEc2InstanceRestore(ctx context.Context, data 
 		ec2Target.Tags = &tags
 	}
 
-	apiReq := externalEonSdkAPI.RestoreInstanceInput{
+	apiReq := externalEonSdkAPI.RestoreAwsEc2InstanceRequest{
 		RestoreAccountId: data.RestoreAccountId.ValueString(),
-		Destination: externalEonSdkAPI.Ec2InstanceRestoreDestination{
+		Destination: externalEonSdkAPI.AwsEc2InstanceRestoreDestination{
 			AwsEc2: ec2Target,
 		},
 	}
