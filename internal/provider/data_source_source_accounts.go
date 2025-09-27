@@ -123,11 +123,7 @@ func (d *SourceAccountsDataSource) Read(ctx context.Context, req datasource.Read
 			UpdatedAt:         types.StringNull(),
 		}
 
-		if account.SourceAccountAttributes.HasCloudProvider() {
-			accountModel.Provider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
-		} else {
-			accountModel.Provider = types.StringNull()
-		}
+		accountModel.Provider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
 
 		data.Accounts = append(data.Accounts, accountModel)
 	}

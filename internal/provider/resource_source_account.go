@@ -156,11 +156,7 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 	data.Name = types.StringValue(account.GetName())
 	data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
 
-	if account.SourceAccountAttributes.HasCloudProvider() {
-		data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
-	} else {
-		data.CloudProvider = types.StringValue(data.CloudProvider.ValueString())
-	}
+	data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
 
 	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
@@ -196,9 +192,7 @@ func (r *SourceAccountResource) Read(ctx context.Context, req resource.ReadReque
 			data.Status = types.StringValue(string(account.Status))
 			data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
 
-			if account.SourceAccountAttributes.HasCloudProvider() {
-				data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
-			}
+			data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
 
 			if data.CreatedAt.IsNull() || data.CreatedAt.IsUnknown() {
 				data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
@@ -276,9 +270,7 @@ func (r *SourceAccountResource) ImportState(ctx context.Context, req resource.Im
 			data.Status = types.StringValue(string(account.Status))
 			data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
 
-			if account.SourceAccountAttributes.HasCloudProvider() {
-				data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
-			}
+			data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
 
 			data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 			data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
