@@ -50,3 +50,4 @@ Thumbs.db
 /examples/.terraform.lock.hcl
 /examples/terraform.tfvars
 /examples/terraform.tfvars.json
+/.tf-debug/
