@@ -35,6 +35,125 @@ resource "eon_backup_policy" "daily_backup" {
   }
 }
 
+# Example: Weekly backup policy
+resource "eon_backup_policy" "weekly_backup" {
+  name    = "Weekly Production Backup"
+  enabled = true
+  resource_selector = {
+    resource_selection_mode = "ALL"
+  }
+
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      backup_schedules = [
+        {
+          vault_id       = "vault-12345678-1234-1234-1234-123456789012"
+          retention_days = 90
+          schedule_config = {
+            frequency = "WEEKLY"
+            weekly_config = {
+              day_of_week          = "SUN"
+              time_of_day_hour     = 3
+              time_of_day_minutes  = 0
+              start_window_minutes = 240
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+# Example: Monthly backup policy
+resource "eon_backup_policy" "monthly_backup" {
+  name    = "Monthly Archive Backup"
+  enabled = true
+  resource_selector = {
+    resource_selection_mode = "ALL"
+  }
+
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      backup_schedules = [
+        {
+          vault_id       = "vault-12345678-1234-1234-1234-123456789012"
+          retention_days = 365
+          schedule_config = {
+            frequency = "MONTHLY"
+            monthly_config = {
+              day_of_month         = 1
+              time_of_day_hour     = 1
+              time_of_day_minutes  = 0
+              start_window_minutes = 240
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+# Example: Annual backup policy
+resource "eon_backup_policy" "annually_backup" {
+  name    = "Annual Compliance Backup"
+  enabled = true
+  resource_selector = {
+    resource_selection_mode = "ALL"
+  }
+
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      backup_schedules = [
+        {
+          vault_id       = "vault-12345678-1234-1234-1234-123456789012"
+          retention_days = 2555 # 7 years for compliance
+          schedule_config = {
+            frequency = "ANNUALLY"
+            annually_config = {
+              month                = "JANUARY"
+              day_of_month         = 1
+              time_of_day_hour     = 0
+              time_of_day_minutes  = 0
+              start_window_minutes = 240
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+# Example: Interval backup policy
+resource "eon_backup_policy" "interval_backup" {
+  name    = "Frequent Interval Backup"
+  enabled = true
+  resource_selector = {
+    resource_selection_mode = "ALL"
+  }
+
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      backup_schedules = [
+        {
+          vault_id       = "vault-12345678-1234-1234-1234-123456789012"
+          retention_days = 14
+          schedule_config = {
+            frequency = "INTERVAL"
+            interval_config = {
+              interval_minutes     = 360 # Every 6 hours
+              start_window_minutes = 60
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
 # Example: High frequency backup policy
 resource "eon_backup_policy" "high_frequency_backup" {
   name    = "High Frequency Critical Data Backup"
@@ -268,6 +387,26 @@ output "daily_backup_policy_id" {
   value       = eon_backup_policy.daily_backup.id
 }
 
+output "weekly_backup_policy_id" {
+  description = "ID of the weekly backup policy"
+  value       = eon_backup_policy.weekly_backup.id
+}
+
+output "monthly_backup_policy_id" {
+  description = "ID of the monthly backup policy"
+  value       = eon_backup_policy.monthly_backup.id
+}
+
+output "annually_backup_policy_id" {
+  description = "ID of the annual backup policy"
+  value       = eon_backup_policy.annually_backup.id
+}
+
+output "interval_backup_policy_id" {
+  description = "ID of the interval backup policy"
+  value       = eon_backup_policy.interval_backup.id
+}
+
 output "high_frequency_backup_policy_id" {
   description = "ID of the high frequency backup policy"
   value       = eon_backup_policy.high_frequency_backup.id
@@ -291,6 +430,26 @@ output "backup_policies_summary" {
       name    = eon_backup_policy.daily_backup.name
       enabled = eon_backup_policy.daily_backup.enabled
     }
+    weekly_backup = {
+      id      = eon_backup_policy.weekly_backup.id
+      name    = eon_backup_policy.weekly_backup.name
+      enabled = eon_backup_policy.weekly_backup.enabled
+    }
+    monthly_backup = {
+      id      = eon_backup_policy.monthly_backup.id
+      name    = eon_backup_policy.monthly_backup.name
+      enabled = eon_backup_policy.monthly_backup.enabled
+    }
+    annually_backup = {
+      id      = eon_backup_policy.annually_backup.id
+      name    = eon_backup_policy.annually_backup.name
+      enabled = eon_backup_policy.annually_backup.enabled
+    }
+    interval_backup = {
+      id      = eon_backup_policy.interval_backup.id
+      name    = eon_backup_policy.interval_backup.name
+      enabled = eon_backup_policy.interval_backup.enabled
+    }
     high_frequency_backup = {
       id      = eon_backup_policy.high_frequency_backup.id
       name    = eon_backup_policy.high_frequency_backup.name
@@ -307,4 +466,4 @@ output "backup_policies_summary" {
       enabled = eon_backup_policy.all_condition_types.enabled
     }
   }
-} 
+}
