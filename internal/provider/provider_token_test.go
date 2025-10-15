@@ -83,11 +83,11 @@ func TestEonProvider_AllAuthenticationMethods(t *testing.T) {
 		description  string
 	}{
 		{
-			name:         "token_only",
-			endpoint:     "https://test.eon.io",
-			projectId:    "project-123",
-			token:        "token-value",
-			description:  "Authentication with token only",
+			name:        "token_only",
+			endpoint:    "https://test.eon.io",
+			projectId:   "project-123",
+			token:       "token-value",
+			description: "Authentication with token only",
 		},
 		{
 			name:         "client_credentials_only",
@@ -111,8 +111,8 @@ func TestEonProvider_AllAuthenticationMethods(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			model := EonProviderModel{
-				Endpoint:     types.StringValue(tc.endpoint),
-				ProjectId:    types.StringValue(tc.projectId),
+				Endpoint:  types.StringValue(tc.endpoint),
+				ProjectId: types.StringValue(tc.projectId),
 			}
 
 			if tc.clientId != "" {
