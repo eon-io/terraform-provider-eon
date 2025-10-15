@@ -577,11 +577,11 @@ Required:
 
 Optional:
 
-- `daily_config` (Attributes) Daily configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--daily_config))
-- `weekly_config` (Attributes) Weekly configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--weekly_config))
-- `monthly_config` (Attributes) Monthly configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--monthly_config))
 - `annually_config` (Attributes) Annually configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--annually_config))
+- `daily_config` (Attributes) Daily configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--daily_config))
 - `interval_config` (Attributes) Interval configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--interval_config))
+- `monthly_config` (Attributes) Monthly configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--monthly_config))
+- `weekly_config` (Attributes) Weekly configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--weekly_config))
 
 <a id="nestedatt--backup_plan--standard_plan--backup_schedules--schedule_config--annually_config"></a>
 ### Nested Schema for `backup_plan.standard_plan.backup_schedules.schedule_config.annually_config`

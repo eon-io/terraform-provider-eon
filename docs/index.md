@@ -33,6 +33,7 @@ provider "eon" {
   client_id     = var.eon_client_id
   client_secret = var.eon_client_secret
   project_id    = var.eon_project_id
+  token         = var.eon_token
 }
 ```
 
@@ -96,3 +97,4 @@ provider "eon" {
 - `client_secret` (String, Sensitive) Eon API client secret for authentication. Can also be set with the `EON_CLIENT_SECRET` environment variable.
 - `endpoint` (String) Eon API base URL in the format `https://<your-domain>.console.eon.io` (no trailing slash). Can also be set with the `EON_ENDPOINT` environment variable.
 - `project_id` (String) Eon project ID. Can also be set with the `EON_PROJECT_ID` environment variable.
+- `token` (String, Sensitive) Eon API token for authentication. Can also be set with the `EON_TOKEN` environment variable.

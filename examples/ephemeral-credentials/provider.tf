@@ -1,13 +1,13 @@
 variable "client_id" {
-  type    = string
-  default = "Eon API client ID"
+  type      = string
+  default   = "Eon API client ID"
   sensitive = true
   ephemeral = true
 }
 
 variable "client_secret" {
-  type    = string
-  default = "Eon API client secret"
+  type      = string
+  default   = "Eon API client secret"
   sensitive = true
   ephemeral = true
 }

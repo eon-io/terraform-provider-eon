@@ -19,7 +19,7 @@ variable "eon_client_secret" {
 variable "eon_project_id" {
   description = "Eon project ID"
   type        = string
-} 
+}
 
 variable "eon_token" {
   description = "Eon API token"
