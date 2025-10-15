@@ -40,6 +40,7 @@ func TestEonProvider_Schema(t *testing.T) {
 	assert.Contains(t, resp.Schema.Attributes, "client_id")
 	assert.Contains(t, resp.Schema.Attributes, "client_secret")
 	assert.Contains(t, resp.Schema.Attributes, "project_id")
+	assert.Contains(t, resp.Schema.Attributes, "token")
 }
 
 // TestEonProvider_Resources tests the provider resources registration
@@ -83,12 +84,14 @@ func TestEonProviderModel(t *testing.T) {
 		ClientId:     types.StringValue("test-client-id"),
 		ClientSecret: types.StringValue("test-client-secret"),
 		ProjectId:    types.StringValue("test-project-id"),
+		Token:        types.StringValue("test-token"),
 	}
 
 	assert.Equal(t, "https://test.eon.io", model.Endpoint.ValueString())
 	assert.Equal(t, "test-client-id", model.ClientId.ValueString())
 	assert.Equal(t, "test-client-secret", model.ClientSecret.ValueString())
 	assert.Equal(t, "test-project-id", model.ProjectId.ValueString())
+	assert.Equal(t, "test-token", model.Token.ValueString())
 }
 
 // TestEonProvider_StringValues tests string value handling
@@ -210,11 +213,11 @@ func TestEonProvider_ProviderSchema(t *testing.T) {
 	require.NotNil(t, resp.Schema)
 	assert.False(t, resp.Diagnostics.HasError())
 
-	// Test that we have exactly 4 attributes
-	assert.Equal(t, 4, len(resp.Schema.Attributes))
+	// Test that we have exactly 5 attributes
+	assert.Equal(t, 5, len(resp.Schema.Attributes))
 
 	// Test attribute names
-	expectedAttributes := []string{"endpoint", "client_id", "client_secret", "project_id"}
+	expectedAttributes := []string{"endpoint", "client_id", "client_secret", "project_id", "token"}
 	for _, attr := range expectedAttributes {
 		assert.Contains(t, resp.Schema.Attributes, attr)
 	}

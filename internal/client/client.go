@@ -30,10 +30,10 @@ func NewEonClientWithToken(endpoint, projectID, token string) (*EonClient, error
 	}
 
 	client := &EonClient{
-		client:       externalEonSdkAPI.NewAPIClient(config),
-		ProjectID:    projectID,
-		authToken:    token,
-		endpoint:     endpoint,
+		client:    externalEonSdkAPI.NewAPIClient(config),
+		ProjectID: projectID,
+		authToken: token,
+		endpoint:  endpoint,
 	}
 
 	client.tokenExpiry = time.Now().Add(time.Duration(60 * 60 * 24 * time.Second)) // 1 day

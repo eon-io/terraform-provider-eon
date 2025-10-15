@@ -49,8 +49,8 @@ jobs:
       - name: Validate Examples (skip provider directory)
         run: |
           for dir in examples/*/; do
-            if [[ "$(basename "$dir")" == "provider" ]]; then
-              echo "Skipping provider directory (requires published provider)"
+            if [[ "$(basename "$dir")" == "provider" || "$(basename "$dir")" == "ephemeral-credentials" ]]; then
+              echo "Skipping $(basename "$dir") directory (requires published provider)"
               continue
             fi
             echo "Validating $dir"
