@@ -11,4 +11,5 @@ provider "eon" {
   client_id     = var.eon_client_id
   client_secret = var.eon_client_secret
   project_id    = var.eon_project_id
+  token         = var.eon_token
 }

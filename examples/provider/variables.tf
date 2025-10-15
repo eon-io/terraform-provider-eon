@@ -20,3 +20,9 @@ variable "eon_project_id" {
   description = "Eon project ID"
   type        = string
 } 
+
+variable "eon_token" {
+  description = "Eon API token"
+  type        = string
+  sensitive   = true
+}

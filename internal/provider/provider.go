@@ -30,6 +30,7 @@ type EonProviderModel struct {
 	ClientId     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
 	ProjectId    types.String `tfsdk:"project_id"`
+	Token        types.String `tfsdk:"token"`
 }
 
 // New creates a new provider instance.
@@ -68,6 +69,11 @@ func (p *EonProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 				MarkdownDescription: "Eon project ID. Can also be set with the `EON_PROJECT_ID` environment variable.",
 				Optional:            true,
 			},
+			"token": schema.StringAttribute{
+				MarkdownDescription: "Eon API token for authentication. Can also be set with the `EON_TOKEN` environment variable.",
+				Optional:            true,
+				Sensitive:           true,
+			},
 		},
 	}
 }
@@ -85,6 +91,7 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 	clientId := os.Getenv("EON_CLIENT_ID")
 	clientSecret := os.Getenv("EON_CLIENT_SECRET")
 	projectId := os.Getenv("EON_PROJECT_ID")
+	token := os.Getenv("EON_TOKEN")
 
 	if !data.Endpoint.IsNull() {
 		endpoint = data.Endpoint.ValueString()
@@ -102,6 +109,10 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		projectId = data.ProjectId.ValueString()
 	}
 
+	if !data.Token.IsNull() {
+		token = data.Token.ValueString()
+	}
+
 	// Validate required fields
 	if endpoint == "" {
 		resp.Diagnostics.AddAttributeError(
@@ -111,20 +122,22 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		)
 	}
 
-	if clientId == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("client_id"),
-			"Missing Eon Client ID",
-			"The provider requires a client ID. Set the client_id value in the configuration or use the `EON_CLIENT_ID` environment variable.",
-		)
-	}
+	if token == "" {
+		if clientId == "" {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("client_id"),
+				"Missing Eon Client ID",
+				"The provider requires either a token or a client ID. Set the client_id value in the configuration or use the `EON_CLIENT_ID` environment variable.",
+			)
+		}
 
-	if clientSecret == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("client_secret"),
-			"Missing Eon Client Secret",
-			"The provider requires a client secret. Set the client_secret value in the configuration or use the `EON_CLIENT_SECRET` environment variable.",
-		)
+		if clientSecret == "" {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("client_secret"),
+				"Missing Eon Client Secret",
+				"The provider requires either a token or a client secret. Set the client_secret value in the configuration or use the `EON_CLIENT_SECRET` environment variable.",
+			)
+		}
 	}
 
 	if projectId == "" {
@@ -140,7 +153,13 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 	}
 
 	// Create Eon client
-	eonClient, err := client.NewEonClient(endpoint, clientId, clientSecret, projectId)
+	var eonClient *client.EonClient
+	var err error
+	if token == "" {
+		eonClient, err = client.NewEonClient(endpoint, clientId, clientSecret, projectId)
+	} else {
+		eonClient, err = client.NewEonClientWithToken(endpoint, projectId, token)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Eon API Client",

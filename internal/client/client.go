@@ -21,6 +21,28 @@ type EonClient struct {
 	endpoint     string
 }
 
+func NewEonClientWithToken(endpoint, projectID, token string) (*EonClient, error) {
+	config := externalEonSdkAPI.NewConfiguration()
+	config.Servers = []externalEonSdkAPI.ServerConfiguration{
+		{
+			URL: fmt.Sprintf("%s/api", endpoint),
+		},
+	}
+
+	client := &EonClient{
+		client:       externalEonSdkAPI.NewAPIClient(config),
+		ProjectID:    projectID,
+		authToken:    token,
+		endpoint:     endpoint,
+	}
+
+	client.tokenExpiry = time.Now().Add(time.Duration(60 * 60 * 24 * time.Second)) // 1 day
+
+	client.client.GetConfig().DefaultHeader["Authorization"] = "Bearer " + token
+
+	return client, nil
+}
+
 // NewEonClient creates a new Eon API client with the provided configuration
 func NewEonClient(endpoint, clientID, clientSecret, projectID string) (*EonClient, error) {
 	config := externalEonSdkAPI.NewConfiguration()
