@@ -161,6 +161,7 @@ func (p *EonProvider) Resources(ctx context.Context) []func() resource.Resource 
 		NewRestoreAccountResource,
 		NewRestoreJobResource,
 		NewBackupPolicyResource,
+		NewBackupVaultResource,
 	}
 }
 
@@ -170,5 +171,6 @@ func (p *EonProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		NewRestoreAccountsDataSource,
 		NewSnapshotDataSource,
 		NewBackupPoliciesDataSource,
+		NewBackupVaultsDataSource,
 	}
 }
