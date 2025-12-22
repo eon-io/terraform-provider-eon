@@ -20,7 +20,7 @@ resource "eon_backup_vault" "production_us_east" {
   cloud_provider = "AWS"
 }
 
-# Example: Create an AWS vault with customer-managed KMS key (CMK)
+# Example: Create an AWS vault with customer-managed KMS key
 resource "eon_backup_vault" "production_eu_central_cmk" {
   name            = "Production EU Central with CMK"
   region          = "eu-central-1"
@@ -28,7 +28,7 @@ resource "eon_backup_vault" "production_eu_central_cmk" {
   aws_kms_key_arn = "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012"
 }
 
-# Example: Create multiple regional vaults using for_each
+# Example: Create vaults in multiple regions using for_each
 resource "eon_backup_vault" "multi_region" {
   for_each = toset(["us-east-1", "us-west-2", "eu-west-1"])
 
@@ -37,7 +37,7 @@ resource "eon_backup_vault" "multi_region" {
   cloud_provider = "AWS"
 }
 
-# Output vault details
+# Output: Vault details
 output "production_vault_id" {
   description = "ID of the production vault"
   value       = eon_backup_vault.production_us_east.id
@@ -68,8 +68,8 @@ output "multi_region_vault_ids" {
 # The actual vaults will continue to exist in Eon permanently.
 #
 # IDEMPOTENT CREATION:
-# If you try to create a vault that already exists (for example, after terraform destroy),
-# the provider automatically imports it if the configuration matches.
+# If you try to create a vault that already exists (e.g., after terraform destroy),
+# the provider will automatically import it if the configuration matches.
 # You'll see a warning message confirming the automatic import.
 #
 # This makes vault management safe and prevents errors when re-applying configurations.

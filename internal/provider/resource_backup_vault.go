@@ -227,102 +227,97 @@ func (r *BackupVaultResource) Create(ctx context.Context, req resource.CreateReq
 	if err != nil {
 		var apiErr *client.APIError
 		isAlreadyExists := errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusConflict
-		tflog.Warn(ctx, "Vault creation failed", map[string]interface{}{
-			"error":             err.Error(),
-			"error_type":        fmt.Sprintf("%T", err),
-			"is_already_exists": isAlreadyExists,
-		})
 
-		if isAlreadyExists {
-			tflog.Warn(ctx, "Vault creation returned 'already exists', attempting to find and import", map[string]interface{}{
-				"name":   data.Name.ValueString(),
-				"region": data.Region.ValueString(),
-			})
-
-			existingVault, findErr := r.findEonManagedVault(ctx,
-				data.Region.ValueString(),
-				data.CloudProvider.ValueString())
-
-			if findErr != nil {
-				// Could not find the vault - provide helpful error message
-				resp.Diagnostics.AddError(
-					"Vault Already Exists",
-					fmt.Sprintf("An Eon-managed vault for cloud provider '%s' in region '%s' already exists, but could not be retrieved for automatic import.\n\n"+
-						"To resolve this, you can:\n"+
-						"1. Manually import the existing vault using: terraform import eon_backup_vault.<resource_name> <vault_id>\n"+
-						"2. Choose a different region or cloud provider in your configuration\n\n"+
-						"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.\n\n"+
-						"Original error: %s\n"+
-						"Lookup error: %s",
-						data.CloudProvider.ValueString(),
-						data.Region.ValueString(),
-						err.Error(),
-						findErr.Error()),
-				)
-				return
-			}
-
-			// Validate that the existing vault matches the requested configuration
-			matches, mismatchReason := userInput.MatchesVault(existingVault)
-			if !matches {
-				resp.Diagnostics.AddError(
-					"Vault Configuration Mismatch",
-					fmt.Sprintf("An Eon-managed vault for cloud provider '%s' in region '%s' already exists (ID: %s, Name: '%s'), "+
-						"but its configuration doesn't match your request.\n\n"+
-						"Mismatch: %s\n\n"+
-						"Existing vault details:\n"+
-						"  Name: %s\n"+
-						"  Cloud Account: %s\n\n"+
-						"To resolve this, you can:\n"+
-						"1. Update your Terraform configuration to match the existing vault (name: '%s')\n"+
-						"2. Import the existing vault: terraform import eon_backup_vault.<resource_name> %s\n"+
-						"3. Choose a different region or cloud provider\n\n"+
-						"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.",
-						existingVault.VaultAttributes.CloudProvider,
-						existingVault.Region,
-						existingVault.Id,
-						existingVault.Name,
-						mismatchReason,
-						existingVault.Name,
-						existingVault.ProviderAccountId,
-						existingVault.Name,
-						existingVault.Id),
-				)
-				return
-			}
-
-			// Configuration matches - automatically import the vault
-			resp.Diagnostics.AddWarning(
-				"Vault Already Exists - Automatically Imported",
-				fmt.Sprintf("An Eon-managed vault for cloud provider '%s' in region '%s' already exists.\n\n"+
-					"Vault details:\n"+
-					"  ID: %s\n"+
-					"  Name: %s\n"+
-					"  Cloud Account: %s\n\n"+
-					"The existing vault matches your configuration and has been automatically imported into Terraform state. "+
-					"This is expected behavior for permanent resources like vaults.\n\n"+
-					"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.",
-					existingVault.VaultAttributes.CloudProvider,
-					existingVault.Region,
-					existingVault.Id,
-					existingVault.Name,
-					existingVault.ProviderAccountId),
-			)
-
-			tflog.Info(ctx, "Successfully imported existing vault", map[string]interface{}{
-				"id":     existingVault.Id,
-				"name":   existingVault.Name,
-				"region": existingVault.Region,
-			})
-
-			vault = existingVault
-		} else {
-			// Different error - fail as normal
+		// If not a "already exists" error, fail immediately
+		if !isAlreadyExists {
 			resp.Diagnostics.AddError(
 				"Failed to Create Vault",
 				fmt.Sprintf("Unable to create backup vault: %s", err))
 			return
 		}
+
+		// Vault already exists - try to auto-import
+		tflog.Warn(ctx, "Vault creation returned 'already exists', attempting to find and import", map[string]interface{}{
+			"name":   userInput.Name,
+			"region": userInput.Region,
+		})
+
+		existingVault, findErr := r.findEonManagedVault(ctx,
+			userInput.Region,
+			userInput.CloudProvider)
+
+		if findErr != nil {
+			resp.Diagnostics.AddError(
+				"Vault Already Exists",
+				fmt.Sprintf("An Eon-managed vault for cloud provider '%s' in region '%s' already exists, but could not be retrieved for automatic import.\n\n"+
+					"To resolve this, you can:\n"+
+					"1. Manually import the existing vault using: terraform import eon_backup_vault.<resource_name> <vault_id>\n"+
+					"2. Choose a different region or cloud provider in your configuration\n\n"+
+					"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.\n\n"+
+					"Original error: %s\n"+
+					"Lookup error: %s",
+					userInput.CloudProvider,
+					userInput.Region,
+					err.Error(),
+					findErr.Error()),
+			)
+			return
+		}
+
+		// Validate that the existing vault matches the requested configuration
+		matches, mismatchReason := userInput.MatchesVault(existingVault)
+		if !matches {
+			resp.Diagnostics.AddError(
+				"Vault Configuration Mismatch",
+				fmt.Sprintf("An Eon-managed vault for cloud provider '%s' in region '%s' already exists (ID: %s, Name: '%s'), "+
+					"but its configuration doesn't match your request.\n\n"+
+					"Mismatch: %s\n\n"+
+					"Existing vault details:\n"+
+					"  Name: %s\n"+
+					"  Cloud Account: %s\n\n"+
+					"To resolve this, you can:\n"+
+					"1. Update your Terraform configuration to match the existing vault (name: '%s')\n"+
+					"2. Import the existing vault: terraform import eon_backup_vault.<resource_name> %s\n"+
+					"3. Choose a different region or cloud provider\n\n"+
+					"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.",
+					existingVault.VaultAttributes.CloudProvider,
+					existingVault.Region,
+					existingVault.Id,
+					existingVault.Name,
+					mismatchReason,
+					existingVault.Name,
+					existingVault.ProviderAccountId,
+					existingVault.Name,
+					existingVault.Id),
+			)
+			return
+		}
+
+		// Configuration matches - automatically import the vault
+		resp.Diagnostics.AddWarning(
+			"Vault Already Exists - Automatically Imported",
+			fmt.Sprintf("An Eon-managed vault for cloud provider '%s' in region '%s' already exists.\n\n"+
+				"Vault details:\n"+
+				"  ID: %s\n"+
+				"  Name: %s\n"+
+				"  Cloud Account: %s\n\n"+
+				"The existing vault matches your configuration and has been automatically imported into Terraform state. "+
+				"This is expected behavior for permanent resources like vaults.\n\n"+
+				"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.",
+				existingVault.VaultAttributes.CloudProvider,
+				existingVault.Region,
+				existingVault.Id,
+				existingVault.Name,
+				existingVault.ProviderAccountId),
+		)
+
+		tflog.Info(ctx, "Successfully imported existing vault", map[string]interface{}{
+			"id":     existingVault.Id,
+			"name":   existingVault.Name,
+			"region": existingVault.Region,
+		})
+
+		vault = existingVault
 	} else {
 		tflog.Info(ctx, "Successfully created new vault", map[string]interface{}{
 			"id":     vault.Id,
