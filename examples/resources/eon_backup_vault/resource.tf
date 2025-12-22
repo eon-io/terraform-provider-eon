@@ -13,7 +13,7 @@ resource "eon_backup_vault" "production_eu_central_cmk" {
   aws_kms_key_arn = "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012"
 }
 
-# Example: Create multiple regional vaults using for_each
+# Example: Create vaults in multiple regions using for_each
 resource "eon_backup_vault" "multi_region" {
   for_each = toset(["us-east-1", "us-west-2", "eu-west-1"])
 
