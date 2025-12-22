@@ -5,7 +5,7 @@ resource "eon_backup_vault" "production_us_east" {
   cloud_provider = "AWS"
 }
 
-# Example: Create an AWS vault with customer-managed KMS key (CMK)
+# Example: Create an AWS vault with customer-managed KMS key
 resource "eon_backup_vault" "production_eu_central_cmk" {
   name            = "Production EU Central with CMK"
   region          = "eu-central-1"
