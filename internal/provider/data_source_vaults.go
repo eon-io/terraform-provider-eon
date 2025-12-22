@@ -77,7 +77,7 @@ func (d *VaultsDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 							Computed:            true,
 						},
 						"aws_kms_key_arn": schema.StringAttribute{
-							MarkdownDescription: "ARN of the AWS KMS customer-managed key for encryption. Empty if using Eon-managed encryption.",
+							MarkdownDescription: "ARN of the AWS customer-managed KMS key for encryption. Empty if using Eon-managed encryption.",
 							Computed:            true,
 						},
 					},
@@ -143,4 +143,3 @@ func (d *VaultsDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
-

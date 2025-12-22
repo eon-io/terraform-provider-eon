@@ -68,8 +68,8 @@ output "multi_region_vault_ids" {
 # The actual vaults will continue to exist in Eon permanently.
 #
 # IDEMPOTENT CREATION:
-# If you try to create a vault that already exists (e.g., after terraform destroy),
-# the provider will automatically import it if the configuration matches.
+# If you try to create a vault that already exists (for example, after terraform destroy),
+# the provider automatically imports it if the configuration matches.
 # You'll see a warning message confirming the automatic import.
 #
 # This makes vault management safe and prevents errors when re-applying configurations.
@@ -80,7 +80,7 @@ output "multi_region_vault_ids" {
 
 ### Required
 
-- `cloud_provider` (String) Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`. Currently only `AWS` is fully supported.
+- `cloud_provider` (String) Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.
 - `name` (String) Vault display name in Eon.
 - `region` (String) Region where the vault is hosted (e.g., `us-east-1`, `eu-central-1`).
 

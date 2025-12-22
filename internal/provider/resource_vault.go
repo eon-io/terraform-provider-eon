@@ -157,7 +157,7 @@ func (r *VaultResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"cloud_provider": schema.StringAttribute{
-				MarkdownDescription: "Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`. Currently only `AWS` is fully supported.",
+				MarkdownDescription: "Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -529,4 +529,3 @@ func (r *VaultResource) findEonManagedVault(
 
 	return nil, fmt.Errorf("no Eon-managed vault found for region=%s cloud_provider=%s", region, cloudProvider)
 }
-
