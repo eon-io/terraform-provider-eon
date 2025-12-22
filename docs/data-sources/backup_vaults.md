@@ -8,7 +8,7 @@ description: |-
 
 # eon_backup_vaults (Data Source)
 
-Retrieves a list of backup vaults in the Eon project.
+Retrieves a list of vaults in the Eon project.
 
 ## Example Usage
 
