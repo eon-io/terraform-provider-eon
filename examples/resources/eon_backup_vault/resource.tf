@@ -22,14 +22,6 @@ resource "eon_backup_vault" "multi_region" {
   cloud_provider = "AWS"
 }
 
-# Example: Vault for disaster recovery with CMK
-resource "eon_backup_vault" "dr_vault" {
-  name            = "Disaster Recovery Vault"
-  region          = "us-west-2"
-  cloud_provider  = "AWS"
-  aws_kms_key_arn = "arn:aws:kms:us-west-2:123456789012:key/abcdef01-2345-6789-abcd-ef0123456789"
-}
-
 # Output vault details
 output "production_vault_id" {
   description = "ID of the production vault"
@@ -59,5 +51,11 @@ output "multi_region_vault_ids" {
 # IMPORTANT: Vaults are permanent and cannot be deleted.
 # Running 'terraform destroy' will only remove vaults from Terraform state.
 # The actual vaults will continue to exist in Eon permanently.
-# Plan carefully before creating vaults!
+#
+# IDEMPOTENT CREATION:
+# If you try to create a vault that already exists (e.g., after terraform destroy),
+# the provider will automatically import it if the configuration matches.
+# You'll see a warning message confirming the automatic import.
+#
+# This makes vault management safe and prevents errors when re-applying configurations.
 

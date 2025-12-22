@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 	"github.com/eon-io/terraform-provider-eon/internal/client"
@@ -36,6 +38,100 @@ type BackupVaultResourceModel struct {
 	VaultAccountId    types.String `tfsdk:"vault_account_id"`
 	ProviderAccountId types.String `tfsdk:"provider_account_id"`
 	IsManagedByEon    types.Bool   `tfsdk:"is_managed_by_eon"`
+}
+
+// VaultUserInput contains only user-configurable fields for vault creation.
+// When you add a field here, you MUST handle it in:
+//   - ToUserInput() method (extraction from model)
+//   - ToCreateRequest() method (building API request)
+//   - MatchesVault() method (validation) - and add to test
+type VaultUserInput struct {
+	Name          string
+	Region        string
+	CloudProvider string
+	AwsKmsKeyArn  *string
+}
+
+// ToUserInput extracts user-configurable fields from the Terraform model.
+// If you add a field to VaultUserInput, the compiler will warn about missing field in struct literal.
+func (m *BackupVaultResourceModel) ToUserInput() VaultUserInput {
+	input := VaultUserInput{
+		Name:          m.Name.ValueString(),
+		Region:        m.Region.ValueString(),
+		CloudProvider: m.CloudProvider.ValueString(),
+	}
+
+	if !m.AwsKmsKeyArn.IsNull() && m.AwsKmsKeyArn.ValueString() != "" {
+		kms := m.AwsKmsKeyArn.ValueString()
+		input.AwsKmsKeyArn = &kms
+	}
+
+	return input
+}
+
+// ToCreateRequest builds a CreateVaultRequest from user input.
+// If you add a field to VaultUserInput, the compiler may warn about unused field.
+func (input *VaultUserInput) ToCreateRequest() (*externalEonSdkAPI.CreateVaultRequest, error) {
+	cloudProvider := externalEonSdkAPI.Provider(input.CloudProvider)
+	if cloudProvider != externalEonSdkAPI.AWS && cloudProvider != externalEonSdkAPI.AZURE && cloudProvider != externalEonSdkAPI.GCP {
+		return nil, fmt.Errorf("cloud_provider must be one of: AWS, AZURE, GCP. Got: %s", input.CloudProvider)
+	}
+
+	vaultAttributes := externalEonSdkAPI.NewVaultProviderAttributesInput(cloudProvider)
+
+	// Handle AWS-specific configuration
+	if cloudProvider == externalEonSdkAPI.AWS {
+		awsConfig := externalEonSdkAPI.NewAwsVaultConfigInput()
+
+		if input.AwsKmsKeyArn != nil {
+			awsConfig.SetEncryptionKey(*input.AwsKmsKeyArn)
+		}
+
+		vaultAttributes.SetAws(*awsConfig)
+	}
+
+	createReq := externalEonSdkAPI.NewCreateVaultRequest(
+		input.Name,
+		input.Region,
+		*vaultAttributes,
+	)
+
+	return createReq, nil
+}
+
+// MatchesVault validates that this user input matches an existing vault.
+// If you add a field to VaultUserInput, you MUST add validation here.
+func (input *VaultUserInput) MatchesVault(vault *externalEonSdkAPI.BackupVault) (bool, string) {
+	if vault.Name != input.Name {
+		return false, fmt.Sprintf("name mismatch: existing vault is named '%s', but you requested '%s'",
+			vault.Name, input.Name)
+	}
+
+	if string(vault.VaultAttributes.CloudProvider) != input.CloudProvider {
+		return false, fmt.Sprintf("cloud provider mismatch: existing=%s, requested=%s",
+			vault.VaultAttributes.CloudProvider, input.CloudProvider)
+	}
+
+	if vault.Region != input.Region {
+		return false, fmt.Sprintf("region mismatch: existing=%s, requested=%s",
+			vault.Region, input.Region)
+	}
+
+	if input.AwsKmsKeyArn != nil {
+		var existingKms string
+		if vault.VaultAttributes.Aws.IsSet() {
+			if awsConfig := vault.VaultAttributes.Aws.Get(); awsConfig.EncryptionKey != nil {
+				existingKms = *awsConfig.EncryptionKey
+			}
+		}
+
+		if existingKms != *input.AwsKmsKeyArn {
+			return false, fmt.Sprintf("AWS KMS key mismatch: existing=%s, requested=%s",
+				existingKms, *input.AwsKmsKeyArn)
+		}
+	}
+
+	return true, ""
 }
 
 func (r *BackupVaultResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -111,53 +207,131 @@ func (r *BackupVaultResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	// Validate cloud provider
-	cloudProvider := externalEonSdkAPI.Provider(data.CloudProvider.ValueString())
-	if cloudProvider != externalEonSdkAPI.AWS && cloudProvider != externalEonSdkAPI.AZURE && cloudProvider != externalEonSdkAPI.GCP {
-		resp.Diagnostics.AddError(
-			"Invalid Cloud Provider",
-			fmt.Sprintf("cloud_provider must be one of: AWS, AZURE, GCP. Got: %s", data.CloudProvider.ValueString()),
-		)
-		return
-	}
-
-	// Build vault attributes based on cloud provider
-	vaultAttributes := externalEonSdkAPI.NewVaultProviderAttributesInput(cloudProvider)
-
-	// Handle AWS-specific configuration
-	if cloudProvider == externalEonSdkAPI.AWS {
-		awsConfig := externalEonSdkAPI.NewAwsVaultConfigInput()
-
-		// Only set encryption key if provided
-		if !data.AwsKmsKeyArn.IsNull() && data.AwsKmsKeyArn.ValueString() != "" {
-			awsConfig.SetEncryptionKey(data.AwsKmsKeyArn.ValueString())
-		}
-
-		vaultAttributes.SetAws(*awsConfig)
-	}
+	userInput := data.ToUserInput()
 
 	// Build create request
-	createReq := externalEonSdkAPI.NewCreateVaultRequest(
-		data.Name.ValueString(),
-		data.Region.ValueString(),
-		*vaultAttributes,
-	)
-
-	tflog.Debug(ctx, "Creating backup vault", map[string]interface{}{
-		"name":           data.Name.ValueString(),
-		"region":         data.Region.ValueString(),
-		"cloud_provider": data.CloudProvider.ValueString(),
-		"has_cmk":        !data.AwsKmsKeyArn.IsNull(),
-	})
-
-	// Create the vault
-	vault, err := r.client.CreateVault(ctx, *createReq)
+	createReq, err := userInput.ToCreateRequest()
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create backup vault: %s", err))
+		resp.Diagnostics.AddError("Invalid Configuration", err.Error())
 		return
 	}
 
-	// Populate state from response
+	tflog.Debug(ctx, "Creating backup vault", map[string]interface{}{
+		"name":           userInput.Name,
+		"region":         userInput.Region,
+		"cloud_provider": userInput.CloudProvider,
+		"has_cmk":        userInput.AwsKmsKeyArn != nil,
+	})
+
+	vault, err := r.client.CreateVault(ctx, *createReq)
+	if err != nil {
+		var apiErr *client.APIError
+		isAlreadyExists := errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusConflict
+		tflog.Warn(ctx, "Vault creation failed", map[string]interface{}{
+			"error":             err.Error(),
+			"error_type":        fmt.Sprintf("%T", err),
+			"is_already_exists": isAlreadyExists,
+		})
+
+		if isAlreadyExists {
+			tflog.Warn(ctx, "Vault creation returned 'already exists', attempting to find and import", map[string]interface{}{
+				"name":   data.Name.ValueString(),
+				"region": data.Region.ValueString(),
+			})
+
+			existingVault, findErr := r.findEonManagedVault(ctx,
+				data.Region.ValueString(),
+				data.CloudProvider.ValueString())
+
+			if findErr != nil {
+				// Could not find the vault - provide helpful error message
+				resp.Diagnostics.AddError(
+					"Vault Already Exists",
+					fmt.Sprintf("An Eon-managed vault for cloud provider '%s' in region '%s' already exists, but could not be retrieved for automatic import.\n\n"+
+						"To resolve this, you can:\n"+
+						"1. Manually import the existing vault using: terraform import eon_backup_vault.<resource_name> <vault_id>\n"+
+						"2. Choose a different region or cloud provider in your configuration\n\n"+
+						"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.\n\n"+
+						"Original error: %s\n"+
+						"Lookup error: %s",
+						data.CloudProvider.ValueString(),
+						data.Region.ValueString(),
+						err.Error(),
+						findErr.Error()),
+				)
+				return
+			}
+
+			// Validate that the existing vault matches the requested configuration
+			matches, mismatchReason := userInput.MatchesVault(existingVault)
+			if !matches {
+				resp.Diagnostics.AddError(
+					"Vault Configuration Mismatch",
+					fmt.Sprintf("An Eon-managed vault for cloud provider '%s' in region '%s' already exists (ID: %s, Name: '%s'), "+
+						"but its configuration doesn't match your request.\n\n"+
+						"Mismatch: %s\n\n"+
+						"Existing vault details:\n"+
+						"  Name: %s\n"+
+						"  Cloud Account: %s\n\n"+
+						"To resolve this, you can:\n"+
+						"1. Update your Terraform configuration to match the existing vault (name: '%s')\n"+
+						"2. Import the existing vault: terraform import eon_backup_vault.<resource_name> %s\n"+
+						"3. Choose a different region or cloud provider\n\n"+
+						"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.",
+						existingVault.VaultAttributes.CloudProvider,
+						existingVault.Region,
+						existingVault.Id,
+						existingVault.Name,
+						mismatchReason,
+						existingVault.Name,
+						existingVault.ProviderAccountId,
+						existingVault.Name,
+						existingVault.Id),
+				)
+				return
+			}
+
+			// Configuration matches - automatically import the vault
+			resp.Diagnostics.AddWarning(
+				"Vault Already Exists - Automatically Imported",
+				fmt.Sprintf("An Eon-managed vault for cloud provider '%s' in region '%s' already exists.\n\n"+
+					"Vault details:\n"+
+					"  ID: %s\n"+
+					"  Name: %s\n"+
+					"  Cloud Account: %s\n\n"+
+					"The existing vault matches your configuration and has been automatically imported into Terraform state. "+
+					"This is expected behavior for permanent resources like vaults.\n\n"+
+					"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.",
+					existingVault.VaultAttributes.CloudProvider,
+					existingVault.Region,
+					existingVault.Id,
+					existingVault.Name,
+					existingVault.ProviderAccountId),
+			)
+
+			tflog.Info(ctx, "Successfully imported existing vault", map[string]interface{}{
+				"id":     existingVault.Id,
+				"name":   existingVault.Name,
+				"region": existingVault.Region,
+			})
+
+			vault = existingVault
+		} else {
+			// Different error - fail as normal
+			resp.Diagnostics.AddError(
+				"Failed to Create Vault",
+				fmt.Sprintf("Unable to create backup vault: %s", err))
+			return
+		}
+	} else {
+		tflog.Info(ctx, "Successfully created new vault", map[string]interface{}{
+			"id":     vault.Id,
+			"name":   vault.Name,
+			"region": vault.Region,
+		})
+	}
+
+	// Populate state from response (works for both create and import)
 	data.Id = types.StringValue(vault.Id)
 	data.VaultAccountId = types.StringValue(vault.VaultAccountId)
 	data.ProviderAccountId = types.StringValue(vault.ProviderAccountId)
@@ -173,7 +347,7 @@ func (r *BackupVaultResource) Create(ctx context.Context, req resource.CreateReq
 		}
 	}
 
-	tflog.Debug(ctx, "Backup vault created", map[string]interface{}{
+	tflog.Debug(ctx, "Backup vault state updated", map[string]interface{}{
 		"id":                  data.Id.ValueString(),
 		"vault_account_id":    data.VaultAccountId.ValueString(),
 		"provider_account_id": data.ProviderAccountId.ValueString(),
@@ -324,4 +498,39 @@ func (r *BackupVaultResource) ImportState(ctx context.Context, req resource.Impo
 		"name":   data.Name.ValueString(),
 		"region": data.Region.ValueString(),
 	})
+}
+
+// findEonManagedVault searches for an Eon-managed vault with the specified region and cloud provider
+// Note: Only one Eon-managed vault can exist per (region + cloud provider + provider account ID) combination
+func (r *BackupVaultResource) findEonManagedVault(
+	ctx context.Context,
+	region string,
+	cloudProvider string,
+) (*externalEonSdkAPI.BackupVault, error) {
+	tflog.Debug(ctx, "Searching for Eon-managed vault", map[string]interface{}{
+		"region":         region,
+		"cloud_provider": cloudProvider,
+	})
+
+	vaults, err := r.client.ListVaults(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list vaults: %w", err)
+	}
+
+	for _, vault := range vaults {
+		if vault.Region == region &&
+			string(vault.VaultAttributes.CloudProvider) == cloudProvider &&
+			vault.IsManagedByEon {
+			tflog.Debug(ctx, "Found existing Eon-managed vault", map[string]interface{}{
+				"id":                  vault.Id,
+				"name":                vault.Name,
+				"region":              vault.Region,
+				"cloud_provider":      vault.VaultAttributes.CloudProvider,
+				"provider_account_id": vault.ProviderAccountId,
+			})
+			return &vault, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no Eon-managed vault found for region=%s cloud_provider=%s", region, cloudProvider)
 }

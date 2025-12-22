@@ -10,6 +10,24 @@ import (
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 )
 
+// APIError represents an error from the Eon API with HTTP status code
+type APIError struct {
+	StatusCode int
+	Message    string
+	Err        error
+}
+
+func (e *APIError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("API error %d: %s: %v", e.StatusCode, e.Message, e.Err)
+	}
+	return fmt.Sprintf("API error %d: %s", e.StatusCode, e.Message)
+}
+
+func (e *APIError) Unwrap() error {
+	return e.Err
+}
+
 // EonClient wraps the Eon SDK client with authentication and configuration
 type EonClient struct {
 	client       *externalEonSdkAPI.APIClient
@@ -82,9 +100,17 @@ func (c *EonClient) handleAPIError(err error, httpResp *http.Response, baseError
 	if err != nil && httpResp != nil {
 		defer httpResp.Body.Close()
 		if body, readErr := io.ReadAll(httpResp.Body); readErr == nil && len(body) > 0 {
-			return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+			return &APIError{
+				StatusCode: httpResp.StatusCode,
+				Message:    string(body),
+				Err:        err,
+			}
 		}
-		return fmt.Errorf("%s: %w", baseErrorMsg, err)
+		return &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    baseErrorMsg,
+			Err:        err,
+		}
 	} else if err != nil {
 		return fmt.Errorf("%s: %w", baseErrorMsg, err)
 	}
@@ -550,7 +576,10 @@ func (c *EonClient) CreateVault(ctx context.Context, req externalEonSdkAPI.Creat
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
 	}
 
 	vault := resp.GetVault()
@@ -571,7 +600,10 @@ func (c *EonClient) GetVault(ctx context.Context, vaultId string) (*externalEonS
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
 	}
 
 	vault := resp.GetVault()
@@ -590,7 +622,7 @@ func (c *EonClient) UpdateVault(ctx context.Context, vaultId string, req externa
 	}
 	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
