@@ -61,7 +61,7 @@ output "cmk_enabled_vaults" {
 
 Read-Only:
 
-- `aws_kms_key_arn` (String) ARN of the AWS KMS customer-managed key for encryption. Empty if using Eon-managed encryption.
+- `aws_kms_key_arn` (String) ARN of the AWS customer-managed KMS key for encryption. Empty if using Eon-managed encryption.
 - `cloud_provider` (String) Cloud provider (AWS, AZURE, GCP).
 - `id` (String) Vault identifier (UUID).
 - `is_managed_by_eon` (Boolean) Whether the vault is in an Eon-managed vault account.
