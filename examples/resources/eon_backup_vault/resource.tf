@@ -22,7 +22,7 @@ resource "eon_backup_vault" "multi_region" {
   cloud_provider = "AWS"
 }
 
-# Output vault details
+# Output: Vault details
 output "production_vault_id" {
   description = "ID of the production vault"
   value       = eon_backup_vault.production_us_east.id
