@@ -13,7 +13,7 @@ Retrieves a list of vaults in the Eon project.
 ## Example Usage
 
 ```terraform
-# List all backup vaults in the project
+# List all vaults in the project
 data "eon_backup_vaults" "all" {}
 
 # Output vault information
