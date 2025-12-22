@@ -1,21 +1,21 @@
-# List all backup vaults in the project
-data "eon_backup_vaults" "all" {}
+# List all vaults in the project
+data "eon_vaults" "all" {}
 
 # Output vault information
 output "vault_count" {
   description = "Total number of vaults in the project"
-  value       = length(data.eon_backup_vaults.all.vaults)
+  value       = length(data.eon_vaults.all.vaults)
 }
 
 output "vault_names" {
   description = "Names of all vaults"
-  value       = [for v in data.eon_backup_vaults.all.vaults : v.name]
+  value       = [for v in data.eon_vaults.all.vaults : v.name]
 }
 
 output "vaults_by_region" {
   description = "Map of regions to vault names"
   value = {
-    for v in data.eon_backup_vaults.all.vaults :
+    for v in data.eon_vaults.all.vaults :
     v.region => v.name...
   }
 }
@@ -23,7 +23,7 @@ output "vaults_by_region" {
 output "cmk_enabled_vaults" {
   description = "Vaults using customer-managed KMS keys"
   value = [
-    for v in data.eon_backup_vaults.all.vaults :
+    for v in data.eon_vaults.all.vaults :
     {
       name    = v.name
       region  = v.region

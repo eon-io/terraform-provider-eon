@@ -18,18 +18,18 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-var _ resource.Resource = &BackupVaultResource{}
-var _ resource.ResourceWithImportState = &BackupVaultResource{}
+var _ resource.Resource = &VaultResource{}
+var _ resource.ResourceWithImportState = &VaultResource{}
 
-func NewBackupVaultResource() resource.Resource {
-	return &BackupVaultResource{}
+func NewVaultResource() resource.Resource {
+	return &VaultResource{}
 }
 
-type BackupVaultResource struct {
+type VaultResource struct {
 	client *client.EonClient
 }
 
-type BackupVaultResourceModel struct {
+type VaultResourceModel struct {
 	Id                types.String `tfsdk:"id"`
 	Name              types.String `tfsdk:"name"`
 	Region            types.String `tfsdk:"region"`
@@ -54,7 +54,7 @@ type VaultUserInput struct {
 
 // ToUserInput extracts user-configurable fields from the Terraform model.
 // If you add a field to VaultUserInput, the compiler will warn about missing field in struct literal.
-func (m *BackupVaultResourceModel) ToUserInput() VaultUserInput {
+func (m *VaultResourceModel) ToUserInput() VaultUserInput {
 	input := VaultUserInput{
 		Name:          m.Name.ValueString(),
 		Region:        m.Region.ValueString(),
@@ -134,11 +134,11 @@ func (input *VaultUserInput) MatchesVault(vault *externalEonSdkAPI.BackupVault) 
 	return true, ""
 }
 
-func (r *BackupVaultResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_backup_vault"
+func (r *VaultResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_vault"
 }
 
-func (r *BackupVaultResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *VaultResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Creates and manages a backup vault for storing Eon backups. **Note**: Vaults are permanent and cannot be deleted. Running `terraform destroy` will only remove the vault from Terraform state; the actual vault will continue to exist in Eon permanently.",
 		Attributes: map[string]schema.Attribute{
@@ -185,7 +185,7 @@ func (r *BackupVaultResource) Schema(ctx context.Context, req resource.SchemaReq
 	}
 }
 
-func (r *BackupVaultResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *VaultResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -199,8 +199,8 @@ func (r *BackupVaultResource) Configure(ctx context.Context, req resource.Config
 	r.client = client
 }
 
-func (r *BackupVaultResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data BackupVaultResourceModel
+func (r *VaultResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data VaultResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -216,7 +216,7 @@ func (r *BackupVaultResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	tflog.Debug(ctx, "Creating backup vault", map[string]interface{}{
+	tflog.Debug(ctx, "Creating vault", map[string]interface{}{
 		"name":           userInput.Name,
 		"region":         userInput.Region,
 		"cloud_provider": userInput.CloudProvider,
@@ -232,7 +232,7 @@ func (r *BackupVaultResource) Create(ctx context.Context, req resource.CreateReq
 		if !isAlreadyExists {
 			resp.Diagnostics.AddError(
 				"Failed to Create Vault",
-				fmt.Sprintf("Unable to create backup vault: %s", err))
+				fmt.Sprintf("Unable to create vault: %s", err))
 			return
 		}
 
@@ -251,7 +251,7 @@ func (r *BackupVaultResource) Create(ctx context.Context, req resource.CreateReq
 				"Vault Already Exists",
 				fmt.Sprintf("An Eon-managed vault for cloud provider '%s' in region '%s' already exists, but could not be retrieved for automatic import.\n\n"+
 					"To resolve this, you can:\n"+
-					"1. Manually import the existing vault using: terraform import eon_backup_vault.<resource_name> <vault_id>\n"+
+					"1. Manually import the existing vault using: terraform import eon_vault.<resource_name> <vault_id>\n"+
 					"2. Choose a different region or cloud provider in your configuration\n\n"+
 					"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.\n\n"+
 					"Original error: %s\n"+
@@ -277,7 +277,7 @@ func (r *BackupVaultResource) Create(ctx context.Context, req resource.CreateReq
 					"  Cloud Account: %s\n\n"+
 					"To resolve this, you can:\n"+
 					"1. Update your Terraform configuration to match the existing vault (name: '%s')\n"+
-					"2. Import the existing vault: terraform import eon_backup_vault.<resource_name> %s\n"+
+					"2. Import the existing vault: terraform import eon_vault.<resource_name> %s\n"+
 					"3. Choose a different region or cloud provider\n\n"+
 					"Note: Only one Eon-managed vault is allowed per (cloud provider + region + cloud account) combination.",
 					existingVault.VaultAttributes.CloudProvider,
@@ -342,7 +342,7 @@ func (r *BackupVaultResource) Create(ctx context.Context, req resource.CreateReq
 		}
 	}
 
-	tflog.Debug(ctx, "Backup vault state updated", map[string]interface{}{
+	tflog.Debug(ctx, "Vault state updated", map[string]interface{}{
 		"id":                  data.Id.ValueString(),
 		"vault_account_id":    data.VaultAccountId.ValueString(),
 		"provider_account_id": data.ProviderAccountId.ValueString(),
@@ -352,8 +352,8 @@ func (r *BackupVaultResource) Create(ctx context.Context, req resource.CreateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *BackupVaultResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data BackupVaultResourceModel
+func (r *VaultResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data VaultResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -362,7 +362,7 @@ func (r *BackupVaultResource) Read(ctx context.Context, req resource.ReadRequest
 
 	vault, err := r.client.GetVault(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read backup vault: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read vault: %s", err))
 		return
 	}
 
@@ -389,9 +389,9 @@ func (r *BackupVaultResource) Read(ctx context.Context, req resource.ReadRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *BackupVaultResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan BackupVaultResourceModel
-	var state BackupVaultResourceModel
+func (r *VaultResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan VaultResourceModel
+	var state VaultResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -403,7 +403,7 @@ func (r *BackupVaultResource) Update(ctx context.Context, req resource.UpdateReq
 	if !plan.Name.Equal(state.Name) {
 		updateReq := externalEonSdkAPI.NewUpdateVaultRequest(plan.Name.ValueString())
 
-		tflog.Debug(ctx, "Updating backup vault name", map[string]interface{}{
+		tflog.Debug(ctx, "Updating vault name", map[string]interface{}{
 			"id":       state.Id.ValueString(),
 			"old_name": state.Name.ValueString(),
 			"new_name": plan.Name.ValueString(),
@@ -411,14 +411,14 @@ func (r *BackupVaultResource) Update(ctx context.Context, req resource.UpdateReq
 
 		vault, err := r.client.UpdateVault(ctx, state.Id.ValueString(), *updateReq)
 		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update backup vault: %s", err))
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update vault: %s", err))
 			return
 		}
 
 		// Update state with the new name from response
 		plan.Name = types.StringValue(vault.Name)
 
-		tflog.Debug(ctx, "Backup vault name updated", map[string]interface{}{
+		tflog.Debug(ctx, "Vault name updated", map[string]interface{}{
 			"id":   state.Id.ValueString(),
 			"name": vault.Name,
 		})
@@ -427,8 +427,8 @@ func (r *BackupVaultResource) Update(ctx context.Context, req resource.UpdateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *BackupVaultResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data BackupVaultResourceModel
+func (r *VaultResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data VaultResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -438,12 +438,12 @@ func (r *BackupVaultResource) Delete(ctx context.Context, req resource.DeleteReq
 	// Vaults are permanent and cannot be deleted - remove from state only
 	resp.Diagnostics.AddWarning(
 		"Vault Not Deleted",
-		fmt.Sprintf("The backup vault '%s' (ID: %s) has been removed from Terraform state but still exists in Eon. Vaults are permanent and cannot be deleted via API, Terraform, or console.",
+		fmt.Sprintf("The vault '%s' (ID: %s) has been removed from Terraform state but still exists in Eon. Vaults are permanent and cannot be deleted via API, Terraform, or console.",
 			data.Name.ValueString(),
 			data.Id.ValueString()),
 	)
 
-	tflog.Warn(ctx, "Removing backup vault from Terraform state only - vaults are permanent", map[string]interface{}{
+	tflog.Warn(ctx, "Removing vault from Terraform state only - vaults are permanent", map[string]interface{}{
 		"id":   data.Id.ValueString(),
 		"name": data.Name.ValueString(),
 		"note": "The actual vault will continue to exist in Eon permanently. Vaults cannot be deleted.",
@@ -453,19 +453,19 @@ func (r *BackupVaultResource) Delete(ctx context.Context, req resource.DeleteReq
 	// No API call is made - deletion is not supported
 }
 
-func (r *BackupVaultResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *VaultResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Set the ID from the import request
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 
 	// Fetch the vault details
 	vault, err := r.client.GetVault(ctx, req.ID)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read backup vault during import: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read vault during import: %s", err))
 		return
 	}
 
 	// Populate state
-	var data BackupVaultResourceModel
+	var data VaultResourceModel
 	data.Id = types.StringValue(vault.Id)
 	data.Name = types.StringValue(vault.Name)
 	data.Region = types.StringValue(vault.Region)
@@ -488,7 +488,7 @@ func (r *BackupVaultResource) ImportState(ctx context.Context, req resource.Impo
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 
-	tflog.Info(ctx, "Successfully imported backup vault", map[string]interface{}{
+	tflog.Info(ctx, "Successfully imported vault", map[string]interface{}{
 		"id":     data.Id.ValueString(),
 		"name":   data.Name.ValueString(),
 		"region": data.Region.ValueString(),
@@ -497,7 +497,7 @@ func (r *BackupVaultResource) ImportState(ctx context.Context, req resource.Impo
 
 // findEonManagedVault searches for an Eon-managed vault with the specified region and cloud provider
 // Note: Only one Eon-managed vault can exist per (region + cloud provider + provider account ID) combination
-func (r *BackupVaultResource) findEonManagedVault(
+func (r *VaultResource) findEonManagedVault(
 	ctx context.Context,
 	region string,
 	cloudProvider string,
@@ -529,3 +529,4 @@ func (r *BackupVaultResource) findEonManagedVault(
 
 	return nil, fmt.Errorf("no Eon-managed vault found for region=%s cloud_provider=%s", region, cloudProvider)
 }
+

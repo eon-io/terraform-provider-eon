@@ -10,21 +10,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-var _ datasource.DataSource = &BackupVaultsDataSource{}
+var _ datasource.DataSource = &VaultsDataSource{}
 
-func NewBackupVaultsDataSource() datasource.DataSource {
-	return &BackupVaultsDataSource{}
+func NewVaultsDataSource() datasource.DataSource {
+	return &VaultsDataSource{}
 }
 
-type BackupVaultsDataSource struct {
+type VaultsDataSource struct {
 	client *client.EonClient
 }
 
-type BackupVaultsDataSourceModel struct {
-	Vaults []BackupVaultModel `tfsdk:"vaults"`
+type VaultsDataSourceModel struct {
+	Vaults []VaultModel `tfsdk:"vaults"`
 }
 
-type BackupVaultModel struct {
+type VaultModel struct {
 	Id                types.String `tfsdk:"id"`
 	Name              types.String `tfsdk:"name"`
 	Region            types.String `tfsdk:"region"`
@@ -35,16 +35,16 @@ type BackupVaultModel struct {
 	AwsKmsKeyArn      types.String `tfsdk:"aws_kms_key_arn"`
 }
 
-func (d *BackupVaultsDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_backup_vaults"
+func (d *VaultsDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_vaults"
 }
 
-func (d *BackupVaultsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *VaultsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Retrieves a list of backup vaults in the Eon project.",
+		MarkdownDescription: "Retrieves a list of vaults in the Eon project.",
 		Attributes: map[string]schema.Attribute{
 			"vaults": schema.ListNestedAttribute{
-				MarkdownDescription: "List of backup vaults.",
+				MarkdownDescription: "List of vaults.",
 				Computed:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -87,7 +87,7 @@ func (d *BackupVaultsDataSource) Schema(ctx context.Context, req datasource.Sche
 	}
 }
 
-func (d *BackupVaultsDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *VaultsDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -104,12 +104,12 @@ func (d *BackupVaultsDataSource) Configure(ctx context.Context, req datasource.C
 	d.client = client
 }
 
-func (d *BackupVaultsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data BackupVaultsDataSourceModel
+func (d *VaultsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data VaultsDataSourceModel
 
 	vaults, err := d.client.ListVaults(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read backup vaults: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read vaults: %s", err))
 		return
 	}
 
@@ -127,7 +127,7 @@ func (d *BackupVaultsDataSource) Read(ctx context.Context, req datasource.ReadRe
 			awsKmsKeyArn = types.StringNull()
 		}
 
-		vaultModel := BackupVaultModel{
+		vaultModel := VaultModel{
 			Id:                types.StringValue(vault.Id),
 			Name:              types.StringValue(vault.Name),
 			Region:            types.StringValue(vault.Region),
@@ -143,3 +143,4 @@ func (d *BackupVaultsDataSource) Read(ctx context.Context, req datasource.ReadRe
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
+
