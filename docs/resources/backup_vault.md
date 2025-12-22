@@ -69,7 +69,7 @@ output "multi_region_vault_ids" {
 #
 # IDEMPOTENT CREATION:
 # If you try to create a vault that already exists (for example, after terraform destroy),
-# the provider will automatically import it if the configuration matches.
+# the provider automatically imports it if the configuration matches.
 # You'll see a warning message confirming the automatic import.
 #
 # This makes vault management safe and prevents errors when re-applying configurations.
