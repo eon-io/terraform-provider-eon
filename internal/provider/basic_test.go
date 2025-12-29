@@ -4,11 +4,17 @@ import (
 	"context"
 	"testing"
 
+	"github.com/eon-io/terraform-provider-eon/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// basicTestFactory is a mock factory for testing
+func basicTestFactory(cfg client.ClientConfig) (*client.EonClient, error) {
+	return nil, nil
+}
 
 // TestEonProvider_Metadata tests the provider metadata
 func TestEonProvider_Metadata(t *testing.T) {
@@ -66,7 +72,7 @@ func TestEonProvider_DataSources(t *testing.T) {
 func TestNew(t *testing.T) {
 	version := "test-version"
 
-	providerFunc := New(version)
+	providerFunc := New(version, basicTestFactory)
 	provider := providerFunc()
 
 	assert.NotNil(t, provider)

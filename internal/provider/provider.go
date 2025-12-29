@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/eon-io/terraform-provider-eon/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -21,7 +22,8 @@ type EonProvider struct {
 	// version is set to the provider version on release, "dev" when the
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
-	version string
+	version       string
+	clientFactory client.ClientFactory
 }
 
 // EonProviderModel describes the provider data model.
@@ -32,11 +34,12 @@ type EonProviderModel struct {
 	ProjectId    types.String `tfsdk:"project_id"`
 }
 
-// New creates a new provider instance.
-func New(version string) func() provider.Provider {
+// New creates a new provider instance with the given client factory.
+func New(version string, factory client.ClientFactory) func() provider.Provider {
 	return func() provider.Provider {
 		return &EonProvider{
-			version: version,
+			version:       version,
+			clientFactory: factory,
 		}
 	}
 }
@@ -139,8 +142,21 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		return
 	}
 
-	// Create Eon client
-	eonClient, err := client.NewEonClient(endpoint, clientId, clientSecret, projectId)
+	// Append /api to endpoint unless exact endpoint mode is enabled (for local dev)
+	if os.Getenv("EON_USE_EXACT_ENDPOINT") != "true" {
+		endpoint = endpoint + "/api"
+	}
+
+	// Build config and create client using injected factory
+	cfg := client.ClientConfig{
+		Endpoint:       endpoint,
+		ClientID:       clientId,
+		ClientSecret:   clientSecret,
+		ProjectID:      projectId,
+		DefaultHeaders: parseDefaultHeaders(os.Getenv("EON_DEFAULT_HEADERS")),
+	}
+
+	eonClient, err := p.clientFactory(cfg)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Eon API Client",
@@ -173,4 +189,21 @@ func (p *EonProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		NewBackupPoliciesDataSource,
 		NewVaultsDataSource,
 	}
+}
+
+// parseDefaultHeaders parses a comma-separated string of headers into a map
+// Format: "Header1:Value1,Header2:Value2"
+func parseDefaultHeaders(env string) map[string]string {
+	headers := make(map[string]string)
+	if env == "" {
+		return headers
+	}
+
+	for h := range strings.SplitSeq(env, ",") {
+		parts := strings.SplitN(h, ":", 2)
+		if len(parts) == 2 {
+			headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+	return headers
 }

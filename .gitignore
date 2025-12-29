@@ -51,3 +51,4 @@ Thumbs.db
 /examples/terraform.tfvars
 /examples/terraform.tfvars.json
 /.tf-debug/
+/local-test/

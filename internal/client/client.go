@@ -30,69 +30,14 @@ func (e *APIError) Unwrap() error {
 
 // EonClient wraps the Eon SDK client with authentication and configuration
 type EonClient struct {
-	client       *externalEonSdkAPI.APIClient
-	ProjectID    string
-	authToken    string
-	tokenExpiry  time.Time
-	clientID     string
-	clientSecret string
-	endpoint     string
+	client         *externalEonSdkAPI.APIClient
+	projectID      string
+	tokenRefresher TokenRefresher
 }
 
-// NewEonClient creates a new Eon API client with the provided configuration
-func NewEonClient(endpoint, clientID, clientSecret, projectID string) (*EonClient, error) {
-	config := externalEonSdkAPI.NewConfiguration()
-	config.Servers = []externalEonSdkAPI.ServerConfiguration{
-		{
-			URL: fmt.Sprintf("%s/api", endpoint),
-		},
-	}
-
-	client := &EonClient{
-		client:       externalEonSdkAPI.NewAPIClient(config),
-		ProjectID:    projectID,
-		clientID:     clientID,
-		clientSecret: clientSecret,
-		endpoint:     endpoint,
-	}
-
-	if err := client.authenticate(); err != nil {
-		return nil, fmt.Errorf("failed to authenticate with Eon API: %w", err)
-	}
-
-	return client, nil
-}
-
-// authenticate performs OAuth authentication with the Eon API
-func (c *EonClient) authenticate() error {
-	resp, httpResp, err := c.client.AuthAPI.GetAccessToken(context.Background()).ApiCredentials(externalEonSdkAPI.ApiCredentials{
-		ClientId:     c.clientID,
-		ClientSecret: c.clientSecret,
-	}).Execute()
-	if err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
-	}
-	defer httpResp.Body.Close()
-
-	if httpResp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(httpResp.Body)
-		return fmt.Errorf("authentication failed with status %d: %s", httpResp.StatusCode, body)
-	}
-
-	c.authToken = resp.GetAccessToken()
-	c.tokenExpiry = time.Now().Add(time.Duration(resp.GetExpirationSeconds()) * time.Second)
-
-	c.client.GetConfig().DefaultHeader["Authorization"] = "Bearer " + c.authToken
-
-	return nil
-}
-
-// ensureValidToken checks if the current token is valid and refreshes it if necessary
-func (c *EonClient) ensureValidToken() error {
-	if time.Now().After(c.tokenExpiry.Add(-30 * time.Second)) {
-		return c.authenticate()
-	}
-	return nil
+// GetProjectID returns the project ID
+func (c *EonClient) GetProjectID() string {
+	return c.projectID
 }
 
 // handleAPIError processes API errors and extracts detailed error information from HTTP responses
@@ -119,11 +64,11 @@ func (c *EonClient) handleAPIError(err error, httpResp *http.Response, baseError
 
 // ListSourceAccounts retrieves all source accounts for the project
 func (c *EonClient) ListSourceAccounts(ctx context.Context) ([]externalEonSdkAPI.SourceAccount, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ListSourceAccounts(ctx, c.ProjectID).ListSourceAccountsRequest(externalEonSdkAPI.ListSourceAccountsRequest{}).Execute()
+	resp, httpResp, err := c.client.AccountsAPI.ListSourceAccounts(ctx, c.projectID).ListSourceAccountsRequest(externalEonSdkAPI.ListSourceAccountsRequest{}).Execute()
 
 	if apiErr := c.handleAPIError(err, httpResp, "failed to list source accounts"); apiErr != nil {
 		return nil, apiErr
@@ -144,11 +89,11 @@ func (c *EonClient) ListSourceAccounts(ctx context.Context) ([]externalEonSdkAPI
 
 // ListRestoreAccounts retrieves all restore accounts for the project
 func (c *EonClient) ListRestoreAccounts(ctx context.Context) ([]externalEonSdkAPI.RestoreAccount, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ListRestoreAccounts(ctx, c.ProjectID).ListRestoreAccountsRequest(externalEonSdkAPI.ListRestoreAccountsRequest{}).Execute()
+	resp, httpResp, err := c.client.AccountsAPI.ListRestoreAccounts(ctx, c.projectID).ListRestoreAccountsRequest(externalEonSdkAPI.ListRestoreAccountsRequest{}).Execute()
 
 	if apiErr := c.handleAPIError(err, httpResp, "failed to list restore accounts"); apiErr != nil {
 		return nil, apiErr
@@ -169,11 +114,11 @@ func (c *EonClient) ListRestoreAccounts(ctx context.Context) ([]externalEonSdkAP
 
 // ConnectSourceAccount connects a new source account
 func (c *EonClient) ConnectSourceAccount(ctx context.Context, req externalEonSdkAPI.ConnectSourceAccountRequest) (*externalEonSdkAPI.SourceAccount, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ConnectSourceAccount(ctx, c.ProjectID).ConnectSourceAccountRequest(req).Execute()
+	resp, httpResp, err := c.client.AccountsAPI.ConnectSourceAccount(ctx, c.projectID).ConnectSourceAccountRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to connect source account"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -190,11 +135,11 @@ func (c *EonClient) ConnectSourceAccount(ctx context.Context, req externalEonSdk
 
 // DisconnectSourceAccount disconnects a source account
 func (c *EonClient) DisconnectSourceAccount(ctx context.Context, accountId string) error {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	_, httpResp, err := c.client.AccountsAPI.DisconnectSourceAccount(ctx, c.ProjectID, accountId).Execute()
+	_, httpResp, err := c.client.AccountsAPI.DisconnectSourceAccount(ctx, c.projectID, accountId).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to disconnect source account"); apiErr != nil {
 		return apiErr
 	}
@@ -210,11 +155,11 @@ func (c *EonClient) DisconnectSourceAccount(ctx context.Context, accountId strin
 
 // ConnectRestoreAccount connects a new restore account
 func (c *EonClient) ConnectRestoreAccount(ctx context.Context, req externalEonSdkAPI.ConnectRestoreAccountRequest) (*externalEonSdkAPI.RestoreAccount, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ConnectRestoreAccount(ctx, c.ProjectID).ConnectRestoreAccountRequest(req).Execute()
+	resp, httpResp, err := c.client.AccountsAPI.ConnectRestoreAccount(ctx, c.projectID).ConnectRestoreAccountRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to connect restore account"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -231,11 +176,11 @@ func (c *EonClient) ConnectRestoreAccount(ctx context.Context, req externalEonSd
 
 // DisconnectRestoreAccount disconnects a restore account
 func (c *EonClient) DisconnectRestoreAccount(ctx context.Context, accountId string) error {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	_, httpResp, err := c.client.AccountsAPI.DisconnectRestoreAccount(ctx, c.ProjectID, accountId).Execute()
+	_, httpResp, err := c.client.AccountsAPI.DisconnectRestoreAccount(ctx, c.projectID, accountId).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to disconnect restore account"); apiErr != nil {
 		return apiErr
 	}
@@ -251,11 +196,11 @@ func (c *EonClient) DisconnectRestoreAccount(ctx context.Context, accountId stri
 
 // GetRestoreJob retrieves a restore job by ID
 func (c *EonClient) GetRestoreJob(ctx context.Context, jobId string) (*externalEonSdkAPI.RestoreJob, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.JobsAPI.GetRestoreJob(ctx, jobId, c.ProjectID).Execute()
+	resp, httpResp, err := c.client.JobsAPI.GetRestoreJob(ctx, jobId, c.projectID).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get restore job"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -273,11 +218,11 @@ func (c *EonClient) GetRestoreJob(ctx context.Context, jobId string) (*externalE
 
 // StartVolumeRestore starts a volume restore job
 func (c *EonClient) StartVolumeRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreVolumeToEbsRequest) (string, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreEbsVolume(ctx, c.ProjectID, resourceId, snapshotId).RestoreVolumeToEbsRequest(req).Execute()
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreEbsVolume(ctx, c.projectID, resourceId, snapshotId).RestoreVolumeToEbsRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start volume restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -294,11 +239,11 @@ func (c *EonClient) StartVolumeRestore(ctx context.Context, resourceId, snapshot
 
 // GetResourceById retrieves a resource by ID
 func (c *EonClient) GetResourceById(ctx context.Context, resourceId string) (*externalEonSdkAPI.InventoryResource, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.ResourcesAPI.GetResource(ctx, resourceId, c.ProjectID).Execute()
+	resp, httpResp, err := c.client.ResourcesAPI.GetResource(ctx, resourceId, c.projectID).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get resource"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -316,11 +261,11 @@ func (c *EonClient) GetResourceById(ctx context.Context, resourceId string) (*ex
 
 // StartRdsRestore starts an RDS restore job
 func (c *EonClient) StartRdsRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreDbToRdsInstanceRequest) (string, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreDatabase(ctx, c.ProjectID, resourceId, snapshotId).RestoreDbToRdsInstanceRequest(req).Execute()
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreDatabase(ctx, c.projectID, resourceId, snapshotId).RestoreDbToRdsInstanceRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start RDS restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -337,11 +282,11 @@ func (c *EonClient) StartRdsRestore(ctx context.Context, resourceId, snapshotId 
 
 // StartEc2InstanceRestore starts an EC2 instance restore job
 func (c *EonClient) StartEc2InstanceRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreAwsEc2InstanceRequest) (string, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreEc2Instance(ctx, c.ProjectID, resourceId, snapshotId).RestoreAwsEc2InstanceRequest(req).Execute()
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreEc2Instance(ctx, c.projectID, resourceId, snapshotId).RestoreAwsEc2InstanceRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start EC2 instance restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -358,11 +303,11 @@ func (c *EonClient) StartEc2InstanceRestore(ctx context.Context, resourceId, sna
 
 // StartS3BucketRestore starts an S3 bucket restore job
 func (c *EonClient) StartS3BucketRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreBucketRequest) (string, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreBucket(ctx, c.ProjectID, resourceId, snapshotId).RestoreBucketRequest(req).Execute()
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreBucket(ctx, c.projectID, resourceId, snapshotId).RestoreBucketRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start S3 bucket restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -379,11 +324,11 @@ func (c *EonClient) StartS3BucketRestore(ctx context.Context, resourceId, snapsh
 
 // StartS3FileRestore starts an S3 file restore job
 func (c *EonClient) StartS3FileRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreFilesRequest) (string, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreFiles(ctx, c.ProjectID, resourceId, snapshotId).RestoreFilesRequest(req).Execute()
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreFiles(ctx, c.projectID, resourceId, snapshotId).RestoreFilesRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start S3 file restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -400,11 +345,11 @@ func (c *EonClient) StartS3FileRestore(ctx context.Context, resourceId, snapshot
 
 // GetSnapshot retrieves a snapshot by ID
 func (c *EonClient) GetSnapshot(ctx context.Context, snapshotId string) (*externalEonSdkAPI.Snapshot, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.GetSnapshot(ctx, snapshotId, c.ProjectID).Execute()
+	resp, httpResp, err := c.client.SnapshotsAPI.GetSnapshot(ctx, snapshotId, c.projectID).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get snapshot"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -458,11 +403,11 @@ func (c *EonClient) WaitForRestoreJobCompletion(ctx context.Context, jobId strin
 
 // ListBackupPolicies retrieves all backup policies for the project
 func (c *EonClient) ListBackupPolicies(ctx context.Context) ([]externalEonSdkAPI.BackupPolicy, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.BackupPoliciesAPI.ListBackupPolicies(ctx, c.ProjectID).Execute()
+	resp, httpResp, err := c.client.BackupPoliciesAPI.ListBackupPolicies(ctx, c.projectID).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to list backup policies"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -479,11 +424,11 @@ func (c *EonClient) ListBackupPolicies(ctx context.Context) ([]externalEonSdkAPI
 
 // GetBackupPolicy retrieves a backup policy by ID
 func (c *EonClient) GetBackupPolicy(ctx context.Context, policyId string) (*externalEonSdkAPI.BackupPolicy, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.BackupPoliciesAPI.GetBackupPolicy(ctx, policyId, c.ProjectID).Execute()
+	resp, httpResp, err := c.client.BackupPoliciesAPI.GetBackupPolicy(ctx, policyId, c.projectID).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get backup policy"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -501,11 +446,11 @@ func (c *EonClient) GetBackupPolicy(ctx context.Context, policyId string) (*exte
 
 // CreateBackupPolicy creates a new backup policy
 func (c *EonClient) CreateBackupPolicy(ctx context.Context, req externalEonSdkAPI.CreateBackupPolicyRequest) (*externalEonSdkAPI.BackupPolicy, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.BackupPoliciesAPI.CreateBackupPolicy(ctx, c.ProjectID).CreateBackupPolicyRequest(req).Execute()
+	resp, httpResp, err := c.client.BackupPoliciesAPI.CreateBackupPolicy(ctx, c.projectID).CreateBackupPolicyRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to create backup policy"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -523,11 +468,11 @@ func (c *EonClient) CreateBackupPolicy(ctx context.Context, req externalEonSdkAP
 
 // UpdateBackupPolicy updates an existing backup policy
 func (c *EonClient) UpdateBackupPolicy(ctx context.Context, policyId string, req externalEonSdkAPI.UpdateBackupPolicyRequest) (*externalEonSdkAPI.BackupPolicy, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.BackupPoliciesAPI.UpdateBackupPolicy(ctx, policyId, c.ProjectID).UpdateBackupPolicyRequest(req).Execute()
+	resp, httpResp, err := c.client.BackupPoliciesAPI.UpdateBackupPolicy(ctx, policyId, c.projectID).UpdateBackupPolicyRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to update backup policy"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -544,11 +489,11 @@ func (c *EonClient) UpdateBackupPolicy(ctx context.Context, policyId string, req
 
 // DeleteBackupPolicy deletes a backup policy
 func (c *EonClient) DeleteBackupPolicy(ctx context.Context, policyId string) error {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	httpResp, err := c.client.BackupPoliciesAPI.DeleteBackupPolicy(ctx, policyId, c.ProjectID).Execute()
+	httpResp, err := c.client.BackupPoliciesAPI.DeleteBackupPolicy(ctx, policyId, c.projectID).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to delete backup policy"); apiErr != nil {
 		return apiErr
 	}
@@ -564,11 +509,11 @@ func (c *EonClient) DeleteBackupPolicy(ctx context.Context, policyId string) err
 
 // CreateVault creates a new backup vault
 func (c *EonClient) CreateVault(ctx context.Context, req externalEonSdkAPI.CreateVaultRequest) (*externalEonSdkAPI.BackupVault, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.VaultsAPI.CreateVault(ctx, c.ProjectID).CreateVaultRequest(req).Execute()
+	resp, httpResp, err := c.client.VaultsAPI.CreateVault(ctx, c.projectID).CreateVaultRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to create vault"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -588,11 +533,11 @@ func (c *EonClient) CreateVault(ctx context.Context, req externalEonSdkAPI.Creat
 
 // GetVault retrieves a vault by ID
 func (c *EonClient) GetVault(ctx context.Context, vaultId string) (*externalEonSdkAPI.BackupVault, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.VaultsAPI.GetVault(ctx, vaultId, c.ProjectID).Execute()
+	resp, httpResp, err := c.client.VaultsAPI.GetVault(ctx, vaultId, c.projectID).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get vault"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -612,11 +557,11 @@ func (c *EonClient) GetVault(ctx context.Context, vaultId string) (*externalEonS
 
 // UpdateVault updates a vault's display name
 func (c *EonClient) UpdateVault(ctx context.Context, vaultId string, req externalEonSdkAPI.UpdateVaultRequest) (*externalEonSdkAPI.BackupVault, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.VaultsAPI.UpdateVault(ctx, vaultId, c.ProjectID).UpdateVaultRequest(req).Execute()
+	resp, httpResp, err := c.client.VaultsAPI.UpdateVault(ctx, vaultId, c.projectID).UpdateVaultRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to update vault"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -633,7 +578,7 @@ func (c *EonClient) UpdateVault(ctx context.Context, vaultId string, req externa
 
 // ListVaults retrieves all vaults for the project
 func (c *EonClient) ListVaults(ctx context.Context) ([]externalEonSdkAPI.BackupVault, error) {
-	if err := c.ensureValidToken(); err != nil {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
@@ -642,7 +587,7 @@ func (c *EonClient) ListVaults(ctx context.Context) ([]externalEonSdkAPI.BackupV
 
 	// Handle pagination to fetch all vaults
 	for {
-		req := c.client.VaultsAPI.ListVaults(ctx, c.ProjectID)
+		req := c.client.VaultsAPI.ListVaults(ctx, c.projectID)
 		if pageToken != nil {
 			req = req.PageToken(*pageToken)
 		}

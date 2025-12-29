@@ -3,14 +3,20 @@ package provider
 import (
 	"testing"
 
+	"github.com/eon-io/terraform-provider-eon/internal/client"
 	"github.com/stretchr/testify/assert"
 )
+
+// testFactory is a mock factory for testing that returns an error (since we don't have a real server)
+func testFactory(cfg client.ClientConfig) (*client.EonClient, error) {
+	return nil, nil
+}
 
 // TestProvider tests the provider creation without external dependencies
 func TestProvider(t *testing.T) {
 	t.Parallel()
 
-	provider := New("test")()
+	provider := New("test", testFactory)()
 	assert.NotNil(t, provider, "Provider should not be nil")
 }
 
@@ -18,7 +24,7 @@ func TestProvider(t *testing.T) {
 func TestProvider_impl(t *testing.T) {
 	t.Parallel()
 
-	provider := New("test")()
+	provider := New("test", testFactory)()
 	assert.NotNil(t, provider, "Provider should not be nil")
 
 	// Test that provider can be created successfully
@@ -55,7 +61,7 @@ func TestProvider_NewWithVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			provider := New(tt.version)()
+			provider := New(tt.version, testFactory)()
 			assert.NotNil(t, provider, "Provider should not be nil for version %s", tt.version)
 		})
 	}
@@ -72,7 +78,7 @@ func TestProvider_BasicValidation(t *testing.T) {
 		{
 			name: "provider creation",
 			test: func(t *testing.T) {
-				provider := New("test")()
+				provider := New("test", testFactory)()
 				assert.NotNil(t, provider, "Provider should not be nil")
 			},
 		},
@@ -81,7 +87,7 @@ func TestProvider_BasicValidation(t *testing.T) {
 			test: func(t *testing.T) {
 				versions := []string{"test", "dev", "1.0.0", ""}
 				for _, version := range versions {
-					provider := New(version)()
+					provider := New(version, testFactory)()
 					assert.NotNil(t, provider, "Provider should not be nil for version %s", version)
 				}
 			},
@@ -90,8 +96,8 @@ func TestProvider_BasicValidation(t *testing.T) {
 			name: "provider stability",
 			test: func(t *testing.T) {
 				// Test that multiple providers can be created
-				provider1 := New("test")()
-				provider2 := New("test")()
+				provider1 := New("test", testFactory)()
+				provider2 := New("test", testFactory)()
 
 				assert.NotNil(t, provider1, "First provider should not be nil")
 				assert.NotNil(t, provider2, "Second provider should not be nil")
@@ -208,7 +214,7 @@ func TestProvider_Concurrent(t *testing.T) {
 			}()
 
 			for j := 0; j < numProvidersPerGoroutine; j++ {
-				provider := New("test")()
+				provider := New("test", testFactory)()
 				if provider == nil {
 					results <- false
 					return

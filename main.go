@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
+	"github.com/eon-io/terraform-provider-eon/internal/client"
 	"github.com/eon-io/terraform-provider-eon/internal/provider"
 )
 
@@ -40,7 +41,7 @@ func main() {
 		Debug:   debug,
 	}
 
-	err := providerserver.Serve(context.Background(), provider.New(version), opts)
+	err := providerserver.Serve(context.Background(), provider.New(version, client.NewClient), opts)
 
 	if err != nil {
 		log.Fatal(err.Error())
