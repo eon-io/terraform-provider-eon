@@ -1,17 +1,34 @@
-# Example: Connect an AWS restore account for disaster recovery
+# Example: Connect an AWS restore account using the new aws block (recommended)
 resource "eon_restore_account" "aws_disaster_recovery" {
-  name                = "Disaster Recovery AWS Account"
-  cloud_provider      = "AWS"
-  provider_account_id = "555666777888"
-  role                = "arn:aws:iam::555666777888:role/EonRestoreRole"
+  name           = "Disaster Recovery AWS Account"
+  cloud_provider = "AWS"
+
+  aws {
+    role_arn = "arn:aws:iam::555666777888:role/EonRestoreRole"
+  }
 }
 
-# Example: Connect an AWS restore account for testing
-resource "eon_restore_account" "aws_test_restore" {
-  name                = "Test Restore AWS Account"
-  cloud_provider      = "AWS"
-  provider_account_id = "111222333444"
-  role                = "arn:aws:iam::111222333444:role/EonTestRestoreRole"
+# Example: Connect an Azure restore account (subscription)
+resource "eon_restore_account" "azure_subscription" {
+  name           = "Disaster Recovery Azure Subscription"
+  cloud_provider = "AZURE"
+
+  azure {
+    tenant_id       = "ae5f2819-f24d-4e4b-990e-0e24fd4c5682"
+    subscription_id = "cbb5ec02-4c52-4c6e-b262-d1c63effae51"
+  }
+}
+
+# Example: Connect an Azure restore account with resource group scoping
+resource "eon_restore_account" "azure_scoped" {
+  name           = "Azure Restore to Specific RG"
+  cloud_provider = "AZURE"
+
+  azure {
+    tenant_id           = "ae5f2819-f24d-4e4b-990e-0e24fd4c5682"
+    subscription_id     = "cbb5ec02-4c52-4c6e-b262-d1c63effae51"
+    resource_group_name = "my-restore-resources"
+  }
 }
 
 # Output the account details
@@ -23,6 +40,16 @@ output "aws_disaster_recovery_account" {
     status              = eon_restore_account.aws_disaster_recovery.status
     provider_account_id = eon_restore_account.aws_disaster_recovery.provider_account_id
     cloud_provider      = eon_restore_account.aws_disaster_recovery.cloud_provider
-    created_at          = eon_restore_account.aws_disaster_recovery.created_at
+  }
+}
+
+output "azure_restore_account" {
+  description = "Details of the connected Azure restore account"
+  value = {
+    id                  = eon_restore_account.azure_subscription.id
+    name                = eon_restore_account.azure_subscription.name
+    status              = eon_restore_account.azure_subscription.status
+    provider_account_id = eon_restore_account.azure_subscription.provider_account_id
+    cloud_provider      = eon_restore_account.azure_subscription.cloud_provider
   }
 }

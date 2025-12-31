@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -28,14 +29,16 @@ type SourceAccountResource struct {
 }
 
 type SourceAccountResourceModel struct {
-	Id                types.String `tfsdk:"id"`
-	Name              types.String `tfsdk:"name"`
-	ProviderAccountId types.String `tfsdk:"provider_account_id"`
-	CloudProvider     types.String `tfsdk:"cloud_provider"`
-	Role              types.String `tfsdk:"role"`
-	Status            types.String `tfsdk:"status"`
-	CreatedAt         types.String `tfsdk:"created_at"`
-	UpdatedAt         types.String `tfsdk:"updated_at"`
+	Id                types.String             `tfsdk:"id"`
+	Name              types.String             `tfsdk:"name"`
+	ProviderAccountId types.String             `tfsdk:"provider_account_id"` // Deprecated, now computed
+	CloudProvider     types.String             `tfsdk:"cloud_provider"`
+	Role              types.String             `tfsdk:"role"` // Deprecated, use aws block
+	Status            types.String             `tfsdk:"status"`
+	CreatedAt         types.String             `tfsdk:"created_at"`
+	UpdatedAt         types.String             `tfsdk:"updated_at"`
+	Aws               *AwsAccountConfigModel   `tfsdk:"aws"`
+	Azure             *AzureAccountConfigModel `tfsdk:"azure"`
 }
 
 func (r *SourceAccountResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -56,9 +59,10 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 				Required:            true,
 			},
 			"provider_account_id": schema.StringAttribute{
-				MarkdownDescription: "Cloud-provider-assigned account ID.",
-				Required:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				MarkdownDescription: "Cloud-provider-assigned account ID (AWS account ID or Azure subscription ID). Computed from the `aws` or `azure` block.",
+				Computed:            true,
+				DeprecationMessage:  "This field is now computed from the aws or azure block.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"cloud_provider": schema.StringAttribute{
 				MarkdownDescription: "Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.",
@@ -66,9 +70,10 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"role": schema.StringAttribute{
-				MarkdownDescription: "ARN of the role Eon assumes to access the account in AWS. **Required when creating new accounts**. Optional for imported accounts that already have a role configured in Eon.",
+				MarkdownDescription: "**Deprecated:** Use `aws { role_arn = \"...\" }` instead. ARN of the role Eon assumes to access the account in AWS.",
 				Optional:            true,
 				Computed:            true,
+				DeprecationMessage:  "Use 'aws { role_arn = \"...\" }' instead.",
 			},
 			"status": schema.StringAttribute{
 				MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
@@ -85,6 +90,10 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+		},
+		Blocks: map[string]schema.Block{
+			CloudProviderAWS.BlockName():   awsSchemaBlock(),
+			CloudProviderAzure.BlockName(): azureSchemaBlock("Scope discovery to this resource group. When provided, only resources in this resource group are discovered."),
 		},
 	}
 }
@@ -111,55 +120,104 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	// Validate role is provided for new account creation
-	if data.Role.IsNull() || data.Role.ValueString() == "" {
-		resp.Diagnostics.AddError(
-			"Missing Role",
-			"The 'role' attribute is required when creating a new source account. Please provide the ARN of the IAM role that Eon should assume.",
-		)
-		return
-	}
+	cloudProvider := CloudProvider(data.CloudProvider.ValueString())
+	config := externalEonSdkAPI.NewSourceAccountAttributesInput(externalEonSdkAPI.Provider(cloudProvider))
 
-	if data.CloudProvider.ValueString() != string(externalEonSdkAPI.AWS) {
+	switch cloudProvider {
+	case CloudProviderAWS:
+		var roleArn string
+		if data.Aws != nil && !data.Aws.RoleArn.IsNull() {
+			roleArn = data.Aws.RoleArn.ValueString()
+		} else if !data.Role.IsNull() && data.Role.ValueString() != "" {
+			// Legacy fallback
+			roleArn = data.Role.ValueString()
+		} else {
+			resp.Diagnostics.AddError(
+				"Missing Configuration",
+				"Either 'aws { role_arn = \"...\" }' or deprecated 'role' attribute is required for AWS accounts.",
+			)
+			return
+		}
+		awsConfig := externalEonSdkAPI.NewAwsSourceAccountAttributesInput(roleArn)
+		config.SetAws(*awsConfig)
+
+		tflog.Debug(ctx, "Connecting AWS source account", map[string]interface{}{
+			"name":     data.Name.ValueString(),
+			"role_arn": roleArn,
+		})
+
+	case CloudProviderAzure:
+		if data.Azure == nil {
+			resp.Diagnostics.AddError(
+				"Missing Configuration",
+				"The 'azure' block is required when cloud_provider is AZURE.",
+			)
+			return
+		}
+		if data.Azure.TenantId.IsNull() || data.Azure.SubscriptionId.IsNull() {
+			resp.Diagnostics.AddError(
+				"Missing Configuration",
+				"Both 'tenant_id' and 'subscription_id' are required in the azure block.",
+			)
+			return
+		}
+		azureConfig := externalEonSdkAPI.NewAzureSourceAccountAttributesInput(
+			data.Azure.TenantId.ValueString(),
+			data.Azure.SubscriptionId.ValueString(),
+		)
+		if !data.Azure.ResourceGroupName.IsNull() && data.Azure.ResourceGroupName.ValueString() != "" {
+			azureConfig.SetResourceGroupName(data.Azure.ResourceGroupName.ValueString())
+		}
+		config.SetAzure(*azureConfig)
+
+		tflog.Debug(ctx, "Connecting Azure source account", map[string]interface{}{
+			"name":            data.Name.ValueString(),
+			"tenant_id":       data.Azure.TenantId.ValueString(),
+			"subscription_id": data.Azure.SubscriptionId.ValueString(),
+		})
+
+	default:
 		resp.Diagnostics.AddError(
 			"Unsupported Provider",
-			"Currently only AWS accounts are supported for account creation",
+			fmt.Sprintf("Cloud provider '%s' is not supported. Supported values: AWS, AZURE.", cloudProvider),
 		)
 		return
 	}
-
-	config := externalEonSdkAPI.NewSourceAccountAttributesInput(externalEonSdkAPI.AWS)
-	awsConfig := externalEonSdkAPI.NewAwsSourceAccountAttributesInput(data.Role.ValueString())
-
-	config.SetAws(*awsConfig)
 
 	connectReq := externalEonSdkAPI.ConnectSourceAccountRequest{
 		Name:                    data.Name.ValueStringPointer(),
 		SourceAccountAttributes: *config,
 	}
 
-	tflog.Debug(ctx, "Connecting source account", map[string]interface{}{
-		"name":     data.Name.ValueString(),
-		"provider": data.CloudProvider.ValueString(),
-		"role":     data.Role.ValueString(),
-	})
-
 	// Connect the source account
 	account, err := r.client.ConnectSourceAccount(ctx, connectReq)
 	if err != nil {
+		// Check if this is a 409 Conflict (account already exists)
+		var apiErr *client.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 409 {
+			existingID := r.findExistingAccountID(ctx, cloudProvider, data)
+			title, detail := conflictErrorMessage("Source Account", existingID)
+			resp.Diagnostics.AddError(title, fmt.Sprintf("%s\n\nOriginal error: %s", detail, err.Error()))
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to connect source account: %s", err))
 		return
 	}
 
+	// Update state from response
 	data.Id = types.StringValue(account.Id)
 	data.Status = types.StringValue(string(account.Status))
 	data.Name = types.StringValue(account.GetName())
 	data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
-
 	data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
-
 	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+
+	// Set role to null by default, override for AWS (backward compatibility)
+	data.Role = types.StringNull()
+	if cloudProvider == CloudProviderAWS && data.Aws != nil {
+		data.Role = data.Aws.RoleArn
+	}
 
 	tflog.Debug(ctx, "Source account connected", map[string]interface{}{
 		"id":     data.Id.ValueString(),
@@ -192,7 +250,33 @@ func (r *SourceAccountResource) Read(ctx context.Context, req resource.ReadReque
 			data.Status = types.StringValue(string(account.Status))
 			data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
 
-			data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
+			cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
+			data.CloudProvider = types.StringValue(cloudProvider.String())
+
+			// Populate cloud-specific blocks from API response
+			switch cloudProvider {
+			case CloudProviderAWS:
+				if account.SourceAccountAttributes.HasAws() {
+					awsAttrs := account.SourceAccountAttributes.GetAws()
+					data.Aws = &AwsAccountConfigModel{
+						RoleArn: types.StringValue(awsAttrs.GetRoleArn()),
+					}
+					// Also populate deprecated role field for backward compatibility
+					data.Role = types.StringValue(awsAttrs.GetRoleArn())
+				}
+				data.Azure = nil
+			case CloudProviderAzure:
+				if account.SourceAccountAttributes.HasAzure() {
+					azureAttrs := account.SourceAccountAttributes.GetAzure()
+					data.Azure = &AzureAccountConfigModel{
+						TenantId:       types.StringValue(azureAttrs.GetTenantId()),
+						SubscriptionId: types.StringValue(account.GetProviderAccountId()), // subscription_id is the provider_account_id
+					}
+					// ResourceGroupName is not returned in the output model for source accounts
+				}
+				data.Aws = nil
+				data.Role = types.StringNull()
+			}
 
 			if data.CreatedAt.IsNull() || data.CreatedAt.IsUnknown() {
 				data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
@@ -270,7 +354,29 @@ func (r *SourceAccountResource) ImportState(ctx context.Context, req resource.Im
 			data.Status = types.StringValue(string(account.Status))
 			data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
 
-			data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
+			cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
+			data.CloudProvider = types.StringValue(cloudProvider.String())
+
+			// Populate cloud-specific blocks from API response
+			switch cloudProvider {
+			case CloudProviderAWS:
+				if account.SourceAccountAttributes.HasAws() {
+					awsAttrs := account.SourceAccountAttributes.GetAws()
+					data.Aws = &AwsAccountConfigModel{
+						RoleArn: types.StringValue(awsAttrs.GetRoleArn()),
+					}
+					// Also populate deprecated role field for backward compatibility
+					data.Role = types.StringValue(awsAttrs.GetRoleArn())
+				}
+			case CloudProviderAzure:
+				if account.SourceAccountAttributes.HasAzure() {
+					azureAttrs := account.SourceAccountAttributes.GetAzure()
+					data.Azure = &AzureAccountConfigModel{
+						TenantId:       types.StringValue(azureAttrs.GetTenantId()),
+						SubscriptionId: types.StringValue(account.GetProviderAccountId()),
+					}
+				}
+			}
 
 			data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 			data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
@@ -294,4 +400,41 @@ func (r *SourceAccountResource) ImportState(ctx context.Context, req resource.Im
 		"name":   data.Name.ValueString(),
 		"status": data.Status.ValueString(),
 	})
+}
+
+// findExistingAccountID attempts to find the ID of an existing source account
+// that matches the given configuration. Returns empty string if not found.
+func (r *SourceAccountResource) findExistingAccountID(ctx context.Context, cloudProvider CloudProvider, data SourceAccountResourceModel) string {
+	accounts, err := r.client.ListSourceAccounts(ctx)
+	if err != nil {
+		tflog.Debug(ctx, "Failed to list source accounts to find existing ID", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return ""
+	}
+
+	for _, account := range accounts {
+		if CloudProvider(account.SourceAccountAttributes.GetCloudProvider()) != cloudProvider {
+			continue
+		}
+
+		switch cloudProvider {
+		case CloudProviderAWS:
+			if data.Aws != nil && account.SourceAccountAttributes.HasAws() {
+				awsAttrs := account.SourceAccountAttributes.GetAws()
+				if awsAttrs.GetRoleArn() == data.Aws.RoleArn.ValueString() {
+					return account.Id
+				}
+			}
+		case CloudProviderAzure:
+			if data.Azure != nil && account.SourceAccountAttributes.HasAzure() {
+				// Match by subscription_id (the unique identifier for Azure accounts)
+				if account.GetProviderAccountId() == data.Azure.SubscriptionId.ValueString() {
+					return account.Id
+				}
+			}
+		}
+	}
+
+	return ""
 }

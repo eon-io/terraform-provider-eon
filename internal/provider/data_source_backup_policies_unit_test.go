@@ -296,7 +296,7 @@ func TestBackupPoliciesDataSource_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Wait for all goroutines to complete
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		select {
 		case err := <-results:
 			assert.NoError(t, err, "Goroutine should complete without error")
