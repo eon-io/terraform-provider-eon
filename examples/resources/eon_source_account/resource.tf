@@ -31,6 +31,17 @@ resource "eon_source_account" "azure_scoped" {
   }
 }
 
+# Example: Connect a GCP source account (project)
+resource "eon_source_account" "gcp_production" {
+  name           = "Production GCP Project"
+  cloud_provider = "GCP"
+
+  gcp {
+    project_id      = "my-gcp-project-id"
+    service_account = "eon-backup@my-gcp-project-id.iam.gserviceaccount.com"
+  }
+}
+
 # Output the account details
 output "aws_production_account" {
   description = "Details of the connected AWS production source account"
@@ -51,5 +62,16 @@ output "azure_subscription_account" {
     status              = eon_source_account.azure_subscription.status
     provider_account_id = eon_source_account.azure_subscription.provider_account_id
     cloud_provider      = eon_source_account.azure_subscription.cloud_provider
+  }
+}
+
+output "gcp_production_account" {
+  description = "Details of the connected GCP source account"
+  value = {
+    id                  = eon_source_account.gcp_production.id
+    name                = eon_source_account.gcp_production.name
+    status              = eon_source_account.gcp_production.status
+    provider_account_id = eon_source_account.gcp_production.provider_account_id
+    cloud_provider      = eon_source_account.gcp_production.cloud_provider
   }
 }

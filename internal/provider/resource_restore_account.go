@@ -179,7 +179,7 @@ func (r *RestoreAccountResource) Create(ctx context.Context, req resource.Create
 	default:
 		resp.Diagnostics.AddError(
 			"Unsupported Provider",
-			fmt.Sprintf("Cloud provider '%s' is not supported. Supported values: AWS, AZURE.", cloudProvider),
+			fmt.Sprintf("Cloud provider '%s' is not supported. Supported values: AWS, AZURE, GCP.", cloudProvider),
 		)
 		return
 	}

@@ -14,6 +14,7 @@ type CloudProvider string
 const (
 	CloudProviderAWS   CloudProvider = "AWS"
 	CloudProviderAzure CloudProvider = "AZURE"
+	CloudProviderGCP   CloudProvider = "GCP"
 )
 
 // BlockName returns the lowercase Terraform schema block name (e.g., "aws", "azure")
@@ -38,6 +39,13 @@ type AzureAccountConfigModel struct {
 	TenantId          types.String `tfsdk:"tenant_id"`
 	SubscriptionId    types.String `tfsdk:"subscription_id"`
 	ResourceGroupName types.String `tfsdk:"resource_group_name"`
+}
+
+// GcpAccountConfigModel represents GCP-specific configuration for cloud accounts.
+// Shared between source and restore accounts.
+type GcpAccountConfigModel struct {
+	ProjectId      types.String `tfsdk:"project_id"`
+	ServiceAccount types.String `tfsdk:"service_account"`
 }
 
 // awsSchemaBlock returns the schema block for AWS-specific configuration.
@@ -70,6 +78,23 @@ func azureSchemaBlock(resourceGroupDescription string) schema.SingleNestedBlock 
 			"resource_group_name": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: resourceGroupDescription,
+			},
+		},
+	}
+}
+
+// gcpSchemaBlock returns the schema block for GCP-specific configuration.
+func gcpSchemaBlock() schema.SingleNestedBlock {
+	return schema.SingleNestedBlock{
+		MarkdownDescription: "GCP-specific configuration. Required when `cloud_provider` is `GCP`.",
+		Attributes: map[string]schema.Attribute{
+			"project_id": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "GCP project ID. Required when using the gcp block.",
+			},
+			"service_account": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "Email of the GCP service account Eon uses to access the project. Required when using the gcp block.",
 			},
 		},
 	}
