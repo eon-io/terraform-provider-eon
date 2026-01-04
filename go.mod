@@ -4,8 +4,6 @@ go 1.24.0
 
 toolchain go1.24.4
 
-replace github.com/eon-io/eon-sdk-go => ../eon-sdk-go
-
 require (
 	github.com/eon-io/eon-sdk-go v1.67.0
 	github.com/hashicorp/terraform-plugin-docs v0.24.0
