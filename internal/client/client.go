@@ -182,7 +182,7 @@ func (c *EonClient) ConnectGcpSourceAccount(ctx context.Context, name string, se
 	// Get the base URL from the client configuration
 	cfg := c.client.GetConfig()
 	baseURL := cfg.Servers[0].URL
-	url := fmt.Sprintf("%s/projects/%s/source-accounts/connect", baseURL, c.projectID)
+	url := fmt.Sprintf("%s/v1/projects/%s/source-accounts", baseURL, c.projectID)
 
 	// Create the HTTP request
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBody))
