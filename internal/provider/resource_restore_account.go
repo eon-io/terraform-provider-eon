@@ -193,46 +193,14 @@ func (r *RestoreAccountResource) Create(ctx context.Context, req resource.Create
 			)
 			return
 		}
+		gcpConfig := externalEonSdkAPI.NewGcpRestoreAccountAttributesInput(data.Gcp.ServiceAccount.ValueString())
+		config.SetGcp(*gcpConfig)
 
 		tflog.Debug(ctx, "Connecting GCP restore account", map[string]interface{}{
 			"name":            data.Name.ValueString(),
 			"project_id":      data.Gcp.ProjectId.ValueString(),
 			"service_account": data.Gcp.ServiceAccount.ValueString(),
 		})
-
-		// Use the custom GCP method since the SDK doesn't support GCP in RestoreAccountAttributesInput yet
-		account, err := r.client.ConnectGcpRestoreAccount(ctx, data.Name.ValueString(), data.Gcp.ServiceAccount.ValueString())
-		if err != nil {
-			// Check if this is a 409 Conflict (account already exists)
-			var apiErr *client.APIError
-			if errors.As(err, &apiErr) && apiErr.StatusCode == 409 {
-				existingID := r.findExistingAccountID(ctx, cloudProvider, data)
-				title, detail := conflictErrorMessage("Restore Account", existingID)
-				resp.Diagnostics.AddError(title, fmt.Sprintf("%s\n\nOriginal error: %s", detail, err.Error()))
-				return
-			}
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to connect GCP restore account: %s", err))
-			return
-		}
-
-		// Update state from response
-		data.Id = types.StringValue(account.Id)
-		data.Status = types.StringValue(string(account.Status))
-		data.Name = types.StringValue(account.GetName())
-		data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
-		data.CloudProvider = types.StringValue(string(account.RestoreAccountAttributes.GetCloudProvider()))
-		data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
-		data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
-		data.Role = types.StringNull()
-
-		tflog.Debug(ctx, "GCP restore account connected", map[string]interface{}{
-			"id":     data.Id.ValueString(),
-			"name":   data.Name.ValueString(),
-			"status": data.Status.ValueString(),
-		})
-
-		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-		return
 
 	default:
 		resp.Diagnostics.AddError(
