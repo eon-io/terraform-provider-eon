@@ -1,4 +1,6 @@
 # golangci-lint configuration
+version: "2"
+
 run:
   timeout: 5m
 
@@ -6,6 +8,9 @@ linters:
   disable-all: true
   enable:
     - errcheck
+    - misspell
+
+formatters:
+  enable:
     - gofmt
     - goimports
-    - misspell

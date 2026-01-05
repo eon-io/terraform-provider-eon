@@ -20,13 +20,13 @@ type GcpSourceAccountAttributesInput struct {
 
 // ConnectSourceAccountRequestWithGcp extends ConnectSourceAccountRequest to include GCP support
 type ConnectSourceAccountRequestWithGcp struct {
-	Name                    *string                          `json:"name,omitempty"`
-	SourceAccountAttributes SourceAccountAttributesInputGcp  `json:"sourceAccountAttributes"`
+	Name                    *string                         `json:"name,omitempty"`
+	SourceAccountAttributes SourceAccountAttributesInputGcp `json:"sourceAccountAttributes"`
 }
 
 // SourceAccountAttributesInputGcp extends SourceAccountAttributesInput to include GCP
 type SourceAccountAttributesInputGcp struct {
-	CloudProvider string                           `json:"cloudProvider"`
+	CloudProvider string                                               `json:"cloudProvider"`
 	Aws           *externalEonSdkAPI.AwsSourceAccountAttributesInput   `json:"aws,omitempty"`
 	Azure         *externalEonSdkAPI.AzureSourceAccountAttributesInput `json:"azure,omitempty"`
 	Gcp           *GcpSourceAccountAttributesInput                     `json:"gcp,omitempty"`
