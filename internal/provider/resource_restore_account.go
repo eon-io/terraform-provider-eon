@@ -39,6 +39,7 @@ type RestoreAccountResourceModel struct {
 	UpdatedAt         types.String             `tfsdk:"updated_at"`
 	Aws               *AwsAccountConfigModel   `tfsdk:"aws"`
 	Azure             *AzureAccountConfigModel `tfsdk:"azure"`
+	Gcp               *GcpAccountConfigModel   `tfsdk:"gcp"`
 }
 
 func (r *RestoreAccountResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -94,6 +95,7 @@ func (r *RestoreAccountResource) Schema(ctx context.Context, req resource.Schema
 		Blocks: map[string]schema.Block{
 			CloudProviderAWS.BlockName():   awsSchemaBlock(),
 			CloudProviderAzure.BlockName(): azureSchemaBlock("Scope restores to this resource group. When provided, only resources in this resource group can be restored to."),
+			CloudProviderGCP.BlockName():   gcpSchemaBlock(),
 		},
 	}
 }
@@ -175,6 +177,62 @@ func (r *RestoreAccountResource) Create(ctx context.Context, req resource.Create
 			"tenant_id":       data.Azure.TenantId.ValueString(),
 			"subscription_id": data.Azure.SubscriptionId.ValueString(),
 		})
+
+	case CloudProviderGCP:
+		if data.Gcp == nil {
+			resp.Diagnostics.AddError(
+				"Missing Configuration",
+				"The 'gcp' block is required when cloud_provider is GCP.",
+			)
+			return
+		}
+		if data.Gcp.ProjectId.IsNull() || data.Gcp.ServiceAccount.IsNull() {
+			resp.Diagnostics.AddError(
+				"Missing Configuration",
+				"Both 'project_id' and 'service_account' are required in the gcp block.",
+			)
+			return
+		}
+
+		tflog.Debug(ctx, "Connecting GCP restore account", map[string]interface{}{
+			"name":            data.Name.ValueString(),
+			"project_id":      data.Gcp.ProjectId.ValueString(),
+			"service_account": data.Gcp.ServiceAccount.ValueString(),
+		})
+
+		// Use the custom GCP method since the SDK doesn't support GCP in RestoreAccountAttributesInput yet
+		account, err := r.client.ConnectGcpRestoreAccount(ctx, data.Name.ValueString(), data.Gcp.ServiceAccount.ValueString())
+		if err != nil {
+			// Check if this is a 409 Conflict (account already exists)
+			var apiErr *client.APIError
+			if errors.As(err, &apiErr) && apiErr.StatusCode == 409 {
+				existingID := r.findExistingAccountID(ctx, cloudProvider, data)
+				title, detail := conflictErrorMessage("Restore Account", existingID)
+				resp.Diagnostics.AddError(title, fmt.Sprintf("%s\n\nOriginal error: %s", detail, err.Error()))
+				return
+			}
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to connect GCP restore account: %s", err))
+			return
+		}
+
+		// Update state from response
+		data.Id = types.StringValue(account.Id)
+		data.Status = types.StringValue(string(account.Status))
+		data.Name = types.StringValue(account.GetName())
+		data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
+		data.CloudProvider = types.StringValue(string(account.RestoreAccountAttributes.GetCloudProvider()))
+		data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+		data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+		data.Role = types.StringNull()
+
+		tflog.Debug(ctx, "GCP restore account connected", map[string]interface{}{
+			"id":     data.Id.ValueString(),
+			"name":   data.Name.ValueString(),
+			"status": data.Status.ValueString(),
+		})
+
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+		return
 
 	default:
 		resp.Diagnostics.AddError(
@@ -271,6 +329,7 @@ func (r *RestoreAccountResource) Read(ctx context.Context, req resource.ReadRequ
 					data.Role = types.StringValue(awsAttrs.GetRoleArn())
 				}
 				data.Azure = nil
+				data.Gcp = nil
 			case CloudProviderAzure:
 				if account.RestoreAccountAttributes.HasAzure() {
 					azureAttrs := account.RestoreAccountAttributes.GetAzure()
@@ -283,6 +342,18 @@ func (r *RestoreAccountResource) Read(ctx context.Context, req resource.ReadRequ
 					}
 				}
 				data.Aws = nil
+				data.Gcp = nil
+				data.Role = types.StringNull()
+			case CloudProviderGCP:
+				if account.RestoreAccountAttributes.HasGcp() {
+					gcpAttrs := account.RestoreAccountAttributes.GetGcp()
+					data.Gcp = &GcpAccountConfigModel{
+						ProjectId:      types.StringValue(account.GetProviderAccountId()),
+						ServiceAccount: types.StringValue(gcpAttrs.GetServiceAccount()),
+					}
+				}
+				data.Aws = nil
+				data.Azure = nil
 				data.Role = types.StringNull()
 			}
 
@@ -390,6 +461,14 @@ func (r *RestoreAccountResource) ImportState(ctx context.Context, req resource.I
 						data.Azure.ResourceGroupName = types.StringValue(azureAttrs.GetResourceGroupName())
 					}
 				}
+			case CloudProviderGCP:
+				if account.RestoreAccountAttributes.HasGcp() {
+					gcpAttrs := account.RestoreAccountAttributes.GetGcp()
+					data.Gcp = &GcpAccountConfigModel{
+						ProjectId:      types.StringValue(account.GetProviderAccountId()),
+						ServiceAccount: types.StringValue(gcpAttrs.GetServiceAccount()),
+					}
+				}
 			}
 
 			data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
@@ -444,6 +523,13 @@ func (r *RestoreAccountResource) findExistingAccountID(ctx context.Context, clou
 			if data.Azure != nil && account.RestoreAccountAttributes.HasAzure() {
 				// Match by subscription_id (the unique identifier for Azure accounts)
 				if account.GetProviderAccountId() == data.Azure.SubscriptionId.ValueString() {
+					return account.Id
+				}
+			}
+		case CloudProviderGCP:
+			if data.Gcp != nil && account.RestoreAccountAttributes.HasGcp() {
+				// Match by project_id (the unique identifier for GCP accounts)
+				if account.GetProviderAccountId() == data.Gcp.ProjectId.ValueString() {
 					return account.Id
 				}
 			}

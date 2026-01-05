@@ -270,6 +270,92 @@ func (c *EonClient) ConnectRestoreAccount(ctx context.Context, req externalEonSd
 	return &account, nil
 }
 
+// ConnectGcpRestoreAccount connects a new GCP restore account using a custom request type
+// This is a workaround until the SDK is updated to include GCP support
+func (c *EonClient) ConnectGcpRestoreAccount(ctx context.Context, name string, serviceAccount string) (*externalEonSdkAPI.RestoreAccount, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	// Build the request with GCP support
+	type GcpRestoreAccountAttributesInput struct {
+		ServiceAccount string `json:"serviceAccount"`
+	}
+	type RestoreAccountAttributesInputGcp struct {
+		CloudProvider string                            `json:"cloudProvider"`
+		Gcp           *GcpRestoreAccountAttributesInput `json:"gcp,omitempty"`
+	}
+	type ConnectRestoreAccountRequestWithGcp struct {
+		Name                     *string                          `json:"name,omitempty"`
+		RestoreAccountAttributes RestoreAccountAttributesInputGcp `json:"restoreAccountAttributes"`
+	}
+
+	req := ConnectRestoreAccountRequestWithGcp{
+		Name: &name,
+		RestoreAccountAttributes: RestoreAccountAttributesInputGcp{
+			CloudProvider: "GCP",
+			Gcp: &GcpRestoreAccountAttributesInput{
+				ServiceAccount: serviceAccount,
+			},
+		},
+	}
+
+	// Marshal the request to JSON
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Get the base URL from the client configuration
+	cfg := c.client.GetConfig()
+	baseURL := cfg.Servers[0].URL
+	url := fmt.Sprintf("%s/v1/projects/%s/restore-accounts", baseURL, c.projectID)
+
+	// Create the HTTP request
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+
+	// Add authorization header from the client's default headers
+	for key, value := range cfg.DefaultHeader {
+		httpReq.Header.Set(key, value)
+	}
+
+	// Execute the request
+	httpResp, err := cfg.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect GCP restore account: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	// Read the response body
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	// Parse the response
+	var resp struct {
+		RestoreAccount externalEonSdkAPI.RestoreAccount `json:"restoreAccount"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &resp.RestoreAccount, nil
+}
+
 // DisconnectRestoreAccount disconnects a restore account
 func (c *EonClient) DisconnectRestoreAccount(ctx context.Context, accountId string) error {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
