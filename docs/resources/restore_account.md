@@ -46,6 +46,17 @@ resource "eon_restore_account" "azure_scoped" {
   }
 }
 
+# Example: Connect a GCP restore account (project)
+resource "eon_restore_account" "gcp_disaster_recovery" {
+  name           = "Disaster Recovery GCP Project"
+  cloud_provider = "GCP"
+
+  gcp {
+    project_id      = "my-gcp-project-id"
+    service_account = "eon-restore@my-gcp-project-id.iam.gserviceaccount.com"
+  }
+}
+
 # Output the account details
 output "aws_disaster_recovery_account" {
   description = "Details of the connected AWS disaster recovery restore account"
@@ -66,6 +77,17 @@ output "azure_restore_account" {
     status              = eon_restore_account.azure_subscription.status
     provider_account_id = eon_restore_account.azure_subscription.provider_account_id
     cloud_provider      = eon_restore_account.azure_subscription.cloud_provider
+  }
+}
+
+output "gcp_restore_account" {
+  description = "Details of the connected GCP restore account"
+  value = {
+    id                  = eon_restore_account.gcp_disaster_recovery.id
+    name                = eon_restore_account.gcp_disaster_recovery.name
+    status              = eon_restore_account.gcp_disaster_recovery.status
+    provider_account_id = eon_restore_account.gcp_disaster_recovery.provider_account_id
+    cloud_provider      = eon_restore_account.gcp_disaster_recovery.cloud_provider
   }
 }
 ```
