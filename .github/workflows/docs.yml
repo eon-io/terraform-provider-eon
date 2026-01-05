@@ -5,15 +5,7 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'internal/**'
-      - 'templates/**'
-      - '.github/workflows/docs.yml'
   pull_request:
-    paths:
-      - 'internal/**'
-      - 'templates/**'
-      - '.github/workflows/docs.yml'
 
 permissions:
   contents: read
