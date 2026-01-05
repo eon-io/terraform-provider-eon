@@ -82,6 +82,7 @@ output "azure_restore_account" {
 
 - `aws` (Block, Optional) AWS-specific configuration. Required when `cloud_provider` is `AWS`. (see [below for nested schema](#nestedblock--aws))
 - `azure` (Block, Optional) Azure-specific configuration. Required when `cloud_provider` is `AZURE`. (see [below for nested schema](#nestedblock--azure))
+- `gcp` (Block, Optional) GCP-specific configuration. Required when `cloud_provider` is `GCP`. (see [below for nested schema](#nestedblock--gcp))
 - `role` (String, Deprecated) **Deprecated:** Use `aws { role_arn = "..." }` instead. ARN of the role Eon assumes to access the account in AWS.
 
 ### Read-Only
@@ -108,3 +109,12 @@ Optional:
 - `resource_group_name` (String) Scope restores to this resource group. When provided, only resources in this resource group can be restored to.
 - `subscription_id` (String) Azure subscription ID. Required when using the azure block.
 - `tenant_id` (String) Azure Active Directory tenant ID. Required when using the azure block.
+
+
+<a id="nestedblock--gcp"></a>
+### Nested Schema for `gcp`
+
+Required:
+
+- `project_id` (String) GCP project ID. Required when using the gcp block.
+- `service_account` (String) Email of the GCP service account Eon uses to access the project. Required when using the gcp block.
