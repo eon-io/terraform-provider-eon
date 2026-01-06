@@ -89,11 +89,11 @@ func gcpSchemaBlock() schema.SingleNestedBlock {
 		MarkdownDescription: "GCP-specific configuration. Required when `cloud_provider` is `GCP`.",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
-				Required:            true,
+				Optional:            true,
 				MarkdownDescription: "GCP project ID. Required when using the gcp block.",
 			},
 			"service_account": schema.StringAttribute{
-				Required:            true,
+				Optional:            true,
 				MarkdownDescription: "Email of the GCP service account Eon uses to access the project. Required when using the gcp block.",
 			},
 		},
