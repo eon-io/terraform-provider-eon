@@ -136,7 +136,7 @@ Optional:
 <a id="nestedblock--gcp"></a>
 ### Nested Schema for `gcp`
 
-Required:
+Optional:
 
 - `project_id` (String) GCP project ID. Required when using the gcp block.
 - `service_account` (String) Email of the GCP service account Eon uses to access the project. Required when using the gcp block.
