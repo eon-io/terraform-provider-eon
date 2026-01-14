@@ -7,7 +7,7 @@ The Terraform provider for Eon allows you to manage your cloud backup and restor
 - **Source Account Management**: Connect and manage cloud accounts containing resources to be backed up
 - **Restore Account Management**: Connect and manage cloud accounts where backups can be restored
 - **Backup Policy Management**: Create, update, and manage backup policies with schedules, retention, and notifications
-- **Multi-Cloud Support**: AWS and Azure fully supported, GCP in development
+- **Multi-Cloud Support**: AWS, Azure, and GCP
 - **Data Sources**: Query existing source and restore accounts, backup policies, and snapshots
 
 ## Requirements
@@ -120,6 +120,36 @@ resource "eon_restore_account" "azure_disaster_recovery" {
 }
 ```
 
+### GCP Source Account
+
+```hcl
+# Connect a GCP source account (project)
+resource "eon_source_account" "gcp_production" {
+  name           = "Production GCP Project"
+  cloud_provider = "GCP"
+
+  gcp {
+    project_id      = "my-gcp-project-id"
+    service_account = "eon-backup@my-gcp-project-id.iam.gserviceaccount.com"
+  }
+}
+```
+
+### GCP Restore Account
+
+```hcl
+# Connect a GCP restore account (project)
+resource "eon_restore_account" "gcp_disaster_recovery" {
+  name           = "Disaster Recovery GCP Project"
+  cloud_provider = "GCP"
+
+  gcp {
+    project_id      = "my-dr-gcp-project-id"
+    service_account = "eon-restore@my-dr-gcp-project-id.iam.gserviceaccount.com"
+  }
+}
+```
+
 ### Basic Backup Policy
 
 ```hcl
@@ -188,12 +218,15 @@ Manages source accounts for backup operations.
 **Cloud Provider Blocks** (one required based on `cloud_provider`):
 
 - `aws` block (for AWS accounts):
-
   - `role_arn` (Required) - ARN of the IAM role Eon assumes to access the account
 
 - `azure` block (for Azure accounts):
   - `tenant_id` (Required) - Azure Active Directory tenant ID
   - `subscription_id` (Required) - Azure subscription ID
+
+- `gcp` block (for GCP accounts):
+  - `project_id` (Required) - GCP project ID
+  - `service_account` (Required) - Email of the GCP service account Eon uses to access the project
 
 **Attributes:**
 
@@ -215,12 +248,15 @@ Manages restore accounts for restore operations.
 **Cloud Provider Blocks** (one required based on `cloud_provider`):
 
 - `aws` block (for AWS accounts):
-
   - `role_arn` (Required) - ARN of the IAM role Eon assumes to access the account
 
 - `azure` block (for Azure accounts):
   - `tenant_id` (Required) - Azure Active Directory tenant ID
   - `subscription_id` (Required) - Azure subscription ID
+
+- `gcp` block (for GCP accounts):
+  - `project_id` (Required) - GCP project ID
+  - `service_account` (Required) - Email of the GCP service account Eon uses to access the project
 
 **Attributes:**
 
