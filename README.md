@@ -7,7 +7,7 @@ The Terraform provider for Eon allows you to manage your cloud backup and restor
 - **Source Account Management**: Connect and manage cloud accounts containing resources to be backed up
 - **Restore Account Management**: Connect and manage cloud accounts where backups can be restored
 - **Backup Policy Management**: Create, update, and manage backup policies with schedules, retention, and notifications
-- **Multi-Cloud Support**: AWS, Azure, and GCP (AWS fully supported, Azure and GCP in development)
+- **Multi-Cloud Support**: AWS and Azure fully supported, GCP in development
 - **Data Sources**: Query existing source and restore accounts, backup policies, and snapshots
 
 ## Requirements
@@ -62,27 +62,61 @@ provider "eon" {
 
 ## Usage Examples
 
-### Basic Source Account
+### AWS Source Account
 
 ```hcl
 # Connect an AWS source account
 resource "eon_source_account" "aws_production" {
-  name                = "Production AWS Account"
-  cloud_provider      = "AWS"
-  provider_account_id = "123456789012"
-  role               = "arn:aws:iam::123456789012:role/EonBackupRole"
+  name           = "Production AWS Account"
+  cloud_provider = "AWS"
+
+  aws {
+    role_arn = "arn:aws:iam::123456789012:role/EonBackupRole"
+  }
 }
 ```
 
-### Basic Restore Account
+### Azure Source Account
+
+```hcl
+# Connect an Azure source account (subscription)
+resource "eon_source_account" "azure_subscription" {
+  name           = "Production Azure Subscription"
+  cloud_provider = "AZURE"
+
+  azure {
+    tenant_id       = "00000000-0000-0000-0000-000000000000"
+    subscription_id = "11111111-1111-1111-1111-111111111111"
+  }
+}
+```
+
+### AWS Restore Account
 
 ```hcl
 # Connect an AWS restore account
 resource "eon_restore_account" "aws_disaster_recovery" {
-  name                = "Disaster Recovery AWS Account"
-  cloud_provider      = "AWS"
-  provider_account_id = "987654321098"
-  role               = "arn:aws:iam::987654321098:role/EonRestoreRole"
+  name           = "Disaster Recovery AWS Account"
+  cloud_provider = "AWS"
+
+  aws {
+    role_arn = "arn:aws:iam::987654321098:role/EonRestoreRole"
+  }
+}
+```
+
+### Azure Restore Account
+
+```hcl
+# Connect an Azure restore account (subscription)
+resource "eon_restore_account" "azure_disaster_recovery" {
+  name           = "Disaster Recovery Azure Subscription"
+  cloud_provider = "AZURE"
+
+  azure {
+    tenant_id       = "00000000-0000-0000-0000-000000000000"
+    subscription_id = "11111111-1111-1111-1111-111111111111"
+  }
 }
 ```
 
@@ -147,14 +181,25 @@ output "backup_policy_count" {
 Manages source accounts for backup operations.
 
 **Arguments:**
+
 - `name` (Required) - Display name for the source account
-- `cloud_provider` (Required) - Cloud provider (AWS, AZURE, GCP)
-- `provider_account_id` (Required) - Cloud provider account ID
-- `role` (Required) - IAM role ARN (AWS), service principal (Azure), or service account email (GCP)
+- `cloud_provider` (Required) - Cloud provider: `AWS`, `AZURE`, or `GCP`
+
+**Cloud Provider Blocks** (one required based on `cloud_provider`):
+
+- `aws` block (for AWS accounts):
+
+  - `role_arn` (Required) - ARN of the IAM role Eon assumes to access the account
+
+- `azure` block (for Azure accounts):
+  - `tenant_id` (Required) - Azure Active Directory tenant ID
+  - `subscription_id` (Required) - Azure subscription ID
 
 **Attributes:**
+
 - `id` - Source account identifier
-- `status` - Connection status
+- `provider_account_id` - Cloud provider account ID (computed)
+- `status` - Connection status (`CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`)
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
 
@@ -163,14 +208,25 @@ Manages source accounts for backup operations.
 Manages restore accounts for restore operations.
 
 **Arguments:**
+
 - `name` (Required) - Display name for the restore account
-- `cloud_provider` (Required) - Cloud provider (AWS, AZURE, GCP)
-- `provider_account_id` (Required) - Cloud provider account ID
-- `role` (Required) - IAM role ARN (AWS), service principal (Azure), or service account email (GCP)
+- `cloud_provider` (Required) - Cloud provider: `AWS`, `AZURE`, or `GCP`
+
+**Cloud Provider Blocks** (one required based on `cloud_provider`):
+
+- `aws` block (for AWS accounts):
+
+  - `role_arn` (Required) - ARN of the IAM role Eon assumes to access the account
+
+- `azure` block (for Azure accounts):
+  - `tenant_id` (Required) - Azure Active Directory tenant ID
+  - `subscription_id` (Required) - Azure subscription ID
 
 **Attributes:**
+
 - `id` - Restore account identifier
-- `status` - Connection status
+- `provider_account_id` - Cloud provider account ID (computed)
+- `status` - Connection status (`CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`)
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
 
@@ -179,6 +235,7 @@ Manages restore accounts for restore operations.
 Manages backup policies for automated backup operations.
 
 **Arguments:**
+
 - `name` (Required) - Display name for the backup policy
 - `enabled` (Required) - Whether the backup policy is enabled
 - `resource_selection_mode` (Required) - Resource selection mode: 'ALL', 'NONE', or 'CONDITIONAL'
@@ -190,6 +247,7 @@ Manages backup policies for automated backup operations.
 - `resource_exclusion_override` (Optional) - List of resource IDs to exclude regardless of selection mode
 
 **Attributes:**
+
 - `id` - Backup policy identifier
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
@@ -201,6 +259,7 @@ Manages backup policies for automated backup operations.
 Retrieves information about all source accounts.
 
 **Attributes:**
+
 - `accounts` - List of source account objects with `id`, `name`, `provider`, `provider_account_id`, and `status`
 
 ### `eon_restore_accounts`
@@ -208,6 +267,7 @@ Retrieves information about all source accounts.
 Retrieves information about all restore accounts.
 
 **Attributes:**
+
 - `accounts` - List of restore account objects with `id`, `provider`, `provider_account_id`, `status`, and `regions`
 
 ### `eon_backup_policies`
@@ -215,4 +275,5 @@ Retrieves information about all restore accounts.
 Retrieves information about all backup policies.
 
 **Attributes:**
+
 - `policies` - List of backup policy objects with `id`, `name`, and `enabled`

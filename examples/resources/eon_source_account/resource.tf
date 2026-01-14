@@ -14,20 +14,8 @@ resource "eon_source_account" "azure_subscription" {
   cloud_provider = "AZURE"
 
   azure {
-    tenant_id       = "ae5f2819-f24d-4e4b-990e-0e24fd4c5682"
-    subscription_id = "cbb5ec02-4c52-4c6e-b262-d1c63effae51"
-  }
-}
-
-# Example: Connect an Azure source account with resource group scoping
-resource "eon_source_account" "azure_scoped" {
-  name           = "Azure Scoped to Resource Group"
-  cloud_provider = "AZURE"
-
-  azure {
-    tenant_id           = "ae5f2819-f24d-4e4b-990e-0e24fd4c5682"
-    subscription_id     = "cbb5ec02-4c52-4c6e-b262-d1c63effae51"
-    resource_group_name = "my-backup-resources"
+    tenant_id       = "00000000-0000-0000-0000-000000000000"
+    subscription_id = "11111111-1111-1111-1111-111111111111"
   }
 }
 
