@@ -174,6 +174,7 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 func (p *EonProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewSourceAccountResource,
+		NewSourceAwsOrganizationalUnitResource,
 		NewRestoreAccountResource,
 		NewRestoreJobResource,
 		NewBackupPolicyResource,
@@ -184,6 +185,7 @@ func (p *EonProvider) Resources(ctx context.Context) []func() resource.Resource 
 func (p *EonProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewSourceAccountsDataSource,
+		NewSourceAwsOrganizationalUnitsDataSource,
 		NewRestoreAccountsDataSource,
 		NewSnapshotDataSource,
 		NewBackupPoliciesDataSource,

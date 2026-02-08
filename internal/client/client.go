@@ -153,6 +153,93 @@ func (c *EonClient) DisconnectSourceAccount(ctx context.Context, accountId strin
 	return nil
 }
 
+// ListSourceAwsOrganizationalUnits retrieves all source AWS organizational units for the project.
+// It paginates through all pages to return the complete list.
+func (c *EonClient) ListSourceAwsOrganizationalUnits(ctx context.Context) ([]externalEonSdkAPI.SourceAwsOrganizationalUnit, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	var allOUs []externalEonSdkAPI.SourceAwsOrganizationalUnit
+	var pageToken string
+
+	for {
+		req := c.client.AccountsAPI.ListSourceAwsOrganizationalUnits(ctx, c.projectID)
+		if pageToken != "" {
+			req = req.PageToken(pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list source AWS organizational units"); apiErr != nil {
+			return nil, apiErr
+		}
+		defer httpResp.Body.Close()
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+		}
+
+		ous := resp.GetOrganizationalUnits()
+		if ous != nil {
+			allOUs = append(allOUs, ous...)
+		}
+
+		if !resp.HasNextToken() {
+			break
+		}
+		pageToken = resp.GetNextToken()
+	}
+
+	if allOUs == nil {
+		return []externalEonSdkAPI.SourceAwsOrganizationalUnit{}, nil
+	}
+
+	return allOUs, nil
+}
+
+// ConnectSourceAwsOrganizationalUnit connects a new source AWS organizational unit
+func (c *EonClient) ConnectSourceAwsOrganizationalUnit(ctx context.Context, req externalEonSdkAPI.ConnectSourceAwsOrganizationalUnitRequest) (*externalEonSdkAPI.SourceAwsOrganizationalUnit, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.ConnectSourceAwsOrganizationalUnit(ctx, c.projectID).ConnectSourceAwsOrganizationalUnitRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to connect source AWS organizational unit"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	ou := resp.GetOrganizationalUnit()
+	return &ou, nil
+}
+
+// DisconnectSourceAwsOrganizationalUnit disconnects a source AWS organizational unit
+func (c *EonClient) DisconnectSourceAwsOrganizationalUnit(ctx context.Context, organizationalUnitId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	_, httpResp, err := c.client.AccountsAPI.DisconnectSourceAwsOrganizationalUnit(ctx, c.projectID, organizationalUnitId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to disconnect source AWS organizational unit"); apiErr != nil {
+		return apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // ConnectRestoreAccount connects a new restore account
 func (c *EonClient) ConnectRestoreAccount(ctx context.Context, req externalEonSdkAPI.ConnectRestoreAccountRequest) (*externalEonSdkAPI.RestoreAccount, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {

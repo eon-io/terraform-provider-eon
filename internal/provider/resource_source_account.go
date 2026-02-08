@@ -168,7 +168,7 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 			data.Azure.SubscriptionId.ValueString(),
 		)
 		if !data.Azure.ResourceGroupName.IsNull() && data.Azure.ResourceGroupName.ValueString() != "" {
-			azureConfig.SetResourceGroupName(data.Azure.ResourceGroupName.ValueString())
+			azureConfig.SetEonInternalResourceGroupName(data.Azure.ResourceGroupName.ValueString())
 		}
 		config.SetAzure(*azureConfig)
 

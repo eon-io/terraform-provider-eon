@@ -115,7 +115,9 @@ func (d *SnapshotDataSource) Read(ctx context.Context, req datasource.ReadReques
 	data.Id = types.StringValue(snapshot.Id)
 	data.ResourceId = types.StringValue(snapshot.ResourceId)
 	data.CreatedAt = types.StringValue(snapshot.GetCreatedTime().String())
-	data.VaultId = types.StringValue(snapshot.VaultId)
+	if snapshot.VaultId != nil {
+		data.VaultId = types.StringValue(*snapshot.VaultId)
+	}
 	data.ExpirationDate = types.StringValue(snapshot.GetExpirationTime().String())
 	data.PointInTime = types.StringValue(snapshot.GetPointInTime().String())
 	if snapshot.ProjectId != nil {
