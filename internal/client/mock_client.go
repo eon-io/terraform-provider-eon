@@ -32,11 +32,11 @@ type MockEonClient struct {
 	ShouldFailIdpGroupDelete bool
 
 	// Call tracking
-	CreateCalls int
-	ReadCalls   int
-	UpdateCalls int
-	DeleteCalls int
-	ListCalls   int
+	CreateCalls         int
+	ReadCalls           int
+	UpdateCalls         int
+	DeleteCalls         int
+	ListCalls           int
 	IdpGroupListCalls   int
 	IdpGroupCreateCalls int
 	IdpGroupReadCalls   int
@@ -275,10 +275,10 @@ func (m *MockEonClient) CreateIdpGroup(ctx context.Context, req externalEonSdkAP
 
 	id := fmt.Sprintf("mock-idp-group-%d", m.IdpGroupCreateCalls)
 	group := &externalEonSdkAPI.IdpGroup{
-		Id:               id,
-		IdpId:            req.GetIdpId(),
-		ProviderGroupId:  req.GetProviderGroupId(),
-		RoleIds:          req.GetRoleIds(),
+		Id:              id,
+		IdpId:           req.GetIdpId(),
+		ProviderGroupId: req.GetProviderGroupId(),
+		RoleIds:         req.GetRoleIds(),
 	}
 	m.IdpGroups[id] = group
 	return group, nil
