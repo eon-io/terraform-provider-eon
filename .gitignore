@@ -23,6 +23,8 @@ go.work
 .terraform.lock.hcl
 terraform.rc
 .terraformrc
+# Local dev provider binary (built for dev_overrides)
+**/terraform-provider-eon_v*
 
 # Crash log files
 crash.log

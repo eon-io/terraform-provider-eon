@@ -16,6 +16,7 @@ type MockEonClient struct {
 
 	// Storage for mock data
 	BackupPolicies map[string]*externalEonSdkAPI.BackupPolicy
+	IdpGroups      map[string]*externalEonSdkAPI.IdpGroup
 
 	// Behavior controls
 	ShouldFailCreate bool
@@ -23,6 +24,12 @@ type MockEonClient struct {
 	ShouldFailUpdate bool
 	ShouldFailDelete bool
 	ShouldFailList   bool
+	// IDP group behavior (when set, IDP group methods return error)
+	ShouldFailIdpGroupList   bool
+	ShouldFailIdpGroupCreate bool
+	ShouldFailIdpGroupRead   bool
+	ShouldFailIdpGroupUpdate bool
+	ShouldFailIdpGroupDelete bool
 
 	// Call tracking
 	CreateCalls int
@@ -30,6 +37,11 @@ type MockEonClient struct {
 	UpdateCalls int
 	DeleteCalls int
 	ListCalls   int
+	IdpGroupListCalls   int
+	IdpGroupCreateCalls int
+	IdpGroupReadCalls   int
+	IdpGroupUpdateCalls int
+	IdpGroupDeleteCalls int
 
 	// Mock configuration
 	ProjectID string
@@ -39,6 +51,7 @@ type MockEonClient struct {
 func NewMockEonClient() *MockEonClient {
 	return &MockEonClient{
 		BackupPolicies: make(map[string]*externalEonSdkAPI.BackupPolicy),
+		IdpGroups:      make(map[string]*externalEonSdkAPI.IdpGroup),
 		ProjectID:      "mock-project-id",
 	}
 }
@@ -172,16 +185,27 @@ func (m *MockEonClient) Reset() {
 	defer m.mu.Unlock()
 
 	m.BackupPolicies = make(map[string]*externalEonSdkAPI.BackupPolicy)
+	m.IdpGroups = make(map[string]*externalEonSdkAPI.IdpGroup)
 	m.CreateCalls = 0
 	m.ReadCalls = 0
 	m.UpdateCalls = 0
 	m.DeleteCalls = 0
 	m.ListCalls = 0
+	m.IdpGroupListCalls = 0
+	m.IdpGroupCreateCalls = 0
+	m.IdpGroupReadCalls = 0
+	m.IdpGroupUpdateCalls = 0
+	m.IdpGroupDeleteCalls = 0
 	m.ShouldFailCreate = false
 	m.ShouldFailRead = false
 	m.ShouldFailUpdate = false
 	m.ShouldFailDelete = false
 	m.ShouldFailList = false
+	m.ShouldFailIdpGroupList = false
+	m.ShouldFailIdpGroupCreate = false
+	m.ShouldFailIdpGroupRead = false
+	m.ShouldFailIdpGroupUpdate = false
+	m.ShouldFailIdpGroupDelete = false
 }
 
 // AddMockPolicy adds a pre-defined mock policy for testing
@@ -199,4 +223,110 @@ func (m *MockEonClient) GetMockPolicy(id string) (*externalEonSdkAPI.BackupPolic
 
 	policy, exists := m.BackupPolicies[id]
 	return policy, exists
+}
+
+// ListIdpGroups mocks listing IDP groups
+func (m *MockEonClient) ListIdpGroups(ctx context.Context) ([]externalEonSdkAPI.IdpGroup, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.IdpGroupListCalls++
+
+	if m.ShouldFailIdpGroupList {
+		return nil, fmt.Errorf("mock idp group list error")
+	}
+
+	groups := make([]externalEonSdkAPI.IdpGroup, 0, len(m.IdpGroups))
+	for _, g := range m.IdpGroups {
+		groups = append(groups, *g)
+	}
+	sort.Slice(groups, func(i, j int) bool { return groups[i].Id < groups[j].Id })
+	return groups, nil
+}
+
+// GetIdpGroup mocks getting an IDP group by ID
+func (m *MockEonClient) GetIdpGroup(ctx context.Context, groupId string) (*externalEonSdkAPI.IdpGroup, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.IdpGroupReadCalls++
+
+	if m.ShouldFailIdpGroupRead {
+		return nil, fmt.Errorf("mock idp group read error")
+	}
+
+	g, exists := m.IdpGroups[groupId]
+	if !exists {
+		return nil, fmt.Errorf("idp group not found: %s", groupId)
+	}
+	return g, nil
+}
+
+// CreateIdpGroup mocks creating an IDP group
+func (m *MockEonClient) CreateIdpGroup(ctx context.Context, req externalEonSdkAPI.CreateIdpGroupRequest) (*externalEonSdkAPI.IdpGroup, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.IdpGroupCreateCalls++
+
+	if m.ShouldFailIdpGroupCreate {
+		return nil, fmt.Errorf("mock idp group create error")
+	}
+
+	id := fmt.Sprintf("mock-idp-group-%d", m.IdpGroupCreateCalls)
+	group := &externalEonSdkAPI.IdpGroup{
+		Id:               id,
+		IdpId:            req.GetIdpId(),
+		ProviderGroupId:  req.GetProviderGroupId(),
+		RoleIds:          req.GetRoleIds(),
+	}
+	m.IdpGroups[id] = group
+	return group, nil
+}
+
+// UpdateIdpGroup mocks updating an IDP group's role assignments
+func (m *MockEonClient) UpdateIdpGroup(ctx context.Context, groupId string, req externalEonSdkAPI.UpdateIdpGroupRequest) (*externalEonSdkAPI.IdpGroup, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.IdpGroupUpdateCalls++
+
+	if m.ShouldFailIdpGroupUpdate {
+		return nil, fmt.Errorf("mock idp group update error")
+	}
+
+	g, exists := m.IdpGroups[groupId]
+	if !exists {
+		return nil, fmt.Errorf("idp group not found: %s", groupId)
+	}
+	g.RoleIds = req.GetRoleIds()
+	m.IdpGroups[groupId] = g
+	return g, nil
+}
+
+// DeleteIdpGroup mocks deleting an IDP group
+func (m *MockEonClient) DeleteIdpGroup(ctx context.Context, groupId string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.IdpGroupDeleteCalls++
+
+	if m.ShouldFailIdpGroupDelete {
+		return fmt.Errorf("mock idp group delete error")
+	}
+
+	_, exists := m.IdpGroups[groupId]
+	if !exists {
+		return fmt.Errorf("idp group not found: %s", groupId)
+	}
+	delete(m.IdpGroups, groupId)
+	return nil
+}
+
+// AddMockIdpGroup adds a pre-defined mock IDP group for testing
+func (m *MockEonClient) AddMockIdpGroup(group *externalEonSdkAPI.IdpGroup) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.IdpGroups[group.Id] = group
 }

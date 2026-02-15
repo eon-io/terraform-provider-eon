@@ -711,3 +711,134 @@ func (c *EonClient) ListVaults(ctx context.Context) ([]externalEonSdkAPI.BackupV
 
 	return allVaults, nil
 }
+
+// CreateIdpGroup creates a new IDP group and assigns roles to it.
+func (c *EonClient) CreateIdpGroup(ctx context.Context, req externalEonSdkAPI.CreateIdpGroupRequest) (*externalEonSdkAPI.IdpGroup, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.IamAPI.CreateIdpGroup(ctx).CreateIdpGroupRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to create IDP group"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	group := resp.GetGroup()
+	return &group, nil
+}
+
+// GetIdpGroup retrieves an IDP group by ID.
+func (c *EonClient) GetIdpGroup(ctx context.Context, groupId string) (*externalEonSdkAPI.IdpGroup, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.IamAPI.GetIdpGroup(ctx, groupId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get IDP group"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	group := resp.GetGroup()
+	return &group, nil
+}
+
+// ListIdpGroups retrieves all IDP groups for the account.
+func (c *EonClient) ListIdpGroups(ctx context.Context) ([]externalEonSdkAPI.IdpGroup, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	var allGroups []externalEonSdkAPI.IdpGroup
+	var pageToken *string
+
+	for {
+		req := c.client.IamAPI.ListIdpGroups(ctx).PageSize(1000)
+		if pageToken != nil {
+			req = req.PageToken(*pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list IDP groups"); apiErr != nil {
+			if httpResp != nil {
+				_ = httpResp.Body.Close()
+			}
+			return nil, apiErr
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			_ = httpResp.Body.Close()
+			return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+		}
+
+		if resp.GetGroups() != nil {
+			allGroups = append(allGroups, resp.GetGroups()...)
+		}
+
+		hasMorePages := resp.NextToken != nil && *resp.NextToken != ""
+		_ = httpResp.Body.Close()
+
+		if !hasMorePages {
+			break
+		}
+		pageToken = resp.NextToken
+	}
+
+	if allGroups == nil {
+		return []externalEonSdkAPI.IdpGroup{}, nil
+	}
+	return allGroups, nil
+}
+
+// UpdateIdpGroup updates the role assignments for an IDP group.
+func (c *EonClient) UpdateIdpGroup(ctx context.Context, groupId string, req externalEonSdkAPI.UpdateIdpGroupRequest) (*externalEonSdkAPI.IdpGroup, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.IamAPI.UpdateIdpGroup(ctx, groupId).UpdateIdpGroupRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to update IDP group"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	group := resp.GetGroup()
+	return &group, nil
+}
+
+// DeleteIdpGroup deletes an IDP group and all its role assignments.
+func (c *EonClient) DeleteIdpGroup(ctx context.Context, groupId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.IamAPI.DeleteIdpGroup(ctx, groupId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to delete IDP group"); apiErr != nil {
+		return apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
