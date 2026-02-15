@@ -4,7 +4,7 @@ package client
 type ClientConfig struct {
 	Endpoint       string
 	ClientID       string
-	ClientSecret   string
+	ClientSecret   string // #nosec G117 -- required for provider API authentication // #nosec G117 -- required for provider API authentication
 	ProjectID      string
 	DefaultHeaders map[string]string // Optional additional headers
 }
