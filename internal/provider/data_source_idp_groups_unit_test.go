@@ -55,10 +55,10 @@ func TestIdpGroupsDataSource_ListWithMockClient(t *testing.T) {
 
 			for i := 0; i < tt.numGroups; i++ {
 				g := &externalEonSdkAPI.IdpGroup{
-					Id:               fmt.Sprintf("group-id-%d", i+1),
-					IdpId:            "idp-123",
-					ProviderGroupId:  fmt.Sprintf("provider-group-%d", i+1),
-					RoleIds:          []string{"role-a", "role-b"},
+					Id:              fmt.Sprintf("group-id-%d", i+1),
+					IdpId:           "idp-123",
+					ProviderGroupId: fmt.Sprintf("provider-group-%d", i+1),
+					RoleIds:         []string{"role-a", "role-b"},
 				}
 				mockClient.AddMockIdpGroup(g)
 			}
