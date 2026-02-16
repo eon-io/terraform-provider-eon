@@ -185,6 +185,10 @@ Optional:
 
 - `expression` (Attributes) Conditional expression that defines which resources this condition applies to. Same structure as backup policy resource_selector.expression (environment, resource_type, group, data_classes, tag_keys, tag_key_values, etc.). (see [below for nested schema](#nestedatt--access_conditions--expression))
 
+Read-Only:
+
+- `expression_compact` (String) JSON object of the expression containing only non-null condition keys (e.g. environment, resource_type). Use in outputs for a compact view without null attributes like account_id or apps.
+
 <a id="nestedatt--access_conditions--expression"></a>
 ### Nested Schema for `access_conditions.expression`
 

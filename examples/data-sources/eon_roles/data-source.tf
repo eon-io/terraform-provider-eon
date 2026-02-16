@@ -65,7 +65,7 @@ output "roles_with_access_conditions" {
   value = {
     for r in local.roles_with_access_conditions :
     r.name => {
-      id               = r.id
+      id                = r.id
       access_conditions = r.access_conditions
     }
   }

@@ -37,6 +37,14 @@ locals {
   }
 }
 
+# Example: Roles that have access conditions (custom roles with scoped permissions)
+locals {
+  roles_with_access_conditions = [
+    for r in data.eon_roles.all.roles :
+    r if length(r.access_conditions) > 0
+  ]
+}
+
 # Example: Output role information
 output "roles_count" {
   description = "Total number of roles"
@@ -64,6 +72,23 @@ output "roles_summary" {
       access_conditions = r.access_conditions
     }
   }
+}
+
+# Example: Output roles that use access conditions (e.g. to audit scoped permissions)
+output "roles_with_access_conditions" {
+  description = "Roles that define access conditions (id, effect, expression)"
+  value = {
+    for r in local.roles_with_access_conditions :
+    r.name => {
+      id                = r.id
+      access_conditions = r.access_conditions
+    }
+  }
+}
+
+output "roles_with_access_conditions_count" {
+  description = "Number of roles that have at least one access condition"
+  value       = length(local.roles_with_access_conditions)
 }
 
 output "role_ids_by_name" {
@@ -107,6 +132,7 @@ Optional:
 Read-Only:
 
 - `effect` (String) Effect of the condition (e.g. ALLOW, DENY).
+- `expression_compact` (String) JSON object of the expression containing only non-null condition keys (e.g. environment, resource_type). Use in outputs for a compact view without null attributes like account_id or apps.
 - `id` (String) Unique identifier for this access condition, used in permission_grants.access_condition_id.
 
 <a id="nestedatt--roles--access_conditions--expression"></a>
