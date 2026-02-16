@@ -132,7 +132,6 @@ Optional:
 Read-Only:
 
 - `effect` (String) Effect of the condition (e.g. ALLOW, DENY).
-- `expression_compact` (String) JSON object of the expression containing only non-null condition keys (e.g. environment, resource_type). Use in outputs for a compact view without null attributes like account_id or apps.
 - `id` (String) Unique identifier for this access condition, used in permission_grants.access_condition_id.
 
 <a id="nestedatt--roles--access_conditions--expression"></a>
