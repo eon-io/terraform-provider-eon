@@ -32,6 +32,7 @@ type RoleModel struct {
 	Name             types.String `tfsdk:"name"`
 	IsBuiltInRole    types.Bool   `tfsdk:"is_built_in_role"`
 	PermissionGrants types.List   `tfsdk:"permission_grants"`
+	AccessConditions types.List   `tfsdk:"access_conditions"`
 }
 
 type PermissionGrantModel struct {
@@ -86,6 +87,28 @@ func (d *RolesDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 								},
 							},
 						},
+						"access_conditions": schema.ListNestedAttribute{
+							MarkdownDescription: "Optional list of access conditions that can be referenced by permission_grants to restrict the scope of permissions.",
+							Computed:            true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"id": schema.StringAttribute{
+										MarkdownDescription: "Unique identifier for this access condition, used in permission_grants.access_condition_id.",
+										Computed:            true,
+									},
+									"effect": schema.StringAttribute{
+										MarkdownDescription: "Effect of the condition (e.g. ALLOW, DENY).",
+										Computed:            true,
+									},
+									"expression": schema.SingleNestedAttribute{
+										MarkdownDescription: RoleExprDescExpression,
+										Computed:            true,
+										Optional:            true,
+										Attributes:          roleAccessConditionExpressionSchemaForDataSource(),
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -125,12 +148,31 @@ func (d *RolesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			resp.Diagnostics.Append(diags...)
 			return
 		}
+		accessCondsVal, diags := flattenRoleAccessConditions(ctx, r.GetAccessConditions())
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+		// When the list API returns no access_conditions but permission_grants reference condition IDs,
+		// use placeholders so the data source output shows those IDs (e.g. "No PII") in access_conditions.
+		grants := r.GetPermissionGrants()
+		acLen := 0
+		if !accessCondsVal.IsNull() {
+			acLen = len(accessCondsVal.Elements())
+		}
+		if acLen == 0 && len(grants) > 0 {
+			placeholders, d2 := accessConditionPlaceholdersFromGrants(ctx, grants)
+			if !d2.HasError() && !placeholders.IsNull() {
+				accessCondsVal = placeholders
+			}
+		}
 
 		data.Roles = append(data.Roles, RoleModel{
 			Id:               types.StringValue(r.GetId()),
 			Name:             types.StringValue(r.GetName()),
 			IsBuiltInRole:    types.BoolValue(r.GetIsBuiltInRole()),
 			PermissionGrants: permGrantsVal,
+			AccessConditions: accessCondsVal,
 		})
 	}
 

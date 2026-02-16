@@ -54,13 +54,14 @@ output "custom_roles_count" {
 }
 
 output "roles_summary" {
-  description = "Summary of all roles"
+  description = "Summary of all roles (includes access_conditions when present)"
   value = {
     for r in data.eon_roles.all.roles :
     r.name => {
-      id               = r.id
-      is_built_in_role = r.is_built_in_role
-      permission_count = length(r.permission_grants)
+      id                = r.id
+      is_built_in_role  = r.is_built_in_role
+      permission_count  = length(r.permission_grants)
+      access_conditions = r.access_conditions
     }
   }
 }
@@ -90,10 +91,361 @@ output "role_ids_by_name" {
 
 Read-Only:
 
+- `access_conditions` (Attributes List) Optional list of access conditions that can be referenced by permission_grants to restrict the scope of permissions. (see [below for nested schema](#nestedatt--roles--access_conditions))
 - `id` (String) System-generated unique identifier for the role.
 - `is_built_in_role` (Boolean) Whether the role is a built-in role provided by Eon (true) or a custom role (false). Built-in roles cannot be modified or deleted.
 - `name` (String) Display name of the role.
 - `permission_grants` (Attributes List) List of permissions granted by the role. (see [below for nested schema](#nestedatt--roles--permission_grants))
+
+<a id="nestedatt--roles--access_conditions"></a>
+### Nested Schema for `roles.access_conditions`
+
+Optional:
+
+- `expression` (Attributes) Conditional expression that defines which resources this condition applies to. Same structure as backup policy resource_selector.expression (environment, resource_type, group, data_classes, tag_keys, tag_key_values, etc.). (see [below for nested schema](#nestedatt--roles--access_conditions--expression))
+
+Read-Only:
+
+- `effect` (String) Effect of the condition (e.g. ALLOW, DENY).
+- `id` (String) Unique identifier for this access condition, used in permission_grants.access_condition_id.
+
+<a id="nestedatt--roles--access_conditions--expression"></a>
+### Nested Schema for `roles.access_conditions.expression`
+
+Optional:
+
+- `account_id` (Attributes) Account ID condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--account_id))
+- `apps` (Attributes) Apps condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--apps))
+- `cloud_provider` (Attributes) Cloud provider condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--cloud_provider))
+- `data_classes` (Attributes) Data classes condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--data_classes))
+- `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--environment))
+- `group` (Attributes) Group condition with logical operator and operands (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group))
+- `resource_group_name` (Attributes) Resource group name condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--resource_group_name))
+- `resource_id` (Attributes) Resource ID condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--resource_id))
+- `resource_name` (Attributes) Resource name condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--resource_name))
+- `resource_type` (Attributes) Resource type condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--resource_type))
+- `source_region` (Attributes) Source region condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--source_region))
+- `subnets` (Attributes) Subnets condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--subnets))
+- `tag_key_values` (Attributes) Tag key-value pairs condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--tag_key_values))
+- `tag_keys` (Attributes) Tag keys condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--tag_keys))
+- `vpc` (Attributes) VPC condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--vpc))
+
+<a id="nestedatt--roles--access_conditions--expression--account_id"></a>
+### Nested Schema for `roles.access_conditions.expression.account_id`
+
+Read-Only:
+
+- `account_ids` (List of String)
+- `operator` (String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--apps"></a>
+### Nested Schema for `roles.access_conditions.expression.apps`
+
+Read-Only:
+
+- `apps` (List of String)
+- `operator` (String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--cloud_provider"></a>
+### Nested Schema for `roles.access_conditions.expression.cloud_provider`
+
+Read-Only:
+
+- `cloud_providers` (List of String)
+- `operator` (String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--data_classes"></a>
+### Nested Schema for `roles.access_conditions.expression.data_classes`
+
+Read-Only:
+
+- `data_classes` (List of String)
+- `operator` (String) Operator: CONTAINS_ANY_OF, CONTAINS_NONE_OF, or CONTAINS_ALL_OF
+
+
+<a id="nestedatt--roles--access_conditions--expression--environment"></a>
+### Nested Schema for `roles.access_conditions.expression.environment`
+
+Read-Only:
+
+- `environments` (List of String)
+- `operator` (String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group"></a>
+### Nested Schema for `roles.access_conditions.expression.group`
+
+Optional:
+
+- `operands` (Attributes List) List of nested conditions (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands))
+
+Read-Only:
+
+- `operator` (String) Logical operator: AND or OR
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands`
+
+Optional:
+
+- `account_id` (Attributes) Account ID condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--account_id))
+- `apps` (Attributes) Apps condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--apps))
+- `cloud_provider` (Attributes) Cloud provider condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--cloud_provider))
+- `data_classes` (Attributes) Data classes condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--data_classes))
+- `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--environment))
+- `resource_group_name` (Attributes) Resource group name condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--resource_group_name))
+- `resource_id` (Attributes) Resource ID condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--resource_id))
+- `resource_name` (Attributes) Resource name condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--resource_name))
+- `resource_type` (Attributes) Resource type condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--resource_type))
+- `source_region` (Attributes) Source region condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--source_region))
+- `subnets` (Attributes) Subnets condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--subnets))
+- `tag_key_values` (Attributes) Tag key-value pairs condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--tag_key_values))
+- `tag_keys` (Attributes) Tag keys condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--tag_keys))
+- `vpc` (Attributes) VPC condition (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--vpc))
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--account_id"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.account_id`
+
+Read-Only:
+
+- `account_ids` (List of String)
+- `operator` (String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--apps"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.apps`
+
+Read-Only:
+
+- `apps` (List of String)
+- `operator` (String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--cloud_provider"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.cloud_provider`
+
+Read-Only:
+
+- `cloud_providers` (List of String)
+- `operator` (String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--data_classes"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.data_classes`
+
+Read-Only:
+
+- `data_classes` (List of String)
+- `operator` (String) Operator: CONTAINS_ANY_OF, CONTAINS_NONE_OF, or CONTAINS_ALL_OF
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--environment"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.environment`
+
+Read-Only:
+
+- `environments` (List of String)
+- `operator` (String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--resource_group_name"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.resource_group_name`
+
+Read-Only:
+
+- `operator` (String)
+- `resource_group_names` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--resource_id"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.resource_id`
+
+Read-Only:
+
+- `operator` (String)
+- `resource_ids` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--resource_name"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.resource_name`
+
+Read-Only:
+
+- `operator` (String)
+- `resource_names` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--resource_type"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.resource_type`
+
+Read-Only:
+
+- `operator` (String)
+- `resource_types` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--source_region"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.source_region`
+
+Read-Only:
+
+- `operator` (String)
+- `source_regions` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--subnets"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.subnets`
+
+Read-Only:
+
+- `operator` (String)
+- `subnets` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--tag_key_values"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.tag_key_values`
+
+Optional:
+
+- `tag_key_values` (Attributes List) (see [below for nested schema](#nestedatt--roles--access_conditions--expression--group--operands--tag_key_values--tag_key_values))
+
+Read-Only:
+
+- `operator` (String)
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--tag_key_values--tag_key_values"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.tag_key_values.tag_key_values`
+
+Optional:
+
+- `value` (String)
+
+Read-Only:
+
+- `key` (String)
+
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--tag_keys"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.tag_keys`
+
+Read-Only:
+
+- `operator` (String)
+- `tag_keys` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--group--operands--vpc"></a>
+### Nested Schema for `roles.access_conditions.expression.group.operands.vpc`
+
+Read-Only:
+
+- `operator` (String)
+- `vpcs` (List of String)
+
+
+
+
+<a id="nestedatt--roles--access_conditions--expression--resource_group_name"></a>
+### Nested Schema for `roles.access_conditions.expression.resource_group_name`
+
+Read-Only:
+
+- `operator` (String)
+- `resource_group_names` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--resource_id"></a>
+### Nested Schema for `roles.access_conditions.expression.resource_id`
+
+Read-Only:
+
+- `operator` (String)
+- `resource_ids` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--resource_name"></a>
+### Nested Schema for `roles.access_conditions.expression.resource_name`
+
+Read-Only:
+
+- `operator` (String)
+- `resource_names` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--resource_type"></a>
+### Nested Schema for `roles.access_conditions.expression.resource_type`
+
+Read-Only:
+
+- `operator` (String)
+- `resource_types` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--source_region"></a>
+### Nested Schema for `roles.access_conditions.expression.source_region`
+
+Read-Only:
+
+- `operator` (String)
+- `source_regions` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--subnets"></a>
+### Nested Schema for `roles.access_conditions.expression.subnets`
+
+Read-Only:
+
+- `operator` (String)
+- `subnets` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--tag_key_values"></a>
+### Nested Schema for `roles.access_conditions.expression.tag_key_values`
+
+Optional:
+
+- `tag_key_values` (Attributes List) (see [below for nested schema](#nestedatt--roles--access_conditions--expression--tag_key_values--tag_key_values))
+
+Read-Only:
+
+- `operator` (String)
+
+<a id="nestedatt--roles--access_conditions--expression--tag_key_values--tag_key_values"></a>
+### Nested Schema for `roles.access_conditions.expression.tag_key_values.tag_key_values`
+
+Optional:
+
+- `value` (String)
+
+Read-Only:
+
+- `key` (String)
+
+
+
+<a id="nestedatt--roles--access_conditions--expression--tag_keys"></a>
+### Nested Schema for `roles.access_conditions.expression.tag_keys`
+
+Read-Only:
+
+- `operator` (String)
+- `tag_keys` (List of String)
+
+
+<a id="nestedatt--roles--access_conditions--expression--vpc"></a>
+### Nested Schema for `roles.access_conditions.expression.vpc`
+
+Read-Only:
+
+- `operator` (String)
+- `vpcs` (List of String)
+
+
+
 
 <a id="nestedatt--roles--permission_grants"></a>
 ### Nested Schema for `roles.permission_grants`

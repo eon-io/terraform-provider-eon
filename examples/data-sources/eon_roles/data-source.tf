@@ -22,6 +22,14 @@ locals {
   }
 }
 
+# Example: Roles that have access conditions (custom roles with scoped permissions)
+locals {
+  roles_with_access_conditions = [
+    for r in data.eon_roles.all.roles :
+    r if length(r.access_conditions) > 0
+  ]
+}
+
 # Example: Output role information
 output "roles_count" {
   description = "Total number of roles"
@@ -39,15 +47,33 @@ output "custom_roles_count" {
 }
 
 output "roles_summary" {
-  description = "Summary of all roles"
+  description = "Summary of all roles (includes access_conditions when present)"
   value = {
     for r in data.eon_roles.all.roles :
     r.name => {
-      id               = r.id
-      is_built_in_role = r.is_built_in_role
-      permission_count = length(r.permission_grants)
+      id                = r.id
+      is_built_in_role  = r.is_built_in_role
+      permission_count  = length(r.permission_grants)
+      access_conditions = r.access_conditions
     }
   }
+}
+
+# Example: Output roles that use access conditions (e.g. to audit scoped permissions)
+output "roles_with_access_conditions" {
+  description = "Roles that define access conditions (id, effect, expression)"
+  value = {
+    for r in local.roles_with_access_conditions :
+    r.name => {
+      id               = r.id
+      access_conditions = r.access_conditions
+    }
+  }
+}
+
+output "roles_with_access_conditions_count" {
+  description = "Number of roles that have at least one access condition"
+  value       = length(local.roles_with_access_conditions)
 }
 
 output "role_ids_by_name" {

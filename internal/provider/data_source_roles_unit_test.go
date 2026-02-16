@@ -80,6 +80,46 @@ func TestRolesDataSource_ListWithPermissionGrants(t *testing.T) {
 	assert.Len(t, result[0].PermissionGrants, 2)
 }
 
+func TestRolesDataSource_ListWithAccessConditions(t *testing.T) {
+	t.Parallel()
+
+	// Build a minimal access condition (environment) so the role has access_conditions
+	envCond := externalEonSdkAPI.NewEnvironmentCondition(
+		externalEonSdkAPI.IN_OPERATOR,
+		[]externalEonSdkAPI.Environment{externalEonSdkAPI.PROD},
+	)
+	expr := externalEonSdkAPI.NewAccessConditionalExpression()
+	expr.SetEnvironment(*envCond)
+	nullableExpr := externalEonSdkAPI.NewNullableAccessConditionalExpression(expr)
+	ac := externalEonSdkAPI.NewAccessCondition(
+		"cond-1",
+		externalEonSdkAPI.RULE_EFFECT_INCLUSIVE,
+		*nullableExpr,
+	)
+
+	mockClient := client.NewMockEonClient()
+	r := &externalEonSdkAPI.Role{
+		Id:            "role-with-conds",
+		Name:          "Role With Conditions",
+		IsBuiltInRole: false,
+		PermissionGrants: []externalEonSdkAPI.PermissionGrant{
+			{Permission: externalEonSdkAPI.PermissionType("dashboard.view"), AccessConditionId: stringPtr("cond-1")},
+		},
+		AccessConditions: []externalEonSdkAPI.AccessCondition{*ac},
+	}
+	mockClient.Roles[r.Id] = r
+
+	result, err := mockClient.ListRoles(context.Background())
+
+	assert.NoError(t, err)
+	assert.Len(t, result, 1)
+	assert.Equal(t, "role-with-conds", result[0].Id)
+	assert.True(t, result[0].HasAccessConditions())
+	assert.Len(t, result[0].GetAccessConditions(), 1)
+	assert.Equal(t, "cond-1", result[0].GetAccessConditions()[0].GetId())
+	assert.Equal(t, string(externalEonSdkAPI.RULE_EFFECT_INCLUSIVE), string(result[0].GetAccessConditions()[0].GetEffect()))
+}
+
 func stringPtr(s string) *string {
 	return &s
 }

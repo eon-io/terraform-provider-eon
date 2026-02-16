@@ -92,7 +92,7 @@ func (r *RoleResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 							Required:            true,
 						},
 						"expression": schema.SingleNestedAttribute{
-							MarkdownDescription: "Conditional expression that defines which resources this condition applies to. Same structure as backup policy resource_selector.expression (environment, resource_type, group, data_classes, tag_keys, tag_key_values, etc.).",
+							MarkdownDescription: RoleExprDescExpression,
 							Optional:            true,
 							Attributes:          roleAccessConditionExpressionSchema(),
 						},

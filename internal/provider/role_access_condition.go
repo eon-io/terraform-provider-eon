@@ -15,7 +15,7 @@ import (
 func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"environment": schema.SingleNestedAttribute{
-			MarkdownDescription: "Environment condition",
+			MarkdownDescription: RoleExprDescEnvironment,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator":     schema.StringAttribute{Required: true},
@@ -23,7 +23,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"resource_type": schema.SingleNestedAttribute{
-			MarkdownDescription: "Resource type condition",
+			MarkdownDescription: RoleExprDescResourceType,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator":       schema.StringAttribute{Required: true},
@@ -31,15 +31,15 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"data_classes": schema.SingleNestedAttribute{
-			MarkdownDescription: "Data classes condition",
+			MarkdownDescription: RoleExprDescDataClasses,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator":     schema.StringAttribute{MarkdownDescription: "Operator: CONTAINS_ANY_OF, CONTAINS_NONE_OF, or CONTAINS_ALL_OF", Required: true},
+				"operator":     schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorContains, Required: true},
 				"data_classes": schema.ListAttribute{ElementType: types.StringType, Required: true},
 			},
 		},
 		"tag_keys": schema.SingleNestedAttribute{
-			MarkdownDescription: "Tag keys condition",
+			MarkdownDescription: RoleExprDescTagKeys,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator": schema.StringAttribute{Required: true},
@@ -47,7 +47,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"tag_key_values": schema.SingleNestedAttribute{
-			MarkdownDescription: "Tag key-value pairs condition",
+			MarkdownDescription: RoleExprDescTagKeyValues,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator": schema.StringAttribute{Required: true},
@@ -63,7 +63,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"apps": schema.SingleNestedAttribute{
-			MarkdownDescription: "Apps condition",
+			MarkdownDescription: RoleExprDescApps,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator": schema.StringAttribute{Required: true},
@@ -71,7 +71,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"cloud_provider": schema.SingleNestedAttribute{
-			MarkdownDescription: "Cloud provider condition",
+			MarkdownDescription: RoleExprDescCloudProvider,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator":        schema.StringAttribute{Required: true},
@@ -79,7 +79,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"account_id": schema.SingleNestedAttribute{
-			MarkdownDescription: "Account ID condition",
+			MarkdownDescription: RoleExprDescAccountID,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator":    schema.StringAttribute{Required: true},
@@ -87,7 +87,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"source_region": schema.SingleNestedAttribute{
-			MarkdownDescription: "Source region condition",
+			MarkdownDescription: RoleExprDescSourceRegion,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator":       schema.StringAttribute{Required: true},
@@ -95,7 +95,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"vpc": schema.SingleNestedAttribute{
-			MarkdownDescription: "VPC condition",
+			MarkdownDescription: RoleExprDescVPC,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator": schema.StringAttribute{Required: true},
@@ -103,7 +103,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"subnets": schema.SingleNestedAttribute{
-			MarkdownDescription: "Subnets condition",
+			MarkdownDescription: RoleExprDescSubnets,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator": schema.StringAttribute{Required: true},
@@ -111,7 +111,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"resource_group_name": schema.SingleNestedAttribute{
-			MarkdownDescription: "Resource group name condition",
+			MarkdownDescription: RoleExprDescResourceGroupName,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator":             schema.StringAttribute{Required: true},
@@ -119,7 +119,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"resource_name": schema.SingleNestedAttribute{
-			MarkdownDescription: "Resource name condition",
+			MarkdownDescription: RoleExprDescResourceName,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator":       schema.StringAttribute{Required: true},
@@ -127,7 +127,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			},
 		},
 		"resource_id": schema.SingleNestedAttribute{
-			MarkdownDescription: "Resource ID condition",
+			MarkdownDescription: RoleExprDescResourceID,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator":     schema.StringAttribute{Required: true},
@@ -144,227 +144,133 @@ func roleAccessConditionExpressionSchema() map[string]schema.Attribute {
 	operandsAttr := roleAccessConditionOperandsSchema()
 	return map[string]schema.Attribute{
 		"environment": schema.SingleNestedAttribute{
-			MarkdownDescription: "Environment condition",
+			MarkdownDescription: RoleExprDescEnvironment,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: IN or NOT_IN",
-					Required:            true,
-				},
-				"environments": schema.ListAttribute{
-					MarkdownDescription: "List of environments",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator":     schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorINorNOTIN, Required: true},
+				"environments": schema.ListAttribute{MarkdownDescription: RoleExprDescListEnvironments, ElementType: types.StringType, Required: true},
 			},
 		},
 		"resource_type": schema.SingleNestedAttribute{
-			MarkdownDescription: "Resource type condition",
+			MarkdownDescription: RoleExprDescResourceType,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: IN or NOT_IN",
-					Required:            true,
-				},
-				"resource_types": schema.ListAttribute{
-					MarkdownDescription: "List of resource types",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator":       schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorINorNOTIN, Required: true},
+				"resource_types": schema.ListAttribute{MarkdownDescription: RoleExprDescListResourceTypes, ElementType: types.StringType, Required: true},
 			},
 		},
 		"data_classes": schema.SingleNestedAttribute{
-			MarkdownDescription: "Data classes condition",
+			MarkdownDescription: RoleExprDescDataClasses,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: CONTAINS_ANY_OF, CONTAINS_NONE_OF, or CONTAINS_ALL_OF",
-					Required:            true,
-				},
-				"data_classes": schema.ListAttribute{
-					MarkdownDescription: "List of data classes",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator":     schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorContains, Required: true},
+				"data_classes": schema.ListAttribute{MarkdownDescription: RoleExprDescListDataClasses, ElementType: types.StringType, Required: true},
 			},
 		},
 		"tag_key_values": schema.SingleNestedAttribute{
-			MarkdownDescription: "Tag key-value pairs condition",
+			MarkdownDescription: RoleExprDescTagKeyValues,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: CONTAINS_ANY_OF, CONTAINS_NONE_OF, or CONTAINS_ALL_OF",
-					Required:            true,
-				},
+				"operator": schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorContains, Required: true},
 				"tag_key_values": schema.ListNestedAttribute{
-					MarkdownDescription: "List of tag key-value pairs to match",
+					MarkdownDescription: RoleExprDescListTagKeyValuesMatch,
 					Required:            true,
 					NestedObject: schema.NestedAttributeObject{
 						Attributes: map[string]schema.Attribute{
-							"key":   schema.StringAttribute{MarkdownDescription: "Tag key", Required: true},
-							"value": schema.StringAttribute{MarkdownDescription: "Tag value", Optional: true},
+							"key":   schema.StringAttribute{MarkdownDescription: RoleExprDescTagKey, Required: true},
+							"value": schema.StringAttribute{MarkdownDescription: RoleExprDescTagValue, Optional: true},
 						},
 					},
 				},
 			},
 		},
 		"tag_keys": schema.SingleNestedAttribute{
-			MarkdownDescription: "Tag keys condition",
+			MarkdownDescription: RoleExprDescTagKeys,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: CONTAINS_ANY_OF, CONTAINS_NONE_OF, or CONTAINS_ALL_OF",
-					Required:            true,
-				},
-				"tag_keys": schema.ListAttribute{
-					MarkdownDescription: "List of tag keys to match",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator": schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorContains, Required: true},
+				"tag_keys": schema.ListAttribute{MarkdownDescription: RoleExprDescListTagKeysMatch, ElementType: types.StringType, Required: true},
 			},
 		},
 		"apps": schema.SingleNestedAttribute{
-			MarkdownDescription: "Apps condition",
+			MarkdownDescription: RoleExprDescApps,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"operator": schema.StringAttribute{Required: true},
-				"apps": schema.ListAttribute{
-					MarkdownDescription: "List of apps",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"apps":     schema.ListAttribute{MarkdownDescription: RoleExprDescListApps, ElementType: types.StringType, Required: true},
 			},
 		},
 		"cloud_provider": schema.SingleNestedAttribute{
-			MarkdownDescription: "Cloud provider condition",
+			MarkdownDescription: RoleExprDescCloudProvider,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: IN or NOT_IN",
-					Required:            true,
-				},
-				"cloud_providers": schema.ListAttribute{
-					MarkdownDescription: "List of cloud providers",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator":        schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorINorNOTIN, Required: true},
+				"cloud_providers": schema.ListAttribute{MarkdownDescription: RoleExprDescListCloudProviders, ElementType: types.StringType, Required: true},
 			},
 		},
 		"account_id": schema.SingleNestedAttribute{
-			MarkdownDescription: "Account ID condition",
+			MarkdownDescription: RoleExprDescAccountID,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: IN or NOT_IN",
-					Required:            true,
-				},
-				"account_ids": schema.ListAttribute{
-					MarkdownDescription: "List of account IDs",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator":    schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorINorNOTIN, Required: true},
+				"account_ids": schema.ListAttribute{MarkdownDescription: RoleExprDescListAccountIDs, ElementType: types.StringType, Required: true},
 			},
 		},
 		"source_region": schema.SingleNestedAttribute{
-			MarkdownDescription: "Source region condition",
+			MarkdownDescription: RoleExprDescSourceRegion,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: IN or NOT_IN",
-					Required:            true,
-				},
-				"source_regions": schema.ListAttribute{
-					MarkdownDescription: "List of source regions",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator":       schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorINorNOTIN, Required: true},
+				"source_regions": schema.ListAttribute{MarkdownDescription: RoleExprDescListSourceRegions, ElementType: types.StringType, Required: true},
 			},
 		},
 		"vpc": schema.SingleNestedAttribute{
-			MarkdownDescription: "VPC condition",
+			MarkdownDescription: RoleExprDescVPC,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: IN or NOT_IN",
-					Required:            true,
-				},
-				"vpcs": schema.ListAttribute{
-					MarkdownDescription: "List of VPCs",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator": schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorINorNOTIN, Required: true},
+				"vpcs":     schema.ListAttribute{MarkdownDescription: RoleExprDescListVPCs, ElementType: types.StringType, Required: true},
 			},
 		},
 		"subnets": schema.SingleNestedAttribute{
-			MarkdownDescription: "Subnets condition",
+			MarkdownDescription: RoleExprDescSubnets,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: CONTAINS_ANY_OF, CONTAINS_NONE_OF, or CONTAINS_ALL_OF",
-					Required:            true,
-				},
-				"subnets": schema.ListAttribute{
-					MarkdownDescription: "List of subnets",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator": schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorContains, Required: true},
+				"subnets":  schema.ListAttribute{MarkdownDescription: RoleExprDescListSubnets, ElementType: types.StringType, Required: true},
 			},
 		},
 		"resource_group_name": schema.SingleNestedAttribute{
-			MarkdownDescription: "Resource group name condition",
+			MarkdownDescription: RoleExprDescResourceGroupName,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: IN or NOT_IN",
-					Required:            true,
-				},
-				"resource_group_names": schema.ListAttribute{
-					MarkdownDescription: "List of resource group names",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator":             schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorINorNOTIN, Required: true},
+				"resource_group_names": schema.ListAttribute{MarkdownDescription: RoleExprDescListResourceGroupNames, ElementType: types.StringType, Required: true},
 			},
 		},
 		"resource_name": schema.SingleNestedAttribute{
-			MarkdownDescription: "Resource name condition",
+			MarkdownDescription: RoleExprDescResourceName,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: IN or NOT_IN",
-					Required:            true,
-				},
-				"resource_names": schema.ListAttribute{
-					MarkdownDescription: "List of resource names",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator":       schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorINorNOTIN, Required: true},
+				"resource_names": schema.ListAttribute{MarkdownDescription: RoleExprDescListResourceNames, ElementType: types.StringType, Required: true},
 			},
 		},
 		"resource_id": schema.SingleNestedAttribute{
-			MarkdownDescription: "Resource ID condition",
+			MarkdownDescription: RoleExprDescResourceID,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Operator: IN or NOT_IN",
-					Required:            true,
-				},
-				"resource_ids": schema.ListAttribute{
-					MarkdownDescription: "List of resource IDs",
-					ElementType:         types.StringType,
-					Required:            true,
-				},
+				"operator":     schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorINorNOTIN, Required: true},
+				"resource_ids": schema.ListAttribute{MarkdownDescription: RoleExprDescListResourceIDs, ElementType: types.StringType, Required: true},
 			},
 		},
 		"group": schema.SingleNestedAttribute{
-			MarkdownDescription: "Group condition with logical operator and operands",
+			MarkdownDescription: RoleExprDescGroup,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator": schema.StringAttribute{
-					MarkdownDescription: "Logical operator: AND or OR",
-					Required:            true,
-				},
+				"operator": schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorLogical, Required: true},
 				"operands": schema.ListNestedAttribute{
-					MarkdownDescription: "List of nested conditions",
+					MarkdownDescription: RoleExprDescListOperands,
 					Optional:            true,
 					NestedObject: schema.NestedAttributeObject{
 						Attributes: operandsAttr,
@@ -708,38 +614,68 @@ func roleResourceIdConditionToSDK(ctx context.Context, obj types.Object) (*exter
 	return externalEonSdkAPI.NewResourceIdCondition(op, list), nil
 }
 
+// roleAccessConditionAttrTypes is the attr type map for one access condition (id, effect, expression).
+var roleAccessConditionAttrTypes = map[string]attr.Type{
+	"id":         types.StringType,
+	"effect":     types.StringType,
+	"expression": types.ObjectType{AttrTypes: roleExpressionAttrTypes},
+}
+
 // flattenRoleAccessConditions converts SDK []AccessCondition to Terraform types.List.
 func flattenRoleAccessConditions(ctx context.Context, conds []externalEonSdkAPI.AccessCondition) (types.List, diag.Diagnostics) {
 	if conds == nil {
-		attrTypes := map[string]attr.Type{
-			"id":         types.StringType,
-			"effect":     types.StringType,
-			"expression": types.ObjectType{AttrTypes: roleExpressionAttrTypes},
-		}
-		return types.ListNull(types.ObjectType{AttrTypes: attrTypes}), nil
-	}
-	attrTypes := map[string]attr.Type{
-		"id":         types.StringType,
-		"effect":     types.StringType,
-		"expression": types.ObjectType{AttrTypes: roleExpressionAttrTypes},
+		return types.ListNull(types.ObjectType{AttrTypes: roleAccessConditionAttrTypes}), nil
 	}
 	elems := make([]attr.Value, 0, len(conds))
 	for _, c := range conds {
 		exprVal, diags := flattenAccessConditionalExpression(ctx, c.GetExpression())
 		if diags.HasError() {
-			return types.ListNull(types.ObjectType{AttrTypes: attrTypes}), diags
+			return types.ListNull(types.ObjectType{AttrTypes: roleAccessConditionAttrTypes}), diags
 		}
-		obj, d := types.ObjectValue(attrTypes, map[string]attr.Value{
+		obj, d := types.ObjectValue(roleAccessConditionAttrTypes, map[string]attr.Value{
 			"id":         types.StringValue(c.GetId()),
 			"effect":     types.StringValue(string(c.GetEffect())),
 			"expression": exprVal,
 		})
 		if d.HasError() {
-			return types.ListNull(types.ObjectType{AttrTypes: attrTypes}), d
+			return types.ListNull(types.ObjectType{AttrTypes: roleAccessConditionAttrTypes}), d
 		}
 		elems = append(elems, obj)
 	}
-	return types.ListValue(types.ObjectType{AttrTypes: attrTypes}, elems)
+	return types.ListValue(types.ObjectType{AttrTypes: roleAccessConditionAttrTypes}, elems)
+}
+
+// accessConditionPlaceholdersFromGrants builds a list of placeholder access conditions (id only, effect and expression null)
+// for each access_condition_id referenced in permission grants. Use when the API returns no access_conditions so the
+// data source output at least shows which condition IDs are referenced (e.g. "No PII").
+func accessConditionPlaceholdersFromGrants(ctx context.Context, grants []externalEonSdkAPI.PermissionGrant) (types.List, diag.Diagnostics) {
+	seen := make(map[string]struct{})
+	var ids []string
+	for _, g := range grants {
+		if g.AccessConditionId != nil && *g.AccessConditionId != "" {
+			if _, ok := seen[*g.AccessConditionId]; !ok {
+				seen[*g.AccessConditionId] = struct{}{}
+				ids = append(ids, *g.AccessConditionId)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return types.ListNull(types.ObjectType{AttrTypes: roleAccessConditionAttrTypes}), nil
+	}
+	elems := make([]attr.Value, 0, len(ids))
+	nullExpr := types.ObjectNull(roleExpressionAttrTypes)
+	for _, id := range ids {
+		obj, d := types.ObjectValue(roleAccessConditionAttrTypes, map[string]attr.Value{
+			"id":         types.StringValue(id),
+			"effect":     types.StringNull(),
+			"expression": nullExpr,
+		})
+		if d.HasError() {
+			return types.ListNull(types.ObjectType{AttrTypes: roleAccessConditionAttrTypes}), d
+		}
+		elems = append(elems, obj)
+	}
+	return types.ListValue(types.ObjectType{AttrTypes: roleAccessConditionAttrTypes}, elems)
 }
 
 // objectValueWithAllAttrs ensures the Object has a value for every key in attrTypes (null if not set).
