@@ -366,8 +366,8 @@ func (m *MockEonClient) CreateRole(ctx context.Context, req externalEonSdkAPI.Cr
 
 	id := fmt.Sprintf("mock-role-%d", len(m.Roles)+1)
 	role := &externalEonSdkAPI.Role{
-		Id:              id,
-		Name:            req.GetName(),
+		Id:               id,
+		Name:             req.GetName(),
 		IsBuiltInRole:    false,
 		PermissionGrants: permissionGrantInputToGrant(req.GetPermissionGrants()),
 	}

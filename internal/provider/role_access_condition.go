@@ -114,7 +114,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			MarkdownDescription: "Resource group name condition",
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator":              schema.StringAttribute{Required: true},
+				"operator":             schema.StringAttribute{Required: true},
 				"resource_group_names": schema.ListAttribute{ElementType: types.StringType, Required: true},
 			},
 		},
@@ -763,20 +763,20 @@ func objectValueWithAllAttrs(attrTypes map[string]attr.Type, partial map[string]
 
 // roleOperandAttrTypes is the attr type map for a single operand (no nested group).
 var roleOperandAttrTypes = map[string]attr.Type{
-	"environment":        types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "environments": types.ListType{ElemType: types.StringType}}},
-	"resource_type":      types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "resource_types": types.ListType{ElemType: types.StringType}}},
-	"data_classes":      types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "data_classes": types.ListType{ElemType: types.StringType}}},
-	"tag_keys":           types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "tag_keys": types.ListType{ElemType: types.StringType}}},
-	"tag_key_values":     types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "tag_key_values": types.ListType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{"key": types.StringType, "value": types.StringType}}}}},
-	"apps":               types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "apps": types.ListType{ElemType: types.StringType}}},
-	"cloud_provider":     types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "cloud_providers": types.ListType{ElemType: types.StringType}}},
-	"account_id":         types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "account_ids": types.ListType{ElemType: types.StringType}}},
-	"source_region":     types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "source_regions": types.ListType{ElemType: types.StringType}}},
-	"vpc":                types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "vpcs": types.ListType{ElemType: types.StringType}}},
-	"subnets":            types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "subnets": types.ListType{ElemType: types.StringType}}},
+	"environment":         types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "environments": types.ListType{ElemType: types.StringType}}},
+	"resource_type":       types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "resource_types": types.ListType{ElemType: types.StringType}}},
+	"data_classes":        types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "data_classes": types.ListType{ElemType: types.StringType}}},
+	"tag_keys":            types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "tag_keys": types.ListType{ElemType: types.StringType}}},
+	"tag_key_values":      types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "tag_key_values": types.ListType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{"key": types.StringType, "value": types.StringType}}}}},
+	"apps":                types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "apps": types.ListType{ElemType: types.StringType}}},
+	"cloud_provider":      types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "cloud_providers": types.ListType{ElemType: types.StringType}}},
+	"account_id":          types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "account_ids": types.ListType{ElemType: types.StringType}}},
+	"source_region":       types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "source_regions": types.ListType{ElemType: types.StringType}}},
+	"vpc":                 types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "vpcs": types.ListType{ElemType: types.StringType}}},
+	"subnets":             types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "subnets": types.ListType{ElemType: types.StringType}}},
 	"resource_group_name": types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "resource_group_names": types.ListType{ElemType: types.StringType}}},
-	"resource_name":     types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "resource_names": types.ListType{ElemType: types.StringType}}},
-	"resource_id":       types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "resource_ids": types.ListType{ElemType: types.StringType}}},
+	"resource_name":       types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "resource_names": types.ListType{ElemType: types.StringType}}},
+	"resource_id":         types.ObjectType{AttrTypes: map[string]attr.Type{"operator": types.StringType, "resource_ids": types.ListType{ElemType: types.StringType}}},
 }
 
 // roleExpressionAttrTypes includes group (operands use roleOperandAttrTypes).

@@ -68,9 +68,9 @@ func TestRoleResource_ReadWithMockClient(t *testing.T) {
 
 	mockClient := client.NewMockEonClient()
 	mockClient.Roles["role-1"] = &externalEonSdkAPI.Role{
-		Id:              "role-1",
-		Name:            "Test Role",
-		IsBuiltInRole:   false,
+		Id:               "role-1",
+		Name:             "Test Role",
+		IsBuiltInRole:    false,
 		PermissionGrants: permGrants,
 	}
 

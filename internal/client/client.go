@@ -843,27 +843,52 @@ func (c *EonClient) DeleteIdpGroup(ctx context.Context, groupId string) error {
 	return nil
 }
 
-// ListRoles retrieves all roles for the account.
+// ListRoles retrieves all roles for the account (paginated).
 func (c *EonClient) ListRoles(ctx context.Context) ([]externalEonSdkAPI.Role, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.IamAPI.ListRoles(ctx).PageSize(100).Execute()
-	if apiErr := c.handleAPIError(err, httpResp, "failed to list roles"); apiErr != nil {
-		return nil, apiErr
-	}
-	defer httpResp.Body.Close()
+	var allRoles []externalEonSdkAPI.Role
+	var pageToken *string
 
-	if httpResp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	for {
+		req := c.client.IamAPI.ListRoles(ctx).PageSize(100)
+		if pageToken != nil {
+			req = req.PageToken(*pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list roles"); apiErr != nil {
+			if httpResp != nil {
+				_ = httpResp.Body.Close()
+			}
+			return nil, apiErr
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			_ = httpResp.Body.Close()
+			return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+		}
+
+		if resp.GetRoles() != nil {
+			allRoles = append(allRoles, resp.GetRoles()...)
+		}
+
+		hasMorePages := resp.NextToken != nil && *resp.NextToken != ""
+		_ = httpResp.Body.Close()
+
+		if !hasMorePages {
+			break
+		}
+		pageToken = resp.NextToken
 	}
 
-	if resp.GetRoles() == nil {
+	if allRoles == nil {
 		return []externalEonSdkAPI.Role{}, nil
 	}
-	return resp.GetRoles(), nil
+	return allRoles, nil
 }
 
 // GetRole retrieves a role by ID.

@@ -21,9 +21,9 @@ func TestRolesDataSource_ListWithMockClient(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		numRoles   int
-		expectLen  int
+		name      string
+		numRoles  int
+		expectLen int
 	}{
 		{"successful list with multiple roles", 2, 2},
 		{"successful list with no roles", 0, 0},

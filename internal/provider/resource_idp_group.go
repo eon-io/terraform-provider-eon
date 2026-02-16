@@ -58,9 +58,9 @@ func (r *IdpGroupResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"role_ids": schema.ListAttribute{
-				ElementType: types.StringType,
+				ElementType:         types.StringType,
 				MarkdownDescription: "List of Eon role IDs assigned to this IDP group. You can reference `eon_role` resources (e.g. `role_ids = [eon_role.admin.id]`) or the `eon_roles` data source (e.g. `role_ids = [for r in data.eon_roles.roles : r.id if r.name == \"Admin\"]`).",
-				Required: true,
+				Required:            true,
 			},
 		},
 	}

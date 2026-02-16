@@ -28,10 +28,10 @@ type RolesDataSourceModel struct {
 }
 
 type RoleModel struct {
-	Id              types.String `tfsdk:"id"`
-	Name            types.String `tfsdk:"name"`
-	IsBuiltInRole   types.Bool   `tfsdk:"is_built_in_role"`
-	PermissionGrants types.List  `tfsdk:"permission_grants"`
+	Id               types.String `tfsdk:"id"`
+	Name             types.String `tfsdk:"name"`
+	IsBuiltInRole    types.Bool   `tfsdk:"is_built_in_role"`
+	PermissionGrants types.List   `tfsdk:"permission_grants"`
 }
 
 type PermissionGrantModel struct {
@@ -40,7 +40,7 @@ type PermissionGrantModel struct {
 }
 
 var permissionGrantAttrTypes = map[string]attr.Type{
-	"permission":         types.StringType,
+	"permission":          types.StringType,
 	"access_condition_id": types.StringType,
 }
 
@@ -127,9 +127,9 @@ func (d *RolesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		}
 
 		data.Roles = append(data.Roles, RoleModel{
-			Id:              types.StringValue(r.GetId()),
-			Name:            types.StringValue(r.GetName()),
-			IsBuiltInRole:   types.BoolValue(r.GetIsBuiltInRole()),
+			Id:               types.StringValue(r.GetId()),
+			Name:             types.StringValue(r.GetName()),
+			IsBuiltInRole:    types.BoolValue(r.GetIsBuiltInRole()),
 			PermissionGrants: permGrantsVal,
 		})
 	}
@@ -150,7 +150,7 @@ func permissionGrantsFromSDK(ctx context.Context, grants []externalEonSdkAPI.Per
 			acId = types.StringValue(*g.AccessConditionId)
 		}
 		obj, d := types.ObjectValue(permissionGrantAttrTypes, map[string]attr.Value{
-			"permission":         types.StringValue(string(g.GetPermission())),
+			"permission":          types.StringValue(string(g.GetPermission())),
 			"access_condition_id": acId,
 		})
 		if d.HasError() {
