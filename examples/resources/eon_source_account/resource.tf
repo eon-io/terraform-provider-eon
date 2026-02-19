@@ -30,6 +30,23 @@ resource "eon_source_account" "gcp_production" {
   }
 }
 
+# Example: Connect a GCP source account (organization or folder) using the setup module
+module "gcp_source" {
+  source = "https://eon-public-b2b628cc-1d96-4fda-8dae-c3b1ad3ea03b.s3.amazonaws.com/gcp-eon-setup.zip"
+
+  account_type                              = "source"
+  organization_id                           = "610387062982"
+  project_id                                = "eon-poc-management"
+  eon_account_id                            = "7ba666c9-8f16-4373-a111-5c15edf1bf02"
+  scanning_project_id                       = "eon-vault-5ad89b88-45db-45"
+  control_plane_service_account             = "control-plane@eon-prod-454910.iam.gserviceaccount.com"
+  enable_gcs_bucket_notification_management = true
+
+  providers = {
+    google = google.org
+  }
+}
+
 # Output the account details
 output "aws_production_account" {
   description = "Details of the connected AWS production source account"
