@@ -1,7 +1,9 @@
 package client
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -428,6 +430,134 @@ func (c *EonClient) StartS3FileRestore(ctx context.Context, resourceId, snapshot
 	}
 
 	return resp.GetJobId(), nil
+}
+
+// StartGcpVmInstanceRestore starts a GCP VM instance restore job
+func (c *EonClient) StartGcpVmInstanceRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreGcpVmInstanceRequest) (string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return "", fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreGcpVmInstance(ctx, c.projectID, resourceId, snapshotId).RestoreGcpVmInstanceRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start GCP VM instance restore"); apiErr != nil {
+		return "", apiErr
+	}
+
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusAccepted {
+		body, _ := io.ReadAll(httpResp.Body)
+		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return resp.GetJobId(), nil
+}
+
+// StartGcpDiskRestore starts a GCP disk restore job
+func (c *EonClient) StartGcpDiskRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreGcpDiskRequest) (string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return "", fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreGcpDisk(ctx, c.projectID, resourceId, snapshotId).RestoreGcpDiskRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start GCP disk restore"); apiErr != nil {
+		return "", apiErr
+	}
+
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusAccepted {
+		body, _ := io.ReadAll(httpResp.Body)
+		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return resp.GetJobId(), nil
+}
+
+// StartGcpCloudSqlRestore starts a GCP Cloud SQL restore job
+func (c *EonClient) StartGcpCloudSqlRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreGcpCloudSqlRequest) (string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return "", fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreGcpCloudSql(ctx, c.projectID, resourceId, snapshotId).RestoreGcpCloudSqlRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start GCP Cloud SQL restore"); apiErr != nil {
+		return "", apiErr
+	}
+
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusAccepted {
+		body, _ := io.ReadAll(httpResp.Body)
+		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return resp.GetJobId(), nil
+}
+
+// BigQueryRestoreDestination represents the destination for a BigQuery dataset restore
+type BigQueryRestoreDestination struct {
+	DatasetId string `json:"datasetId"`
+	Location  string `json:"location"`
+}
+
+// BigQueryRestoreRequest represents the request body for a BigQuery dataset restore
+type BigQueryRestoreRequest struct {
+	RestoreAccountId string                     `json:"restoreAccountId"`
+	Destination      BigQueryRestoreDestination `json:"destination"`
+	Tables           []string                   `json:"tables,omitempty"`
+}
+
+// BigQueryRestoreResponse represents the response from a BigQuery restore job initiation
+type BigQueryRestoreResponse struct {
+	JobId string `json:"jobId"`
+}
+
+// StartBigQueryDatasetRestore starts a BigQuery dataset restore job
+func (c *EonClient) StartBigQueryDatasetRestore(ctx context.Context, resourceId, snapshotId string, req BigQueryRestoreRequest) (string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return "", fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	// Build the URL for BigQuery dataset restore
+	baseURL := c.client.GetConfig().Servers[0].URL
+	url := fmt.Sprintf("%s/v1/projects/%s/resources/%s/snapshots/%s/restore-bigquery-dataset", baseURL, c.projectID, resourceId, snapshotId)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal BigQuery restore request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("failed to create BigQuery restore request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+
+	// Copy auth and default headers from the SDK client config
+	for key, value := range c.client.GetConfig().DefaultHeader {
+		httpReq.Header.Set(key, value)
+	}
+
+	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start BigQuery dataset restore"); apiErr != nil {
+		return "", apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusAccepted {
+		respBody, _ := io.ReadAll(httpResp.Body)
+		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
+	}
+
+	var restoreResp BigQueryRestoreResponse
+	if err := json.NewDecoder(httpResp.Body).Decode(&restoreResp); err != nil {
+		return "", fmt.Errorf("failed to decode BigQuery restore response: %w", err)
+	}
+
+	return restoreResp.JobId, nil
 }
 
 // GetSnapshot retrieves a snapshot by ID

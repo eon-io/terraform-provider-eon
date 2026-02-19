@@ -77,6 +77,11 @@ func (input *VaultUserInput) ToCreateRequest() (*externalEonSdkAPI.CreateVaultRe
 		return nil, fmt.Errorf("cloud_provider must be one of: AWS, AZURE, GCP. Got: %s", input.CloudProvider)
 	}
 
+	// Validate that AWS-specific fields are not used with non-AWS providers
+	if cloudProvider != externalEonSdkAPI.AWS && input.AwsKmsKeyArn != nil {
+		return nil, fmt.Errorf("aws_kms_key_arn can only be used when cloud_provider is AWS. Got cloud_provider: %s", input.CloudProvider)
+	}
+
 	vaultAttributes := externalEonSdkAPI.NewVaultProviderAttributesInput(cloudProvider)
 
 	// Handle AWS-specific configuration

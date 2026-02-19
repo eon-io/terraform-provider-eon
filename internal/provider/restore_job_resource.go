@@ -37,12 +37,20 @@ type RestoreJobResourceModel struct {
 	ResourceId       types.String `tfsdk:"resource_id"`
 	RestoreAccountId types.String `tfsdk:"restore_account_id"`
 
-	// Restore type specific configuration blocks
+	// Restore type specific configuration blocks — AWS
 	EbsConfig      *EbsRestoreConfig      `tfsdk:"ebs_config"`
 	Ec2Config      *Ec2RestoreConfig      `tfsdk:"ec2_config"`
 	RdsConfig      *RdsRestoreConfig      `tfsdk:"rds_config"`
 	S3BucketConfig *S3BucketRestoreConfig `tfsdk:"s3_bucket_config"`
 	S3FileConfig   *S3FileRestoreConfig   `tfsdk:"s3_file_config"`
+
+	// Restore type specific configuration blocks — GCP
+	GcpVmConfig              *GcpVmRestoreConfig              `tfsdk:"gcp_vm_config"`
+	GcpDiskConfig            *GcpDiskRestoreConfig            `tfsdk:"gcp_disk_config"`
+	GcpCloudSqlConfig        *GcpCloudSqlRestoreConfig        `tfsdk:"gcp_cloud_sql_config"`
+	GcsBucketConfig          *GcsBucketRestoreConfig          `tfsdk:"gcs_bucket_config"`
+	GcsFileConfig            *GcsFileRestoreConfig            `tfsdk:"gcs_file_config"`
+	GcpBigQueryDatasetConfig *GcpBigQueryDatasetRestoreConfig `tfsdk:"gcp_bigquery_restore_dataset_config"`
 
 	// Common fields
 	TimeoutMinutes    types.Int64 `tfsdk:"timeout_minutes"`
@@ -123,6 +131,77 @@ type VolumeRestoreParam struct {
 type S3FileParam struct {
 	Path        types.String `tfsdk:"path"`
 	IsDirectory types.Bool   `tfsdk:"is_directory"`
+}
+
+// GCP restore config types
+
+type GcpVmRestoreConfig struct {
+	Zone                      types.String `tfsdk:"zone"`
+	MachineType               types.String `tfsdk:"machine_type"`
+	Name                      types.String `tfsdk:"name"`
+	NetworkName               types.String `tfsdk:"network_name"`
+	SubnetName                types.String `tfsdk:"subnet_name"`
+	NetworkHostProject        types.String `tfsdk:"network_host_project"`
+	Labels                    types.Map    `tfsdk:"labels"`
+	StartInstanceAfterRestore types.Bool   `tfsdk:"start_instance_after_restore"`
+	Disks                     types.List   `tfsdk:"disks"`
+}
+
+type GcpDiskRestoreParam struct {
+	ProviderDiskId  types.String `tfsdk:"provider_disk_id"`
+	Name            types.String `tfsdk:"name"`
+	DiskType        types.String `tfsdk:"disk_type"`
+	SizeBytes       types.Int64  `tfsdk:"size_bytes"`
+	Iops            types.Int64  `tfsdk:"iops"`
+	Throughput      types.Int64  `tfsdk:"throughput"`
+	Description     types.String `tfsdk:"description"`
+	Labels          types.Map    `tfsdk:"labels"`
+	EncryptionKeyId types.String `tfsdk:"encryption_key_id"`
+}
+
+type GcpDiskRestoreConfig struct {
+	ProviderDiskId  types.String `tfsdk:"provider_disk_id"`
+	Zone            types.String `tfsdk:"zone"`
+	Name            types.String `tfsdk:"name"`
+	DiskType        types.String `tfsdk:"disk_type"`
+	SizeBytes       types.Int64  `tfsdk:"size_bytes"`
+	Iops            types.Int64  `tfsdk:"iops"`
+	Throughput      types.Int64  `tfsdk:"throughput"`
+	Description     types.String `tfsdk:"description"`
+	Labels          types.Map    `tfsdk:"labels"`
+	EncryptionKeyId types.String `tfsdk:"encryption_key_id"`
+}
+
+type GcpCloudSqlRestoreConfig struct {
+	Zone               types.String `tfsdk:"zone"`
+	Name               types.String `tfsdk:"name"`
+	NetworkType        types.String `tfsdk:"network_type"`
+	NetworkName        types.String `tfsdk:"network_name"`
+	NetworkHostProject types.String `tfsdk:"network_host_project"`
+	Labels             types.Map    `tfsdk:"labels"`
+}
+
+type GcsBucketRestoreConfig struct {
+	BucketName types.String `tfsdk:"bucket_name"`
+	KeyPrefix  types.String `tfsdk:"key_prefix"`
+}
+
+type GcsFileRestoreConfig struct {
+	BucketName types.String `tfsdk:"bucket_name"`
+	KeyPrefix  types.String `tfsdk:"key_prefix"`
+	Files      types.List   `tfsdk:"files"`
+}
+
+// BigQuery restore config types
+
+type GcpBigQueryDatasetRestoreConfig struct {
+	DatasetId types.String `tfsdk:"dataset_id"`
+	Location  types.String `tfsdk:"location"`
+	Tables    types.List   `tfsdk:"tables"`
+}
+
+type GcpBigQueryTableParam struct {
+	TableId types.String `tfsdk:"table_id"`
 }
 
 func (r *RestoreJobResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -427,6 +506,239 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 					},
 				},
 			},
+			// GCP restore configuration blocks
+			"gcp_vm_config": schema.SingleNestedBlock{
+				MarkdownDescription: "GCP VM instance restore configuration. Required when restoring a GCP Compute Engine instance with `full` restore type.",
+				Attributes: map[string]schema.Attribute{
+					"zone": schema.StringAttribute{
+						MarkdownDescription: "Zone to restore the VM instance to (e.g. `us-central1-a`).",
+						Optional:            true,
+					},
+					"machine_type": schema.StringAttribute{
+						MarkdownDescription: "Machine type to use for the restored instance (e.g. `e2-medium`).",
+						Optional:            true,
+					},
+					"name": schema.StringAttribute{
+						MarkdownDescription: "Name for the restored VM instance.",
+						Optional:            true,
+					},
+					"network_name": schema.StringAttribute{
+						MarkdownDescription: "Name of the VPC network to use.",
+						Optional:            true,
+					},
+					"subnet_name": schema.StringAttribute{
+						MarkdownDescription: "Name of the subnet to use.",
+						Optional:            true,
+					},
+					"network_host_project": schema.StringAttribute{
+						MarkdownDescription: "ID of the project that hosts the VPC network. Applicable only when restoring to a shared VPC network.",
+						Optional:            true,
+					},
+					"labels": schema.MapAttribute{
+						MarkdownDescription: "Labels to apply to the restored VM as key-value pairs. The label `\"eon-restore\": \"true\"` is always applied automatically.",
+						ElementType:         types.StringType,
+						Optional:            true,
+					},
+					"start_instance_after_restore": schema.BoolAttribute{
+						MarkdownDescription: "Whether to start the VM instance after restoring it. If `false`, the VM will be created in a stopped state. Defaults to `true`.",
+						Optional:            true,
+						Computed:            true,
+						Default:             booldefault.StaticBool(true),
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"disks": schema.ListNestedBlock{
+						MarkdownDescription: "Disks to restore and attach to the restored instance. Each item corresponds to a disk, where `provider_disk_id` matches the disk's ID at the time of the snapshot. The boot disk must be in the list.",
+						NestedObject: schema.NestedBlockObject{
+							Attributes: map[string]schema.Attribute{
+								"provider_disk_id": schema.StringAttribute{
+									MarkdownDescription: "Cloud-provider-assigned ID of the disk to restore.",
+									Optional:            true,
+								},
+								"name": schema.StringAttribute{
+									MarkdownDescription: "Disk name.",
+									Optional:            true,
+								},
+								"disk_type": schema.StringAttribute{
+									MarkdownDescription: "Disk type (e.g. `pd-standard`, `pd-ssd`, `pd-balanced`, `pd-extreme`).",
+									Optional:            true,
+								},
+								"size_bytes": schema.Int64Attribute{
+									MarkdownDescription: "Size of the disk in bytes.",
+									Optional:            true,
+								},
+								"iops": schema.Int64Attribute{
+									MarkdownDescription: "Provisioned IOPS for the disk. Applicable only when `disk_type` is `pd-extreme`.",
+									Optional:            true,
+								},
+								"throughput": schema.Int64Attribute{
+									MarkdownDescription: "Disk throughput. Defaults to the original throughput captured by the snapshot.",
+									Optional:            true,
+								},
+								"description": schema.StringAttribute{
+									MarkdownDescription: "Description for the restored disk.",
+									Optional:            true,
+								},
+								"labels": schema.MapAttribute{
+									MarkdownDescription: "Labels to apply to the restored disk as key-value pairs.",
+									ElementType:         types.StringType,
+									Optional:            true,
+								},
+								"encryption_key_id": schema.StringAttribute{
+									MarkdownDescription: "ID of the customer-managed encryption key (CMEK) to use for the disk.",
+									Optional:            true,
+								},
+							},
+						},
+					},
+				},
+			},
+			"gcp_disk_config": schema.SingleNestedBlock{
+				MarkdownDescription: "GCP disk restore configuration. Required when restoring a GCP Compute Engine disk with `partial` restore type, or a standalone GCP disk.",
+				Attributes: map[string]schema.Attribute{
+					"provider_disk_id": schema.StringAttribute{
+						MarkdownDescription: "Cloud-provider-assigned ID of the disk to restore.",
+						Optional:            true,
+					},
+					"zone": schema.StringAttribute{
+						MarkdownDescription: "Zone to restore the disk to (e.g. `us-central1-a`).",
+						Optional:            true,
+					},
+					"name": schema.StringAttribute{
+						MarkdownDescription: "Name for the restored disk.",
+						Optional:            true,
+					},
+					"disk_type": schema.StringAttribute{
+						MarkdownDescription: "Disk type (e.g. `pd-standard`, `pd-ssd`, `pd-balanced`, `pd-extreme`).",
+						Optional:            true,
+					},
+					"size_bytes": schema.Int64Attribute{
+						MarkdownDescription: "Size of the disk in bytes.",
+						Optional:            true,
+					},
+					"iops": schema.Int64Attribute{
+						MarkdownDescription: "Provisioned IOPS for the disk. Applicable only when `disk_type` is `pd-extreme`.",
+						Optional:            true,
+					},
+					"throughput": schema.Int64Attribute{
+						MarkdownDescription: "Disk throughput. Defaults to the original throughput captured by the snapshot.",
+						Optional:            true,
+					},
+					"description": schema.StringAttribute{
+						MarkdownDescription: "Description for the restored disk.",
+						Optional:            true,
+					},
+					"labels": schema.MapAttribute{
+						MarkdownDescription: "Labels to apply to the restored disk as key-value pairs.",
+						ElementType:         types.StringType,
+						Optional:            true,
+					},
+					"encryption_key_id": schema.StringAttribute{
+						MarkdownDescription: "ID of the customer-managed encryption key (CMEK) to use for the disk.",
+						Optional:            true,
+					},
+				},
+			},
+			"gcp_cloud_sql_config": schema.SingleNestedBlock{
+				MarkdownDescription: "GCP Cloud SQL restore configuration. Required when restoring a GCP Cloud SQL instance.",
+				Attributes: map[string]schema.Attribute{
+					"zone": schema.StringAttribute{
+						MarkdownDescription: "Zone to restore the Cloud SQL instance to (e.g. `us-central1-a`).",
+						Optional:            true,
+					},
+					"name": schema.StringAttribute{
+						MarkdownDescription: "Name for the restored Cloud SQL instance.",
+						Optional:            true,
+					},
+					"network_type": schema.StringAttribute{
+						MarkdownDescription: "Network type for the Cloud SQL instance. Possible values: `PUBLIC`, `PRIVATE`.",
+						Optional:            true,
+					},
+					"network_name": schema.StringAttribute{
+						MarkdownDescription: "Name of the VPC network to use. Required when `network_type` is `PRIVATE`.",
+						Optional:            true,
+					},
+					"network_host_project": schema.StringAttribute{
+						MarkdownDescription: "ID of the project that hosts the VPC network. Applicable only when restoring to a shared VPC network.",
+						Optional:            true,
+					},
+					"labels": schema.MapAttribute{
+						MarkdownDescription: "Labels to apply to the restored Cloud SQL instance as key-value pairs. The label `\"eon-restore\": \"true\"` is always applied automatically.",
+						ElementType:         types.StringType,
+						Optional:            true,
+					},
+				},
+			},
+			"gcs_bucket_config": schema.SingleNestedBlock{
+				MarkdownDescription: "GCS bucket restore configuration. Required when restoring a GCP Cloud Storage bucket with `full` restore type.",
+				Attributes: map[string]schema.Attribute{
+					"bucket_name": schema.StringAttribute{
+						MarkdownDescription: "Name of an existing GCS bucket to restore the data to.",
+						Optional:            true,
+					},
+					"key_prefix": schema.StringAttribute{
+						MarkdownDescription: "Prefix to add to the restore path. If you don't specify a prefix, the files are restored to their respective folders in the original file tree, starting from the root of the bucket.",
+						Optional:            true,
+					},
+				},
+			},
+			"gcs_file_config": schema.SingleNestedBlock{
+				MarkdownDescription: "GCS file restore configuration. Required when restoring GCP Cloud Storage files with `partial` restore type.",
+				Attributes: map[string]schema.Attribute{
+					"bucket_name": schema.StringAttribute{
+						MarkdownDescription: "Name of an existing GCS bucket to restore the files to.",
+						Optional:            true,
+					},
+					"key_prefix": schema.StringAttribute{
+						MarkdownDescription: "Prefix to add to the restore path. If you don't specify a prefix, the files are restored to their respective folders in the original file tree, starting from the root of the bucket.",
+						Optional:            true,
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"files": schema.ListNestedBlock{
+						MarkdownDescription: "List of file paths to restore.",
+						NestedObject: schema.NestedBlockObject{
+							Attributes: map[string]schema.Attribute{
+								"path": schema.StringAttribute{
+									MarkdownDescription: "Absolute path to the file or directory to restore.",
+									Optional:            true,
+								},
+								"is_directory": schema.BoolAttribute{
+									MarkdownDescription: "Whether `path` is a directory. If `true`, Eon restores all files in all subdirectories under the path. If `false`, Eon restores only the file at the path.",
+									Optional:            true,
+								},
+							},
+						},
+					},
+				},
+			},
+			// BigQuery restore configuration blocks
+			"gcp_bigquery_restore_dataset_config": schema.SingleNestedBlock{
+				MarkdownDescription: "GCP BigQuery dataset restore configuration. Required when restoring a BigQuery dataset. Provide a target `dataset_id` and `location`. When no table filter is specified, all tables in the dataset are restored. When tables are specified, only matching tables are restored.",
+				Attributes: map[string]schema.Attribute{
+					"dataset_id": schema.StringAttribute{
+						MarkdownDescription: "Target BigQuery dataset ID for the restore (e.g. `my_dataset_restored`).",
+						Required:            true,
+					},
+					"location": schema.StringAttribute{
+						MarkdownDescription: "GCP location for the restored dataset (e.g. `US`, `EU`, `us-central1`).",
+						Required:            true,
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"tables": schema.ListNestedBlock{
+						MarkdownDescription: "Optional list of tables to restore. When omitted, all tables in the dataset are restored.",
+						NestedObject: schema.NestedBlockObject{
+							Attributes: map[string]schema.Attribute{
+								"table_id": schema.StringAttribute{
+									MarkdownDescription: "BigQuery table ID to include in the restore.",
+									Optional:            true,
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -473,12 +785,12 @@ func (r *RestoreJobResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 	var jobId string
 
-	// Fallback to inventory-based detection for backward compatibility
+	// Route to the correct restore method based on resource type
 	switch inventoryResource.GetResourceType() {
+	// AWS resource types
 	case externalEonSdkAPI.AWS_EC2:
 		if restoreType == "partial" {
 			if data.EbsConfig == nil {
-
 				resp.Diagnostics.AddError("Configuration Error", "ebs_config is required when restoring AWS EC2 volumes with restore_type 'partial'")
 				return
 			}
@@ -510,8 +822,55 @@ func (r *RestoreJobResource) Create(ctx context.Context, req resource.CreateRequ
 			}
 			jobId, err = r.createS3FileRestore(ctx, data, resourceId)
 		}
+	// GCP resource types
+	case externalEonSdkAPI.GCP_COMPUTE_ENGINE_INSTANCE:
+		if restoreType == "partial" {
+			if data.GcpDiskConfig == nil {
+				resp.Diagnostics.AddError("Configuration Error", "gcp_disk_config is required when restoring GCP Compute Engine disks with restore_type 'partial'")
+				return
+			}
+			jobId, err = r.createGcpDiskRestore(ctx, data, resourceId)
+		} else {
+			if data.GcpVmConfig == nil {
+				resp.Diagnostics.AddError("Configuration Error", "gcp_vm_config is required when restoring GCP Compute Engine instances with restore_type 'full'")
+				return
+			}
+			jobId, err = r.createGcpVmInstanceRestore(ctx, data, resourceId)
+		}
+	case externalEonSdkAPI.GCP_DISK:
+		if data.GcpDiskConfig == nil {
+			resp.Diagnostics.AddError("Configuration Error", "gcp_disk_config is required when restoring GCP disks")
+			return
+		}
+		jobId, err = r.createGcpDiskRestore(ctx, data, resourceId)
+	case externalEonSdkAPI.GCP_CLOUD_SQL_INSTANCE:
+		if data.GcpCloudSqlConfig == nil {
+			resp.Diagnostics.AddError("Configuration Error", "gcp_cloud_sql_config is required when restoring GCP Cloud SQL instances")
+			return
+		}
+		jobId, err = r.createGcpCloudSqlRestore(ctx, data, resourceId)
+	case externalEonSdkAPI.GCP_CLOUD_STORAGE_BUCKET:
+		if restoreType == "full" {
+			if data.GcsBucketConfig == nil {
+				resp.Diagnostics.AddError("Configuration Error", "gcs_bucket_config is required when restoring GCP Cloud Storage buckets with restore_type 'full'")
+				return
+			}
+			jobId, err = r.createGcsBucketRestore(ctx, data, resourceId)
+		} else {
+			if data.GcsFileConfig == nil {
+				resp.Diagnostics.AddError("Configuration Error", "gcs_file_config is required when restoring GCP Cloud Storage files with restore_type 'partial'")
+				return
+			}
+			jobId, err = r.createGcsFileRestore(ctx, data, resourceId)
+		}
+	case externalEonSdkAPI.GCP_BIG_QUERY:
+		if data.GcpBigQueryDatasetConfig == nil {
+			resp.Diagnostics.AddError("Configuration Error", "gcp_bigquery_restore_dataset_config is required when restoring GCP BigQuery datasets")
+			return
+		}
+		jobId, err = r.createGcpBigQueryDatasetRestore(ctx, data, resourceId)
 	default:
-		resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Unsupported resource type: %s. Supported types: AWS_EC2, AWS_RDS, AWS_S3. Please provide one of: ebs_config, ec2_config, rds_config, s3_bucket_config, or s3_file_config", inventoryResource.GetResourceType()))
+		resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Unsupported resource type: %s. Supported types: AWS_EC2, AWS_RDS, AWS_S3, GCP_COMPUTE_ENGINE_INSTANCE, GCP_DISK, GCP_CLOUD_SQL_INSTANCE, GCP_CLOUD_STORAGE_BUCKET, GCP_BIG_QUERY", inventoryResource.GetResourceType()))
 		return
 	}
 
@@ -907,6 +1266,369 @@ func (r *RestoreJobResource) createS3FileRestore(ctx context.Context, data Resto
 	}
 
 	return r.client.StartS3FileRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+// GCP restore methods
+
+func (r *RestoreJobResource) createGcpVmInstanceRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.GcpVmConfig
+
+	// Validate required fields
+	if config.Zone.IsNull() || config.Zone.ValueString() == "" {
+		return "", fmt.Errorf("zone is required for GCP VM instance restore")
+	}
+	if config.MachineType.IsNull() || config.MachineType.ValueString() == "" {
+		return "", fmt.Errorf("machine_type is required for GCP VM instance restore")
+	}
+	if config.Name.IsNull() || config.Name.ValueString() == "" {
+		return "", fmt.Errorf("name is required for GCP VM instance restore")
+	}
+	if config.NetworkName.IsNull() || config.NetworkName.ValueString() == "" {
+		return "", fmt.Errorf("network_name is required for GCP VM instance restore")
+	}
+	if config.SubnetName.IsNull() || config.SubnetName.ValueString() == "" {
+		return "", fmt.Errorf("subnet_name is required for GCP VM instance restore")
+	}
+	if config.Disks.IsNull() || len(config.Disks.Elements()) == 0 {
+		return "", fmt.Errorf("disks is required for GCP VM instance restore (must include the boot disk)")
+	}
+
+	var labels map[string]string
+	if !config.Labels.IsNull() {
+		labelsMap := make(map[string]types.String, len(config.Labels.Elements()))
+		diags := config.Labels.ElementsAs(ctx, &labelsMap, false)
+		if diags.HasError() {
+			return "", fmt.Errorf("failed to parse labels")
+		}
+		labels = make(map[string]string)
+		for k, v := range labelsMap {
+			labels[k] = v.ValueString()
+		}
+	}
+
+	// Parse disks
+	var diskInputs []externalEonSdkAPI.RestoreGcpInstanceDiskInput
+	var diskParams []GcpDiskRestoreParam
+	diags := config.Disks.ElementsAs(ctx, &diskParams, false)
+	if diags.HasError() {
+		return "", fmt.Errorf("failed to parse disks")
+	}
+
+	for _, dp := range diskParams {
+		diskSettings := externalEonSdkAPI.GcpDiskSettings{
+			Name:      dp.Name.ValueString(),
+			Type:      dp.DiskType.ValueString(),
+			SizeBytes: dp.SizeBytes.ValueInt64(),
+		}
+
+		if !dp.Iops.IsNull() {
+			iops := dp.Iops.ValueInt64()
+			diskSettings.Iops = &iops
+		}
+		if !dp.Throughput.IsNull() {
+			throughput := dp.Throughput.ValueInt64()
+			diskSettings.Throughput = &throughput
+		}
+		if !dp.Description.IsNull() && dp.Description.ValueString() != "" {
+			desc := dp.Description.ValueString()
+			diskSettings.Description = &desc
+		}
+		if !dp.Labels.IsNull() {
+			diskLabelsMap := make(map[string]types.String, len(dp.Labels.Elements()))
+			diags := dp.Labels.ElementsAs(ctx, &diskLabelsMap, false)
+			if !diags.HasError() {
+				diskLabels := make(map[string]string)
+				for k, v := range diskLabelsMap {
+					diskLabels[k] = v.ValueString()
+				}
+				diskSettings.Labels = &diskLabels
+			}
+		}
+		if !dp.EncryptionKeyId.IsNull() && dp.EncryptionKeyId.ValueString() != "" {
+			keyId := dp.EncryptionKeyId.ValueString()
+			diskSettings.EncryptionKeyId = &keyId
+		}
+
+		diskInputs = append(diskInputs, externalEonSdkAPI.RestoreGcpInstanceDiskInput{
+			ProviderDiskId: dp.ProviderDiskId.ValueString(),
+			Settings:       diskSettings,
+		})
+	}
+
+	vmTarget := &externalEonSdkAPI.GcpVmInstanceRestoreTarget{
+		Zone:        config.Zone.ValueString(),
+		MachineType: config.MachineType.ValueString(),
+		Name:        config.Name.ValueString(),
+		NetworkName: config.NetworkName.ValueString(),
+		SubnetName:  config.SubnetName.ValueString(),
+		Disks:       diskInputs,
+	}
+
+	if !config.NetworkHostProject.IsNull() && config.NetworkHostProject.ValueString() != "" {
+		nhp := config.NetworkHostProject.ValueString()
+		vmTarget.NetworkHostProject = &nhp
+	}
+	if labels != nil {
+		vmTarget.Labels = &labels
+	}
+	if !config.StartInstanceAfterRestore.IsNull() {
+		startAfterRestore := config.StartInstanceAfterRestore.ValueBool()
+		vmTarget.StartInstanceAfterRestore = &startAfterRestore
+	}
+
+	apiReq := externalEonSdkAPI.RestoreGcpVmInstanceRequest{
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Destination: externalEonSdkAPI.GcpVmInstanceRestoreDestination{
+			GcpVm: vmTarget,
+		},
+	}
+
+	return r.client.StartGcpVmInstanceRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+func (r *RestoreJobResource) createGcpDiskRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.GcpDiskConfig
+
+	// Validate required fields
+	if config.ProviderDiskId.IsNull() || config.ProviderDiskId.ValueString() == "" {
+		return "", fmt.Errorf("provider_disk_id is required for GCP disk restore")
+	}
+	if config.Zone.IsNull() || config.Zone.ValueString() == "" {
+		return "", fmt.Errorf("zone is required for GCP disk restore")
+	}
+	if config.Name.IsNull() || config.Name.ValueString() == "" {
+		return "", fmt.Errorf("name is required for GCP disk restore")
+	}
+	if config.DiskType.IsNull() || config.DiskType.ValueString() == "" {
+		return "", fmt.Errorf("disk_type is required for GCP disk restore")
+	}
+	if config.SizeBytes.IsNull() || config.SizeBytes.ValueInt64() == 0 {
+		return "", fmt.Errorf("size_bytes is required for GCP disk restore")
+	}
+
+	diskSettings := externalEonSdkAPI.GcpDiskSettings{
+		Name:      config.Name.ValueString(),
+		Type:      config.DiskType.ValueString(),
+		SizeBytes: config.SizeBytes.ValueInt64(),
+	}
+
+	if !config.Iops.IsNull() {
+		iops := config.Iops.ValueInt64()
+		diskSettings.Iops = &iops
+	}
+	if !config.Throughput.IsNull() {
+		throughput := config.Throughput.ValueInt64()
+		diskSettings.Throughput = &throughput
+	}
+	if !config.Description.IsNull() && config.Description.ValueString() != "" {
+		desc := config.Description.ValueString()
+		diskSettings.Description = &desc
+	}
+	if !config.Labels.IsNull() {
+		labelsMap := make(map[string]types.String, len(config.Labels.Elements()))
+		diags := config.Labels.ElementsAs(ctx, &labelsMap, false)
+		if !diags.HasError() {
+			labels := make(map[string]string)
+			for k, v := range labelsMap {
+				labels[k] = v.ValueString()
+			}
+			diskSettings.Labels = &labels
+		}
+	}
+	if !config.EncryptionKeyId.IsNull() && config.EncryptionKeyId.ValueString() != "" {
+		keyId := config.EncryptionKeyId.ValueString()
+		diskSettings.EncryptionKeyId = &keyId
+	}
+
+	diskTarget := &externalEonSdkAPI.GcpDiskTarget{
+		Zone:     config.Zone.ValueString(),
+		Settings: diskSettings,
+	}
+
+	apiReq := externalEonSdkAPI.RestoreGcpDiskRequest{
+		ProviderDiskId:   config.ProviderDiskId.ValueString(),
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Destination: externalEonSdkAPI.GcpDiskRestoreDestination{
+			GcpDisk: diskTarget,
+		},
+	}
+
+	return r.client.StartGcpDiskRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+func (r *RestoreJobResource) createGcpCloudSqlRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.GcpCloudSqlConfig
+
+	// Validate required fields
+	if config.Zone.IsNull() || config.Zone.ValueString() == "" {
+		return "", fmt.Errorf("zone is required for GCP Cloud SQL restore")
+	}
+	if config.Name.IsNull() || config.Name.ValueString() == "" {
+		return "", fmt.Errorf("name is required for GCP Cloud SQL restore")
+	}
+	if config.NetworkType.IsNull() || config.NetworkType.ValueString() == "" {
+		return "", fmt.Errorf("network_type is required for GCP Cloud SQL restore")
+	}
+
+	networkType, err := externalEonSdkAPI.NewGcpNetworkTypeFromValue(config.NetworkType.ValueString())
+	if err != nil {
+		return "", fmt.Errorf("invalid network_type: %s. Valid values are: PUBLIC, PRIVATE", config.NetworkType.ValueString())
+	}
+
+	sqlTarget := &externalEonSdkAPI.GcpCloudSqlTarget{
+		Zone:        config.Zone.ValueString(),
+		Name:        config.Name.ValueString(),
+		NetworkType: *networkType,
+	}
+
+	if !config.NetworkName.IsNull() && config.NetworkName.ValueString() != "" {
+		nn := config.NetworkName.ValueString()
+		sqlTarget.NetworkName = &nn
+	}
+	if !config.NetworkHostProject.IsNull() && config.NetworkHostProject.ValueString() != "" {
+		nhp := config.NetworkHostProject.ValueString()
+		sqlTarget.NetworkHostProject = &nhp
+	}
+	if !config.Labels.IsNull() {
+		labelsMap := make(map[string]types.String, len(config.Labels.Elements()))
+		diags := config.Labels.ElementsAs(ctx, &labelsMap, false)
+		if !diags.HasError() {
+			labels := make(map[string]string)
+			for k, v := range labelsMap {
+				labels[k] = v.ValueString()
+			}
+			sqlTarget.Labels = &labels
+		}
+	}
+
+	apiReq := externalEonSdkAPI.RestoreGcpCloudSqlRequest{
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Destination: externalEonSdkAPI.GcpCloudSqlRestoreDestination{
+			GcpCloudSql: sqlTarget,
+		},
+	}
+
+	return r.client.StartGcpCloudSqlRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+func (r *RestoreJobResource) createGcsBucketRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.GcsBucketConfig
+
+	// Validate required fields
+	if config.BucketName.IsNull() || config.BucketName.ValueString() == "" {
+		return "", fmt.Errorf("bucket_name is required for GCS bucket restore")
+	}
+
+	gcsTarget := &externalEonSdkAPI.GCSRestoreTarget{
+		BucketName: config.BucketName.ValueString(),
+	}
+
+	if !config.KeyPrefix.IsNull() {
+		prefix := config.KeyPrefix.ValueString()
+		gcsTarget.Prefix = &prefix
+	}
+
+	apiReq := externalEonSdkAPI.RestoreBucketRequest{
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Destination: externalEonSdkAPI.ObjectStorageDestination{
+			GcsBucket: gcsTarget,
+		},
+	}
+
+	return r.client.StartS3BucketRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+func (r *RestoreJobResource) createGcsFileRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.GcsFileConfig
+
+	// Validate required fields
+	if config.BucketName.IsNull() || config.BucketName.ValueString() == "" {
+		return "", fmt.Errorf("bucket_name is required for GCS file restore")
+	}
+	if config.Files.IsNull() || len(config.Files.Elements()) == 0 {
+		return "", fmt.Errorf("files is required for GCS file restore")
+	}
+
+	var files []externalEonSdkAPI.FilePath
+	var fileList []S3FileParam
+	diags := config.Files.ElementsAs(ctx, &fileList, false)
+	if diags.HasError() {
+		return "", fmt.Errorf("failed to parse files list")
+	}
+
+	for _, file := range fileList {
+		filePath := externalEonSdkAPI.FilePath{
+			Path: file.Path.ValueString(),
+		}
+		if !file.IsDirectory.IsNull() {
+			filePath.IsDirectory = file.IsDirectory.ValueBool()
+		} else {
+			filePath.IsDirectory = false
+		}
+		files = append(files, filePath)
+	}
+
+	gcsTarget := &externalEonSdkAPI.GCSRestoreTarget{
+		BucketName: config.BucketName.ValueString(),
+	}
+
+	if !config.KeyPrefix.IsNull() {
+		prefix := config.KeyPrefix.ValueString()
+		gcsTarget.Prefix = &prefix
+	}
+
+	apiReq := externalEonSdkAPI.RestoreFilesRequest{
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Files:            files,
+		Destination: externalEonSdkAPI.ObjectStorageDestination{
+			GcsBucket: gcsTarget,
+		},
+	}
+
+	return r.client.StartS3FileRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+// BigQuery restore methods
+
+func (r *RestoreJobResource) createGcpBigQueryDatasetRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.GcpBigQueryDatasetConfig
+
+	// Validate required fields
+	if config.DatasetId.IsNull() || config.DatasetId.ValueString() == "" {
+		return "", fmt.Errorf("dataset_id is required for BigQuery dataset restore")
+	}
+	if config.Location.IsNull() || config.Location.ValueString() == "" {
+		return "", fmt.Errorf("location is required for BigQuery dataset restore")
+	}
+
+	apiReq := client.BigQueryRestoreRequest{
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Destination: client.BigQueryRestoreDestination{
+			DatasetId: config.DatasetId.ValueString(),
+			Location:  config.Location.ValueString(),
+		},
+	}
+
+	// Optional table filter
+	if !config.Tables.IsNull() && len(config.Tables.Elements()) > 0 {
+		var tableParams []GcpBigQueryTableParam
+		diags := config.Tables.ElementsAs(ctx, &tableParams, false)
+		if diags.HasError() {
+			return "", fmt.Errorf("failed to parse tables list")
+		}
+
+		var tables []string
+		for _, tp := range tableParams {
+			if !tp.TableId.IsNull() && tp.TableId.ValueString() != "" {
+				tables = append(tables, tp.TableId.ValueString())
+			}
+		}
+		if len(tables) > 0 {
+			apiReq.Tables = tables
+		}
+	}
+
+	return r.client.StartBigQueryDatasetRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
 }
 
 func (r *RestoreJobResource) updateJobStatus(ctx context.Context, data *RestoreJobResourceModel, job *externalEonSdkAPI.RestoreJob) {
