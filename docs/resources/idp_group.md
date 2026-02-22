@@ -22,8 +22,8 @@ terraform {
 }
 
 # Example: IDP group that assigns custom roles (reference eon_role resources)
-resource "eon_role" "viewer" {
-  name = "Viewer (IDP Example)"
+resource "eon_role" "read_only" {
+  name = "Read-only (IDP Example)"
 
   permission_grants = [
     { permission = "dashboard.view" },
@@ -31,8 +31,8 @@ resource "eon_role" "viewer" {
   ]
 }
 
-resource "eon_role" "operator" {
-  name = "Operator (IDP Example)"
+resource "eon_role" "ops" {
+  name = "Ops (IDP Example)"
 
   permission_grants = [
     { permission = "dashboard.view" },
@@ -42,23 +42,23 @@ resource "eon_role" "operator" {
   ]
 }
 
-resource "eon_idp_group" "viewers" {
+resource "eon_idp_group" "read_only" {
   idp_id            = "your-idp-id"
-  provider_group_id = "your-idp-group-id-for-viewers"
+  provider_group_id = "your-idp-group-id-for-read-only"
 
   role_ids = [
-    eon_role.viewer.id,
+    eon_role.read_only.id,
   ]
 }
 
 # Example: IDP group with multiple roles
-resource "eon_idp_group" "operators" {
+resource "eon_idp_group" "ops" {
   idp_id            = "your-idp-id"
-  provider_group_id = "your-idp-group-id-for-operators"
+  provider_group_id = "your-idp-group-id-for-ops"
 
   role_ids = [
-    eon_role.viewer.id,
-    eon_role.operator.id,
+    eon_role.read_only.id,
+    eon_role.ops.id,
   ]
 }
 
