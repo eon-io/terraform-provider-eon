@@ -244,7 +244,7 @@ resource "eon_restore_job" "gcs_files" {
 
 # 11. GCP BigQuery Dataset Restore (all tables)
 resource "eon_restore_job" "bigquery_dataset_full" {
-  restore_type        = "full"
+  restore_type        = "full" # any value accepted for BigQuery
   snapshot_id         = "cd6312c7-0713-4a24-a0b3-b838c1108d2f"
   restore_account_id  = "e696c7f0-17c6-4d9b-b589-591293c00d36"
   timeout_minutes     = 120
@@ -258,7 +258,7 @@ resource "eon_restore_job" "bigquery_dataset_full" {
 
 # 12. GCP BigQuery Dataset Restore (filtered by specific tables)
 resource "eon_restore_job" "bigquery_dataset_filtered" {
-  restore_type        = "full"
+  restore_type        = "full" # any value accepted for BigQuery
   snapshot_id         = "cd6312c7-0713-4a24-a0b3-b838c1108d2f"
   restore_account_id  = "e696c7f0-17c6-4d9b-b589-591293c00d36"
   timeout_minutes     = 120

@@ -779,11 +779,21 @@ func (r *RestoreJobResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	restoreType := data.RestoreType.ValueString()
-	if restoreType != "full" && restoreType != "partial" {
-		resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Invalid restore_type: %s. Supported types: full, partial", restoreType))
-		return
-	}
 	var jobId string
+
+	// BigQuery accepts any restore_type — handle it before validating restore_type
+	if inventoryResource.GetResourceType() == externalEonSdkAPI.GCP_BIG_QUERY {
+		if data.GcpBigQueryDatasetConfig == nil {
+			resp.Diagnostics.AddError("Configuration Error", "gcp_bigquery_restore_dataset_config is required when restoring GCP BigQuery datasets")
+			return
+		}
+		jobId, err = r.createGcpBigQueryDatasetRestore(ctx, data, resourceId)
+	} else {
+		// Validate restore_type for all non-BigQuery resource types
+		if restoreType != "full" && restoreType != "partial" {
+			resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Invalid restore_type: %s. Supported types: full, partial", restoreType))
+			return
+		}
 
 	// Route to the correct restore method based on resource type
 	switch inventoryResource.GetResourceType() {
@@ -863,16 +873,11 @@ func (r *RestoreJobResource) Create(ctx context.Context, req resource.CreateRequ
 			}
 			jobId, err = r.createGcsFileRestore(ctx, data, resourceId)
 		}
-	case externalEonSdkAPI.GCP_BIG_QUERY:
-		if data.GcpBigQueryDatasetConfig == nil {
-			resp.Diagnostics.AddError("Configuration Error", "gcp_bigquery_restore_dataset_config is required when restoring GCP BigQuery datasets")
-			return
-		}
-		jobId, err = r.createGcpBigQueryDatasetRestore(ctx, data, resourceId)
 	default:
 		resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Unsupported resource type: %s. Supported types: AWS_EC2, AWS_RDS, AWS_S3, GCP_COMPUTE_ENGINE_INSTANCE, GCP_DISK, GCP_CLOUD_SQL_INSTANCE, GCP_CLOUD_STORAGE_BUCKET, GCP_BIG_QUERY", inventoryResource.GetResourceType()))
 		return
 	}
+	} // end else (non-BigQuery)
 
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to start restore job: %s", err))
