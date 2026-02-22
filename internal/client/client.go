@@ -541,7 +541,7 @@ func (c *EonClient) StartBigQueryDatasetRestore(ctx context.Context, resourceId,
 		httpReq.Header.Set(key, value)
 	}
 
-	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq)
+	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq) // #nosec G704 -- URL is built from trusted server configuration, not user input
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start BigQuery dataset restore"); apiErr != nil {
 		return "", apiErr
 	}
