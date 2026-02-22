@@ -19,6 +19,24 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
+// parseMapAttribute extracts a types.Map of string values into a map[string]string.
+// Returns nil if the map is null or empty.
+func parseMapAttribute(ctx context.Context, m types.Map) (map[string]string, error) {
+	if m.IsNull() || len(m.Elements()) == 0 {
+		return nil, nil
+	}
+	raw := make(map[string]types.String, len(m.Elements()))
+	diags := m.ElementsAs(ctx, &raw, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to parse map attribute")
+	}
+	result := make(map[string]string, len(raw))
+	for k, v := range raw {
+		result[k] = v.ValueString()
+	}
+	return result, nil
+}
+
 var _ resource.Resource = &RestoreJobResource{}
 var _ resource.ResourceWithImportState = &RestoreJobResource{}
 
@@ -128,7 +146,7 @@ type VolumeRestoreParam struct {
 	KmsKeyId         types.String `tfsdk:"kms_key_id"`
 }
 
-type S3FileParam struct {
+type FileRestoreParam struct {
 	Path        types.String `tfsdk:"path"`
 	IsDirectory types.Bool   `tfsdk:"is_directory"`
 }
@@ -512,23 +530,23 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Attributes: map[string]schema.Attribute{
 					"zone": schema.StringAttribute{
 						MarkdownDescription: "Zone to restore the VM instance to (e.g. `us-central1-a`).",
-						Optional:            true,
+						Required:            true,
 					},
 					"machine_type": schema.StringAttribute{
 						MarkdownDescription: "Machine type to use for the restored instance (e.g. `e2-medium`).",
-						Optional:            true,
+						Required:            true,
 					},
 					"name": schema.StringAttribute{
 						MarkdownDescription: "Name for the restored VM instance.",
-						Optional:            true,
+						Required:            true,
 					},
 					"network_name": schema.StringAttribute{
 						MarkdownDescription: "Name of the VPC network to use.",
-						Optional:            true,
+						Required:            true,
 					},
 					"subnet_name": schema.StringAttribute{
 						MarkdownDescription: "Name of the subnet to use.",
-						Optional:            true,
+						Required:            true,
 					},
 					"network_host_project": schema.StringAttribute{
 						MarkdownDescription: "ID of the project that hosts the VPC network. Applicable only when restoring to a shared VPC network.",
@@ -598,23 +616,23 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Attributes: map[string]schema.Attribute{
 					"provider_disk_id": schema.StringAttribute{
 						MarkdownDescription: "Cloud-provider-assigned ID of the disk to restore.",
-						Optional:            true,
+						Required:            true,
 					},
 					"zone": schema.StringAttribute{
 						MarkdownDescription: "Zone to restore the disk to (e.g. `us-central1-a`).",
-						Optional:            true,
+						Required:            true,
 					},
 					"name": schema.StringAttribute{
 						MarkdownDescription: "Name for the restored disk.",
-						Optional:            true,
+						Required:            true,
 					},
 					"disk_type": schema.StringAttribute{
 						MarkdownDescription: "Disk type (e.g. `pd-standard`, `pd-ssd`, `pd-balanced`, `pd-extreme`).",
-						Optional:            true,
+						Required:            true,
 					},
 					"size_bytes": schema.Int64Attribute{
 						MarkdownDescription: "Size of the disk in bytes.",
-						Optional:            true,
+						Required:            true,
 					},
 					"iops": schema.Int64Attribute{
 						MarkdownDescription: "Provisioned IOPS for the disk. Applicable only when `disk_type` is `pd-extreme`.",
@@ -644,15 +662,15 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Attributes: map[string]schema.Attribute{
 					"zone": schema.StringAttribute{
 						MarkdownDescription: "Zone to restore the Cloud SQL instance to (e.g. `us-central1-a`).",
-						Optional:            true,
+						Required:            true,
 					},
 					"name": schema.StringAttribute{
 						MarkdownDescription: "Name for the restored Cloud SQL instance.",
-						Optional:            true,
+						Required:            true,
 					},
 					"network_type": schema.StringAttribute{
 						MarkdownDescription: "Network type for the Cloud SQL instance. Possible values: `PUBLIC`, `PRIVATE`.",
-						Optional:            true,
+						Required:            true,
 					},
 					"network_name": schema.StringAttribute{
 						MarkdownDescription: "Name of the VPC network to use. Required when `network_type` is `PRIVATE`.",
@@ -939,17 +957,9 @@ func (r *RestoreJobResource) createEbsVolumeRestore(ctx context.Context, data Re
 		return "", fmt.Errorf("volume_size is required for EBS volume restore")
 	}
 
-	var tags map[string]string
-	if !config.Tags.IsNull() {
-		tagsMap := make(map[string]types.String, len(config.Tags.Elements()))
-		diags := config.Tags.ElementsAs(ctx, &tagsMap, false)
-		if diags.HasError() {
-			return "", fmt.Errorf("failed to parse tags")
-		}
-		tags = make(map[string]string)
-		for k, v := range tagsMap {
-			tags[k] = v.ValueString()
-		}
+	tags, err := parseMapAttribute(ctx, config.Tags)
+	if err != nil {
+		return "", err
 	}
 
 	// Build volume settings
@@ -1016,17 +1026,9 @@ func (r *RestoreJobResource) createEc2InstanceRestore(ctx context.Context, data 
 		return "", fmt.Errorf("volume_restore_params is required for EC2 instance restore")
 	}
 
-	var tags map[string]string
-	if !config.Tags.IsNull() {
-		tagsMap := make(map[string]types.String, len(config.Tags.Elements()))
-		diags := config.Tags.ElementsAs(ctx, &tagsMap, false)
-		if diags.HasError() {
-			return "", fmt.Errorf("failed to parse tags")
-		}
-		tags = make(map[string]string)
-		for k, v := range tagsMap {
-			tags[k] = v.ValueString()
-		}
+	tags, err := parseMapAttribute(ctx, config.Tags)
+	if err != nil {
+		return "", err
 	}
 
 	var securityGroupIds []string
@@ -1133,17 +1135,9 @@ func (r *RestoreJobResource) createRdsRestore(ctx context.Context, data RestoreJ
 		return "", fmt.Errorf("kms_key_id is required for RDS restore")
 	}
 
-	var tags map[string]string
-	if !config.Tags.IsNull() {
-		tagsMap := make(map[string]types.String, len(config.Tags.Elements()))
-		diags := config.Tags.ElementsAs(ctx, &tagsMap, false)
-		if diags.HasError() {
-			return "", fmt.Errorf("failed to parse tags")
-		}
-		tags = make(map[string]string)
-		for k, v := range tagsMap {
-			tags[k] = v.ValueString()
-		}
+	tags, err := parseMapAttribute(ctx, config.Tags)
+	if err != nil {
+		return "", err
 	}
 
 	var vpcSecurityGroupIds []string
@@ -1230,7 +1224,7 @@ func (r *RestoreJobResource) createS3FileRestore(ctx context.Context, data Resto
 
 	var files []externalEonSdkAPI.FilePath
 	if !config.Files.IsNull() {
-		var fileList []S3FileParam
+		var fileList []FileRestoreParam
 		diags := config.Files.ElementsAs(ctx, &fileList, false)
 		if diags.HasError() {
 			return "", fmt.Errorf("failed to parse files list")
@@ -1278,37 +1272,9 @@ func (r *RestoreJobResource) createS3FileRestore(ctx context.Context, data Resto
 func (r *RestoreJobResource) createGcpVmInstanceRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
 	config := data.GcpVmConfig
 
-	// Validate required fields
-	if config.Zone.IsNull() || config.Zone.ValueString() == "" {
-		return "", fmt.Errorf("zone is required for GCP VM instance restore")
-	}
-	if config.MachineType.IsNull() || config.MachineType.ValueString() == "" {
-		return "", fmt.Errorf("machine_type is required for GCP VM instance restore")
-	}
-	if config.Name.IsNull() || config.Name.ValueString() == "" {
-		return "", fmt.Errorf("name is required for GCP VM instance restore")
-	}
-	if config.NetworkName.IsNull() || config.NetworkName.ValueString() == "" {
-		return "", fmt.Errorf("network_name is required for GCP VM instance restore")
-	}
-	if config.SubnetName.IsNull() || config.SubnetName.ValueString() == "" {
-		return "", fmt.Errorf("subnet_name is required for GCP VM instance restore")
-	}
-	if config.Disks.IsNull() || len(config.Disks.Elements()) == 0 {
-		return "", fmt.Errorf("disks is required for GCP VM instance restore (must include the boot disk)")
-	}
-
-	var labels map[string]string
-	if !config.Labels.IsNull() {
-		labelsMap := make(map[string]types.String, len(config.Labels.Elements()))
-		diags := config.Labels.ElementsAs(ctx, &labelsMap, false)
-		if diags.HasError() {
-			return "", fmt.Errorf("failed to parse labels")
-		}
-		labels = make(map[string]string)
-		for k, v := range labelsMap {
-			labels[k] = v.ValueString()
-		}
+	labels, err := parseMapAttribute(ctx, config.Labels)
+	if err != nil {
+		return "", err
 	}
 
 	// Parse disks
@@ -1338,16 +1304,12 @@ func (r *RestoreJobResource) createGcpVmInstanceRestore(ctx context.Context, dat
 			desc := dp.Description.ValueString()
 			diskSettings.Description = &desc
 		}
-		if !dp.Labels.IsNull() {
-			diskLabelsMap := make(map[string]types.String, len(dp.Labels.Elements()))
-			diags := dp.Labels.ElementsAs(ctx, &diskLabelsMap, false)
-			if !diags.HasError() {
-				diskLabels := make(map[string]string)
-				for k, v := range diskLabelsMap {
-					diskLabels[k] = v.ValueString()
-				}
-				diskSettings.Labels = &diskLabels
-			}
+		diskLabels, parseErr := parseMapAttribute(ctx, dp.Labels)
+		if parseErr != nil {
+			return "", parseErr
+		}
+		if diskLabels != nil {
+			diskSettings.Labels = &diskLabels
 		}
 		if !dp.EncryptionKeyId.IsNull() && dp.EncryptionKeyId.ValueString() != "" {
 			keyId := dp.EncryptionKeyId.ValueString()
@@ -1394,23 +1356,6 @@ func (r *RestoreJobResource) createGcpVmInstanceRestore(ctx context.Context, dat
 func (r *RestoreJobResource) createGcpDiskRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
 	config := data.GcpDiskConfig
 
-	// Validate required fields
-	if config.ProviderDiskId.IsNull() || config.ProviderDiskId.ValueString() == "" {
-		return "", fmt.Errorf("provider_disk_id is required for GCP disk restore")
-	}
-	if config.Zone.IsNull() || config.Zone.ValueString() == "" {
-		return "", fmt.Errorf("zone is required for GCP disk restore")
-	}
-	if config.Name.IsNull() || config.Name.ValueString() == "" {
-		return "", fmt.Errorf("name is required for GCP disk restore")
-	}
-	if config.DiskType.IsNull() || config.DiskType.ValueString() == "" {
-		return "", fmt.Errorf("disk_type is required for GCP disk restore")
-	}
-	if config.SizeBytes.IsNull() || config.SizeBytes.ValueInt64() == 0 {
-		return "", fmt.Errorf("size_bytes is required for GCP disk restore")
-	}
-
 	diskSettings := externalEonSdkAPI.GcpDiskSettings{
 		Name:      config.Name.ValueString(),
 		Type:      config.DiskType.ValueString(),
@@ -1429,16 +1374,12 @@ func (r *RestoreJobResource) createGcpDiskRestore(ctx context.Context, data Rest
 		desc := config.Description.ValueString()
 		diskSettings.Description = &desc
 	}
-	if !config.Labels.IsNull() {
-		labelsMap := make(map[string]types.String, len(config.Labels.Elements()))
-		diags := config.Labels.ElementsAs(ctx, &labelsMap, false)
-		if !diags.HasError() {
-			labels := make(map[string]string)
-			for k, v := range labelsMap {
-				labels[k] = v.ValueString()
-			}
-			diskSettings.Labels = &labels
-		}
+	diskLabels, err := parseMapAttribute(ctx, config.Labels)
+	if err != nil {
+		return "", err
+	}
+	if diskLabels != nil {
+		diskSettings.Labels = &diskLabels
 	}
 	if !config.EncryptionKeyId.IsNull() && config.EncryptionKeyId.ValueString() != "" {
 		keyId := config.EncryptionKeyId.ValueString()
@@ -1464,17 +1405,6 @@ func (r *RestoreJobResource) createGcpDiskRestore(ctx context.Context, data Rest
 func (r *RestoreJobResource) createGcpCloudSqlRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
 	config := data.GcpCloudSqlConfig
 
-	// Validate required fields
-	if config.Zone.IsNull() || config.Zone.ValueString() == "" {
-		return "", fmt.Errorf("zone is required for GCP Cloud SQL restore")
-	}
-	if config.Name.IsNull() || config.Name.ValueString() == "" {
-		return "", fmt.Errorf("name is required for GCP Cloud SQL restore")
-	}
-	if config.NetworkType.IsNull() || config.NetworkType.ValueString() == "" {
-		return "", fmt.Errorf("network_type is required for GCP Cloud SQL restore")
-	}
-
 	networkType, err := externalEonSdkAPI.NewGcpNetworkTypeFromValue(config.NetworkType.ValueString())
 	if err != nil {
 		return "", fmt.Errorf("invalid network_type: %s. Valid values are: PUBLIC, PRIVATE", config.NetworkType.ValueString())
@@ -1494,16 +1424,12 @@ func (r *RestoreJobResource) createGcpCloudSqlRestore(ctx context.Context, data 
 		nhp := config.NetworkHostProject.ValueString()
 		sqlTarget.NetworkHostProject = &nhp
 	}
-	if !config.Labels.IsNull() {
-		labelsMap := make(map[string]types.String, len(config.Labels.Elements()))
-		diags := config.Labels.ElementsAs(ctx, &labelsMap, false)
-		if !diags.HasError() {
-			labels := make(map[string]string)
-			for k, v := range labelsMap {
-				labels[k] = v.ValueString()
-			}
-			sqlTarget.Labels = &labels
-		}
+	sqlLabels, err := parseMapAttribute(ctx, config.Labels)
+	if err != nil {
+		return "", err
+	}
+	if sqlLabels != nil {
+		sqlTarget.Labels = &sqlLabels
 	}
 
 	apiReq := externalEonSdkAPI.RestoreGcpCloudSqlRequest{
@@ -1555,7 +1481,7 @@ func (r *RestoreJobResource) createGcsFileRestore(ctx context.Context, data Rest
 	}
 
 	var files []externalEonSdkAPI.FilePath
-	var fileList []S3FileParam
+	var fileList []FileRestoreParam
 	diags := config.Files.ElementsAs(ctx, &fileList, false)
 	if diags.HasError() {
 		return "", fmt.Errorf("failed to parse files list")
@@ -1597,14 +1523,6 @@ func (r *RestoreJobResource) createGcsFileRestore(ctx context.Context, data Rest
 
 func (r *RestoreJobResource) createGcpBigQueryDatasetRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
 	config := data.GcpBigQueryDatasetConfig
-
-	// Validate required fields
-	if config.DatasetId.IsNull() || config.DatasetId.ValueString() == "" {
-		return "", fmt.Errorf("dataset_id is required for BigQuery dataset restore")
-	}
-	if config.Location.IsNull() || config.Location.ValueString() == "" {
-		return "", fmt.Errorf("location is required for BigQuery dataset restore")
-	}
 
 	apiReq := client.BigQueryRestoreRequest{
 		RestoreAccountId: data.RestoreAccountId.ValueString(),

@@ -507,47 +507,56 @@ Optional:
 <a id="nestedblock--gcp_cloud_sql_config"></a>
 ### Nested Schema for `gcp_cloud_sql_config`
 
+Required:
+
+- `name` (String) Name for the restored Cloud SQL instance.
+- `network_type` (String) Network type for the Cloud SQL instance. Possible values: `PUBLIC`, `PRIVATE`.
+- `zone` (String) Zone to restore the Cloud SQL instance to (e.g. `us-central1-a`).
+
 Optional:
 
 - `labels` (Map of String) Labels to apply to the restored Cloud SQL instance as key-value pairs. The label `"eon-restore": "true"` is always applied automatically.
-- `name` (String) Name for the restored Cloud SQL instance.
 - `network_host_project` (String) ID of the project that hosts the VPC network. Applicable only when restoring to a shared VPC network.
 - `network_name` (String) Name of the VPC network to use. Required when `network_type` is `PRIVATE`.
-- `network_type` (String) Network type for the Cloud SQL instance. Possible values: `PUBLIC`, `PRIVATE`.
-- `zone` (String) Zone to restore the Cloud SQL instance to (e.g. `us-central1-a`).
 
 
 <a id="nestedblock--gcp_disk_config"></a>
 ### Nested Schema for `gcp_disk_config`
 
-Optional:
+Required:
 
-- `description` (String) Description for the restored disk.
 - `disk_type` (String) Disk type (e.g. `pd-standard`, `pd-ssd`, `pd-balanced`, `pd-extreme`).
-- `encryption_key_id` (String) ID of the customer-managed encryption key (CMEK) to use for the disk.
-- `iops` (Number) Provisioned IOPS for the disk. Applicable only when `disk_type` is `pd-extreme`.
-- `labels` (Map of String) Labels to apply to the restored disk as key-value pairs.
 - `name` (String) Name for the restored disk.
 - `provider_disk_id` (String) Cloud-provider-assigned ID of the disk to restore.
 - `size_bytes` (Number) Size of the disk in bytes.
-- `throughput` (Number) Disk throughput. Defaults to the original throughput captured by the snapshot.
 - `zone` (String) Zone to restore the disk to (e.g. `us-central1-a`).
+
+Optional:
+
+- `description` (String) Description for the restored disk.
+- `encryption_key_id` (String) ID of the customer-managed encryption key (CMEK) to use for the disk.
+- `iops` (Number) Provisioned IOPS for the disk. Applicable only when `disk_type` is `pd-extreme`.
+- `labels` (Map of String) Labels to apply to the restored disk as key-value pairs.
+- `throughput` (Number) Disk throughput. Defaults to the original throughput captured by the snapshot.
 
 
 <a id="nestedblock--gcp_vm_config"></a>
 ### Nested Schema for `gcp_vm_config`
 
+Required:
+
+- `machine_type` (String) Machine type to use for the restored instance (e.g. `e2-medium`).
+- `name` (String) Name for the restored VM instance.
+- `network_name` (String) Name of the VPC network to use.
+- `subnet_name` (String) Name of the subnet to use.
+- `zone` (String) Zone to restore the VM instance to (e.g. `us-central1-a`).
+
 Optional:
 
 - `disks` (Block List) Disks to restore and attach to the restored instance. Each item corresponds to a disk, where `provider_disk_id` matches the disk's ID at the time of the snapshot. The boot disk must be in the list. (see [below for nested schema](#nestedblock--gcp_vm_config--disks))
 - `labels` (Map of String) Labels to apply to the restored VM as key-value pairs. The label `"eon-restore": "true"` is always applied automatically.
-- `machine_type` (String) Machine type to use for the restored instance (e.g. `e2-medium`).
-- `name` (String) Name for the restored VM instance.
 - `network_host_project` (String) ID of the project that hosts the VPC network. Applicable only when restoring to a shared VPC network.
-- `network_name` (String) Name of the VPC network to use.
 - `start_instance_after_restore` (Boolean) Whether to start the VM instance after restoring it. If `false`, the VM will be created in a stopped state. Defaults to `true`.
-- `subnet_name` (String) Name of the subnet to use.
-- `zone` (String) Zone to restore the VM instance to (e.g. `us-central1-a`).
 
 <a id="nestedblock--gcp_vm_config--disks"></a>
 ### Nested Schema for `gcp_vm_config.disks`
