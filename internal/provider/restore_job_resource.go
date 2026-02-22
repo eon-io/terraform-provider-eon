@@ -795,88 +795,88 @@ func (r *RestoreJobResource) Create(ctx context.Context, req resource.CreateRequ
 			return
 		}
 
-	// Route to the correct restore method based on resource type
-	switch inventoryResource.GetResourceType() {
-	// AWS resource types
-	case externalEonSdkAPI.AWS_EC2:
-		if restoreType == "partial" {
-			if data.EbsConfig == nil {
-				resp.Diagnostics.AddError("Configuration Error", "ebs_config is required when restoring AWS EC2 volumes with restore_type 'partial'")
+		// Route to the correct restore method based on resource type
+		switch inventoryResource.GetResourceType() {
+		// AWS resource types
+		case externalEonSdkAPI.AWS_EC2:
+			if restoreType == "partial" {
+				if data.EbsConfig == nil {
+					resp.Diagnostics.AddError("Configuration Error", "ebs_config is required when restoring AWS EC2 volumes with restore_type 'partial'")
+					return
+				}
+				jobId, err = r.createEbsVolumeRestore(ctx, data, resourceId)
+			} else {
+				if data.Ec2Config == nil {
+					resp.Diagnostics.AddError("Configuration Error", "ec2_config is required when restoring AWS EC2 instances with restore_type 'full'")
+					return
+				}
+				jobId, err = r.createEc2InstanceRestore(ctx, data, resourceId)
+			}
+		case externalEonSdkAPI.AWS_RDS:
+			if data.RdsConfig == nil {
+				resp.Diagnostics.AddError("Configuration Error", "rds_config is required when restoring AWS RDS databases")
 				return
 			}
-			jobId, err = r.createEbsVolumeRestore(ctx, data, resourceId)
-		} else {
-			if data.Ec2Config == nil {
-				resp.Diagnostics.AddError("Configuration Error", "ec2_config is required when restoring AWS EC2 instances with restore_type 'full'")
-				return
+			jobId, err = r.createRdsRestore(ctx, data, resourceId)
+		case externalEonSdkAPI.AWS_S3:
+			if restoreType == "full" {
+				if data.S3BucketConfig == nil {
+					resp.Diagnostics.AddError("Configuration Error", "s3_bucket_config is required when restoring AWS S3 buckets with restore_type 'full'")
+					return
+				}
+				jobId, err = r.createS3BucketRestore(ctx, data, resourceId)
+			} else {
+				if data.S3FileConfig == nil {
+					resp.Diagnostics.AddError("Configuration Error", "s3_file_config is required when restoring AWS S3 files with restore_type 'partial'")
+					return
+				}
+				jobId, err = r.createS3FileRestore(ctx, data, resourceId)
 			}
-			jobId, err = r.createEc2InstanceRestore(ctx, data, resourceId)
-		}
-	case externalEonSdkAPI.AWS_RDS:
-		if data.RdsConfig == nil {
-			resp.Diagnostics.AddError("Configuration Error", "rds_config is required when restoring AWS RDS databases")
-			return
-		}
-		jobId, err = r.createRdsRestore(ctx, data, resourceId)
-	case externalEonSdkAPI.AWS_S3:
-		if restoreType == "full" {
-			if data.S3BucketConfig == nil {
-				resp.Diagnostics.AddError("Configuration Error", "s3_bucket_config is required when restoring AWS S3 buckets with restore_type 'full'")
-				return
+		// GCP resource types
+		case externalEonSdkAPI.GCP_COMPUTE_ENGINE_INSTANCE:
+			if restoreType == "partial" {
+				if data.GcpDiskConfig == nil {
+					resp.Diagnostics.AddError("Configuration Error", "gcp_disk_config is required when restoring GCP Compute Engine disks with restore_type 'partial'")
+					return
+				}
+				jobId, err = r.createGcpDiskRestore(ctx, data, resourceId)
+			} else {
+				if data.GcpVmConfig == nil {
+					resp.Diagnostics.AddError("Configuration Error", "gcp_vm_config is required when restoring GCP Compute Engine instances with restore_type 'full'")
+					return
+				}
+				jobId, err = r.createGcpVmInstanceRestore(ctx, data, resourceId)
 			}
-			jobId, err = r.createS3BucketRestore(ctx, data, resourceId)
-		} else {
-			if data.S3FileConfig == nil {
-				resp.Diagnostics.AddError("Configuration Error", "s3_file_config is required when restoring AWS S3 files with restore_type 'partial'")
-				return
-			}
-			jobId, err = r.createS3FileRestore(ctx, data, resourceId)
-		}
-	// GCP resource types
-	case externalEonSdkAPI.GCP_COMPUTE_ENGINE_INSTANCE:
-		if restoreType == "partial" {
+		case externalEonSdkAPI.GCP_DISK:
 			if data.GcpDiskConfig == nil {
-				resp.Diagnostics.AddError("Configuration Error", "gcp_disk_config is required when restoring GCP Compute Engine disks with restore_type 'partial'")
+				resp.Diagnostics.AddError("Configuration Error", "gcp_disk_config is required when restoring GCP disks")
 				return
 			}
 			jobId, err = r.createGcpDiskRestore(ctx, data, resourceId)
-		} else {
-			if data.GcpVmConfig == nil {
-				resp.Diagnostics.AddError("Configuration Error", "gcp_vm_config is required when restoring GCP Compute Engine instances with restore_type 'full'")
+		case externalEonSdkAPI.GCP_CLOUD_SQL_INSTANCE:
+			if data.GcpCloudSqlConfig == nil {
+				resp.Diagnostics.AddError("Configuration Error", "gcp_cloud_sql_config is required when restoring GCP Cloud SQL instances")
 				return
 			}
-			jobId, err = r.createGcpVmInstanceRestore(ctx, data, resourceId)
-		}
-	case externalEonSdkAPI.GCP_DISK:
-		if data.GcpDiskConfig == nil {
-			resp.Diagnostics.AddError("Configuration Error", "gcp_disk_config is required when restoring GCP disks")
+			jobId, err = r.createGcpCloudSqlRestore(ctx, data, resourceId)
+		case externalEonSdkAPI.GCP_CLOUD_STORAGE_BUCKET:
+			if restoreType == "full" {
+				if data.GcsBucketConfig == nil {
+					resp.Diagnostics.AddError("Configuration Error", "gcs_bucket_config is required when restoring GCP Cloud Storage buckets with restore_type 'full'")
+					return
+				}
+				jobId, err = r.createGcsBucketRestore(ctx, data, resourceId)
+			} else {
+				if data.GcsFileConfig == nil {
+					resp.Diagnostics.AddError("Configuration Error", "gcs_file_config is required when restoring GCP Cloud Storage files with restore_type 'partial'")
+					return
+				}
+				jobId, err = r.createGcsFileRestore(ctx, data, resourceId)
+			}
+		default:
+			resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Unsupported resource type: %s. Supported types: AWS_EC2, AWS_RDS, AWS_S3, GCP_COMPUTE_ENGINE_INSTANCE, GCP_DISK, GCP_CLOUD_SQL_INSTANCE, GCP_CLOUD_STORAGE_BUCKET, GCP_BIG_QUERY", inventoryResource.GetResourceType()))
 			return
 		}
-		jobId, err = r.createGcpDiskRestore(ctx, data, resourceId)
-	case externalEonSdkAPI.GCP_CLOUD_SQL_INSTANCE:
-		if data.GcpCloudSqlConfig == nil {
-			resp.Diagnostics.AddError("Configuration Error", "gcp_cloud_sql_config is required when restoring GCP Cloud SQL instances")
-			return
-		}
-		jobId, err = r.createGcpCloudSqlRestore(ctx, data, resourceId)
-	case externalEonSdkAPI.GCP_CLOUD_STORAGE_BUCKET:
-		if restoreType == "full" {
-			if data.GcsBucketConfig == nil {
-				resp.Diagnostics.AddError("Configuration Error", "gcs_bucket_config is required when restoring GCP Cloud Storage buckets with restore_type 'full'")
-				return
-			}
-			jobId, err = r.createGcsBucketRestore(ctx, data, resourceId)
-		} else {
-			if data.GcsFileConfig == nil {
-				resp.Diagnostics.AddError("Configuration Error", "gcs_file_config is required when restoring GCP Cloud Storage files with restore_type 'partial'")
-				return
-			}
-			jobId, err = r.createGcsFileRestore(ctx, data, resourceId)
-		}
-	default:
-		resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Unsupported resource type: %s. Supported types: AWS_EC2, AWS_RDS, AWS_S3, GCP_COMPUTE_ENGINE_INSTANCE, GCP_DISK, GCP_CLOUD_SQL_INSTANCE, GCP_CLOUD_STORAGE_BUCKET, GCP_BIG_QUERY", inventoryResource.GetResourceType()))
-		return
-	}
 	} // end else (non-BigQuery)
 
 	if err != nil {
