@@ -530,23 +530,23 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Attributes: map[string]schema.Attribute{
 					"zone": schema.StringAttribute{
 						MarkdownDescription: "Zone to restore the VM instance to (e.g. `us-central1-a`).",
-						Required:            true,
+						Optional:            true,
 					},
 					"machine_type": schema.StringAttribute{
 						MarkdownDescription: "Machine type to use for the restored instance (e.g. `e2-medium`).",
-						Required:            true,
+						Optional:            true,
 					},
 					"name": schema.StringAttribute{
 						MarkdownDescription: "Name for the restored VM instance.",
-						Required:            true,
+						Optional:            true,
 					},
 					"network_name": schema.StringAttribute{
 						MarkdownDescription: "Name of the VPC network to use.",
-						Required:            true,
+						Optional:            true,
 					},
 					"subnet_name": schema.StringAttribute{
 						MarkdownDescription: "Name of the subnet to use.",
-						Required:            true,
+						Optional:            true,
 					},
 					"network_host_project": schema.StringAttribute{
 						MarkdownDescription: "ID of the project that hosts the VPC network. Applicable only when restoring to a shared VPC network.",
@@ -616,23 +616,23 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Attributes: map[string]schema.Attribute{
 					"provider_disk_id": schema.StringAttribute{
 						MarkdownDescription: "Cloud-provider-assigned ID of the disk to restore.",
-						Required:            true,
+						Optional:            true,
 					},
 					"zone": schema.StringAttribute{
 						MarkdownDescription: "Zone to restore the disk to (e.g. `us-central1-a`).",
-						Required:            true,
+						Optional:            true,
 					},
 					"name": schema.StringAttribute{
 						MarkdownDescription: "Name for the restored disk.",
-						Required:            true,
+						Optional:            true,
 					},
 					"disk_type": schema.StringAttribute{
 						MarkdownDescription: "Disk type (e.g. `pd-standard`, `pd-ssd`, `pd-balanced`, `pd-extreme`).",
-						Required:            true,
+						Optional:            true,
 					},
 					"size_bytes": schema.Int64Attribute{
 						MarkdownDescription: "Size of the disk in bytes.",
-						Required:            true,
+						Optional:            true,
 					},
 					"iops": schema.Int64Attribute{
 						MarkdownDescription: "Provisioned IOPS for the disk. Applicable only when `disk_type` is `pd-extreme`.",
@@ -662,15 +662,15 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Attributes: map[string]schema.Attribute{
 					"zone": schema.StringAttribute{
 						MarkdownDescription: "Zone to restore the Cloud SQL instance to (e.g. `us-central1-a`).",
-						Required:            true,
+						Optional:            true,
 					},
 					"name": schema.StringAttribute{
 						MarkdownDescription: "Name for the restored Cloud SQL instance.",
-						Required:            true,
+						Optional:            true,
 					},
 					"network_type": schema.StringAttribute{
 						MarkdownDescription: "Network type for the Cloud SQL instance. Possible values: `PUBLIC`, `PRIVATE`.",
-						Required:            true,
+						Optional:            true,
 					},
 					"network_name": schema.StringAttribute{
 						MarkdownDescription: "Name of the VPC network to use. Required when `network_type` is `PRIVATE`.",
@@ -736,11 +736,11 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Attributes: map[string]schema.Attribute{
 					"dataset_id": schema.StringAttribute{
 						MarkdownDescription: "Target BigQuery dataset ID for the restore (e.g. `my_dataset_restored`).",
-						Required:            true,
+						Optional:            true,
 					},
 					"location": schema.StringAttribute{
 						MarkdownDescription: "GCP location for the restored dataset (e.g. `US`, `EU`, `us-central1`).",
-						Required:            true,
+						Optional:            true,
 					},
 				},
 				Blocks: map[string]schema.Block{
@@ -1272,6 +1272,22 @@ func (r *RestoreJobResource) createS3FileRestore(ctx context.Context, data Resto
 func (r *RestoreJobResource) createGcpVmInstanceRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
 	config := data.GcpVmConfig
 
+	if config.Zone.IsNull() || config.Zone.ValueString() == "" {
+		return "", fmt.Errorf("zone is required for GCP VM instance restore")
+	}
+	if config.MachineType.IsNull() || config.MachineType.ValueString() == "" {
+		return "", fmt.Errorf("machine_type is required for GCP VM instance restore")
+	}
+	if config.Name.IsNull() || config.Name.ValueString() == "" {
+		return "", fmt.Errorf("name is required for GCP VM instance restore")
+	}
+	if config.NetworkName.IsNull() || config.NetworkName.ValueString() == "" {
+		return "", fmt.Errorf("network_name is required for GCP VM instance restore")
+	}
+	if config.SubnetName.IsNull() || config.SubnetName.ValueString() == "" {
+		return "", fmt.Errorf("subnet_name is required for GCP VM instance restore")
+	}
+
 	labels, err := parseMapAttribute(ctx, config.Labels)
 	if err != nil {
 		return "", err
@@ -1356,6 +1372,22 @@ func (r *RestoreJobResource) createGcpVmInstanceRestore(ctx context.Context, dat
 func (r *RestoreJobResource) createGcpDiskRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
 	config := data.GcpDiskConfig
 
+	if config.ProviderDiskId.IsNull() || config.ProviderDiskId.ValueString() == "" {
+		return "", fmt.Errorf("provider_disk_id is required for GCP disk restore")
+	}
+	if config.Zone.IsNull() || config.Zone.ValueString() == "" {
+		return "", fmt.Errorf("zone is required for GCP disk restore")
+	}
+	if config.Name.IsNull() || config.Name.ValueString() == "" {
+		return "", fmt.Errorf("name is required for GCP disk restore")
+	}
+	if config.DiskType.IsNull() || config.DiskType.ValueString() == "" {
+		return "", fmt.Errorf("disk_type is required for GCP disk restore")
+	}
+	if config.SizeBytes.IsNull() || config.SizeBytes.ValueInt64() == 0 {
+		return "", fmt.Errorf("size_bytes is required for GCP disk restore")
+	}
+
 	diskSettings := externalEonSdkAPI.GcpDiskSettings{
 		Name:      config.Name.ValueString(),
 		Type:      config.DiskType.ValueString(),
@@ -1404,6 +1436,16 @@ func (r *RestoreJobResource) createGcpDiskRestore(ctx context.Context, data Rest
 
 func (r *RestoreJobResource) createGcpCloudSqlRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
 	config := data.GcpCloudSqlConfig
+
+	if config.Zone.IsNull() || config.Zone.ValueString() == "" {
+		return "", fmt.Errorf("zone is required for GCP Cloud SQL restore")
+	}
+	if config.Name.IsNull() || config.Name.ValueString() == "" {
+		return "", fmt.Errorf("name is required for GCP Cloud SQL restore")
+	}
+	if config.NetworkType.IsNull() || config.NetworkType.ValueString() == "" {
+		return "", fmt.Errorf("network_type is required for GCP Cloud SQL restore")
+	}
 
 	networkType, err := externalEonSdkAPI.NewGcpNetworkTypeFromValue(config.NetworkType.ValueString())
 	if err != nil {
@@ -1523,6 +1565,13 @@ func (r *RestoreJobResource) createGcsFileRestore(ctx context.Context, data Rest
 
 func (r *RestoreJobResource) createGcpBigQueryDatasetRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
 	config := data.GcpBigQueryDatasetConfig
+
+	if config.DatasetId.IsNull() || config.DatasetId.ValueString() == "" {
+		return "", fmt.Errorf("dataset_id is required for BigQuery dataset restore")
+	}
+	if config.Location.IsNull() || config.Location.ValueString() == "" {
+		return "", fmt.Errorf("location is required for BigQuery dataset restore")
+	}
 
 	apiReq := client.BigQueryRestoreRequest{
 		RestoreAccountId: data.RestoreAccountId.ValueString(),
