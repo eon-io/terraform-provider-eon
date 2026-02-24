@@ -1575,9 +1575,11 @@ func (r *RestoreJobResource) createGcpBigQueryDatasetRestore(ctx context.Context
 
 	apiReq := client.BigQueryRestoreRequest{
 		RestoreAccountId: data.RestoreAccountId.ValueString(),
-		Destination: client.BigQueryRestoreDestination{
-			DatasetId: config.DatasetId.ValueString(),
-			Location:  config.Location.ValueString(),
+		Destination: client.BigQueryDatasetRestoreDestination{
+			GcpBigQuery: &client.BigQueryDatasetTarget{
+				DatasetId: config.DatasetId.ValueString(),
+				Location:  config.Location.ValueString(),
+			},
 		},
 	}
 

@@ -495,17 +495,22 @@ func (c *EonClient) StartGcpCloudSqlRestore(ctx context.Context, resourceId, sna
 	return resp.GetJobId(), nil
 }
 
-// BigQueryRestoreDestination represents the destination for a BigQuery dataset restore
-type BigQueryRestoreDestination struct {
+// BigQueryDatasetTarget represents the target configuration for a BigQuery dataset restore
+type BigQueryDatasetTarget struct {
 	DatasetId string `json:"datasetId"`
 	Location  string `json:"location"`
 }
 
+// BigQueryDatasetRestoreDestination wraps the BigQuery target following v1 external conventions
+type BigQueryDatasetRestoreDestination struct {
+	GcpBigQuery *BigQueryDatasetTarget `json:"gcpBigQuery,omitempty"`
+}
+
 // BigQueryRestoreRequest represents the request body for a BigQuery dataset restore
 type BigQueryRestoreRequest struct {
-	RestoreAccountId string                     `json:"restoreAccountId"`
-	Destination      BigQueryRestoreDestination `json:"destination"`
-	Tables           []string                   `json:"tables,omitempty"`
+	RestoreAccountId string                            `json:"restoreAccountId"`
+	Destination      BigQueryDatasetRestoreDestination `json:"destination"`
+	Tables           []string                          `json:"tables,omitempty"`
 }
 
 // BigQueryRestoreResponse represents the response from a BigQuery restore job initiation
