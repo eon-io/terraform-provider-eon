@@ -265,7 +265,7 @@ func (r *RestoreAccountResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	accounts, err := r.client.ListRestoreAccounts(ctx)
+	accounts, err := r.client.ListRestoreAccounts(ctx, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read restore accounts: %s", err))
 		return
@@ -384,7 +384,7 @@ func (r *RestoreAccountResource) Delete(ctx context.Context, req resource.Delete
 func (r *RestoreAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 
-	accounts, err := r.client.ListRestoreAccounts(ctx)
+	accounts, err := r.client.ListRestoreAccounts(ctx, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read restore accounts during import: %s", err))
 		return
@@ -466,7 +466,7 @@ func (r *RestoreAccountResource) ImportState(ctx context.Context, req resource.I
 // findExistingAccountID attempts to find the ID of an existing restore account
 // that matches the given configuration. Returns empty string if not found.
 func (r *RestoreAccountResource) findExistingAccountID(ctx context.Context, cloudProvider CloudProvider, data RestoreAccountResourceModel) string {
-	accounts, err := r.client.ListRestoreAccounts(ctx)
+	accounts, err := r.client.ListRestoreAccounts(ctx, nil)
 	if err != nil {
 		tflog.Debug(ctx, "Failed to list restore accounts to find existing ID", map[string]any{
 			"error": err.Error(),

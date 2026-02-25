@@ -12,6 +12,14 @@ import (
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 )
 
+// Condition represents a query condition for internal bypass of filters
+type Condition struct {
+	Property   string      `json:"property,omitempty,omitzero"`
+	Operator   string      `json:"operator"`
+	Value      []string    `json:"value,omitempty,omitzero"`
+	Conditions []Condition `json:"conditions,omitempty,omitzero"`
+}
+
 // APIError represents an error from the Eon API with HTTP status code
 type APIError struct {
 	StatusCode int
@@ -64,10 +72,15 @@ func (c *EonClient) handleAPIError(err error, httpResp *http.Response, baseError
 	return nil
 }
 
-// ListSourceAccounts retrieves all source accounts for the project
-func (c *EonClient) ListSourceAccounts(ctx context.Context) ([]externalEonSdkAPI.SourceAccount, error) {
+// ListSourceAccounts retrieves all source accounts for the project.
+// If a condition is provided, it is sent as an internal bypass that ignores filters.
+func (c *EonClient) ListSourceAccounts(ctx context.Context, condition *Condition) ([]externalEonSdkAPI.SourceAccount, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	if condition != nil {
+		return c.listSourceAccountsWithCondition(ctx, condition)
 	}
 
 	resp, httpResp, err := c.client.AccountsAPI.ListSourceAccounts(ctx, c.projectID).ListSourceAccountsRequest(externalEonSdkAPI.ListSourceAccountsRequest{}).Execute()
@@ -89,10 +102,63 @@ func (c *EonClient) ListSourceAccounts(ctx context.Context) ([]externalEonSdkAPI
 	return resp.GetAccounts(), nil
 }
 
-// ListRestoreAccounts retrieves all restore accounts for the project
-func (c *EonClient) ListRestoreAccounts(ctx context.Context) ([]externalEonSdkAPI.RestoreAccount, error) {
+func (c *EonClient) listSourceAccountsWithCondition(ctx context.Context, condition *Condition) ([]externalEonSdkAPI.SourceAccount, error) {
+	baseURL := c.client.GetConfig().Servers[0].URL
+	url := fmt.Sprintf("%s/v1/projects/%s/source-accounts/list", baseURL, c.projectID)
+
+	reqBody := struct {
+		Condition *Condition `json:"condition"`
+	}{Condition: condition}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+
+	for key, value := range c.client.GetConfig().DefaultHeader {
+		httpReq.Header.Set(key, value)
+	}
+
+	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list source accounts"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
+	}
+
+	var resp externalEonSdkAPI.ListSourceAccountsResponse
+	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if resp.GetAccounts() == nil {
+		return []externalEonSdkAPI.SourceAccount{}, nil
+	}
+
+	return resp.GetAccounts(), nil
+}
+
+// ListRestoreAccounts retrieves all restore accounts for the project.
+// If a condition is provided, it is sent as an internal bypass that ignores filters.
+func (c *EonClient) ListRestoreAccounts(ctx context.Context, condition *Condition) ([]externalEonSdkAPI.RestoreAccount, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	if condition != nil {
+		return c.listRestoreAccountsWithCondition(ctx, condition)
 	}
 
 	resp, httpResp, err := c.client.AccountsAPI.ListRestoreAccounts(ctx, c.projectID).ListRestoreAccountsRequest(externalEonSdkAPI.ListRestoreAccountsRequest{}).Execute()
@@ -105,6 +171,54 @@ func (c *EonClient) ListRestoreAccounts(ctx context.Context) ([]externalEonSdkAP
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	if resp.GetAccounts() == nil {
+		return []externalEonSdkAPI.RestoreAccount{}, nil
+	}
+
+	return resp.GetAccounts(), nil
+}
+
+func (c *EonClient) listRestoreAccountsWithCondition(ctx context.Context, condition *Condition) ([]externalEonSdkAPI.RestoreAccount, error) {
+	baseURL := c.client.GetConfig().Servers[0].URL
+	url := fmt.Sprintf("%s/v1/projects/%s/restore-accounts/list", baseURL, c.projectID)
+
+	reqBody := struct {
+		Condition *Condition `json:"condition"`
+	}{Condition: condition}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+
+	for key, value := range c.client.GetConfig().DefaultHeader {
+		httpReq.Header.Set(key, value)
+	}
+
+	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list restore accounts"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
+	}
+
+	var resp externalEonSdkAPI.ListRestoreAccountsResponse
+	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	if resp.GetAccounts() == nil {

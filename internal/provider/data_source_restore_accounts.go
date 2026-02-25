@@ -108,7 +108,7 @@ func (d *RestoreAccountsDataSource) Configure(ctx context.Context, req datasourc
 func (d *RestoreAccountsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data RestoreAccountsDataSourceModel
 
-	accounts, err := d.client.ListRestoreAccounts(ctx)
+	accounts, err := d.client.ListRestoreAccounts(ctx, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read restore accounts: %s", err))
 		return

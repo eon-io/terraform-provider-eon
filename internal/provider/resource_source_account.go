@@ -262,7 +262,7 @@ func (r *SourceAccountResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	accounts, err := r.client.ListSourceAccounts(ctx)
+	accounts, err := r.client.ListSourceAccounts(ctx, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read source accounts: %s", err))
 		return
@@ -375,7 +375,7 @@ func (r *SourceAccountResource) Delete(ctx context.Context, req resource.DeleteR
 func (r *SourceAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 
-	accounts, err := r.client.ListSourceAccounts(ctx)
+	accounts, err := r.client.ListSourceAccounts(ctx, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read source accounts during import: %s", err))
 		return
@@ -452,7 +452,7 @@ func (r *SourceAccountResource) ImportState(ctx context.Context, req resource.Im
 // findExistingAccountID attempts to find the ID of an existing source account
 // that matches the given configuration. Returns empty string if not found.
 func (r *SourceAccountResource) findExistingAccountID(ctx context.Context, cloudProvider CloudProvider, data SourceAccountResourceModel) string {
-	accounts, err := r.client.ListSourceAccounts(ctx)
+	accounts, err := r.client.ListSourceAccounts(ctx, nil)
 	if err != nil {
 		tflog.Debug(ctx, "Failed to list source accounts to find existing ID", map[string]interface{}{
 			"error": err.Error(),

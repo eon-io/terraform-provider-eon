@@ -107,7 +107,7 @@ func (d *SourceAccountsDataSource) Configure(ctx context.Context, req datasource
 func (d *SourceAccountsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data SourceAccountsDataSourceModel
 
-	accounts, err := d.client.ListSourceAccounts(ctx)
+	accounts, err := d.client.ListSourceAccounts(ctx, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read source accounts: %s", err))
 		return
