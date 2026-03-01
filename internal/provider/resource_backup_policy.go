@@ -462,7 +462,7 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 													Optional:            true,
 													Attributes: map[string]schema.Attribute{
 														"operator": schema.StringAttribute{
-															MarkdownDescription: "Operator: 'IN' or 'NOT_IN'",
+															MarkdownDescription: "Operator: 'IN', 'NOT_IN', 'STARTS_WITH', 'NOT_STARTS_WITH', 'ENDS_WITH', 'NOT_ENDS_WITH', 'CONTAINS', or 'NOT_CONTAINS'",
 															Required:            true,
 														},
 														"account_ids": schema.ListAttribute{
