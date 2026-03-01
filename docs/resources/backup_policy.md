@@ -715,7 +715,7 @@ Optional:
 Required:
 
 - `account_ids` (List of String) List of account IDs
-- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `operator` (String) Operator: 'IN', 'NOT_IN', 'STARTS_WITH', 'NOT_STARTS_WITH', 'ENDS_WITH', 'NOT_ENDS_WITH', 'CONTAINS', or 'NOT_CONTAINS'
 
 
 <a id="nestedatt--resource_selector--expression--group--operands--apps"></a>
