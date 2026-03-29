@@ -242,10 +242,14 @@ func (r *RestoreAccountResource) Create(ctx context.Context, req resource.Create
 	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 
-	// Set role to null by default, override for AWS (backward compatibility)
+	// Populate role from API response (not plan data, which may be unknown during replace)
 	data.Role = types.StringNull()
-	if cloudProvider == CloudProviderAWS && data.Aws != nil {
-		data.Role = data.Aws.RoleArn
+	if cloudProvider == CloudProviderAWS && account.RestoreAccountAttributes.HasAws() {
+		awsAttrs := account.RestoreAccountAttributes.GetAws()
+		data.Role = types.StringValue(awsAttrs.GetRoleArn())
+		if data.Aws != nil {
+			data.Aws.RoleArn = types.StringValue(awsAttrs.GetRoleArn())
+		}
 	}
 
 	tflog.Debug(ctx, "Restore account connected", map[string]interface{}{
