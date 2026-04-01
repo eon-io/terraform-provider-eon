@@ -64,54 +64,98 @@ func (c *EonClient) handleAPIError(err error, httpResp *http.Response, baseError
 	return nil
 }
 
-// ListSourceAccounts retrieves all source accounts for the project
+// ListSourceAccounts retrieves all source accounts for the project.
+// It paginates through all pages to return the complete list.
 func (c *EonClient) ListSourceAccounts(ctx context.Context) ([]externalEonSdkAPI.SourceAccount, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ListSourceAccounts(ctx, c.projectID).ListSourceAccountsRequest(externalEonSdkAPI.ListSourceAccountsRequest{}).Execute()
+	var allAccounts []externalEonSdkAPI.SourceAccount
+	var pageToken string
 
-	if apiErr := c.handleAPIError(err, httpResp, "failed to list source accounts"); apiErr != nil {
-		return nil, apiErr
+	for {
+		req := c.client.AccountsAPI.ListSourceAccounts(ctx, c.projectID).
+			ListSourceAccountsRequest(externalEonSdkAPI.ListSourceAccountsRequest{})
+		if pageToken != "" {
+			req = req.PageToken(pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list source accounts"); apiErr != nil {
+			return nil, apiErr
+		}
+		defer httpResp.Body.Close()
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+		}
+
+		accounts := resp.GetAccounts()
+		if accounts != nil {
+			allAccounts = append(allAccounts, accounts...)
+		}
+
+		if !resp.HasNextToken() {
+			break
+		}
+		pageToken = resp.GetNextToken()
 	}
-	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
-	}
-
-	if resp.GetAccounts() == nil {
+	if allAccounts == nil {
 		return []externalEonSdkAPI.SourceAccount{}, nil
 	}
 
-	return resp.GetAccounts(), nil
+	return allAccounts, nil
 }
 
-// ListRestoreAccounts retrieves all restore accounts for the project
+// ListRestoreAccounts retrieves all restore accounts for the project.
+// It paginates through all pages to return the complete list.
 func (c *EonClient) ListRestoreAccounts(ctx context.Context) ([]externalEonSdkAPI.RestoreAccount, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ListRestoreAccounts(ctx, c.projectID).ListRestoreAccountsRequest(externalEonSdkAPI.ListRestoreAccountsRequest{}).Execute()
+	var allAccounts []externalEonSdkAPI.RestoreAccount
+	var pageToken string
 
-	if apiErr := c.handleAPIError(err, httpResp, "failed to list restore accounts"); apiErr != nil {
-		return nil, apiErr
+	for {
+		req := c.client.AccountsAPI.ListRestoreAccounts(ctx, c.projectID).
+			ListRestoreAccountsRequest(externalEonSdkAPI.ListRestoreAccountsRequest{})
+		if pageToken != "" {
+			req = req.PageToken(pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list restore accounts"); apiErr != nil {
+			return nil, apiErr
+		}
+		defer httpResp.Body.Close()
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+		}
+
+		accounts := resp.GetAccounts()
+		if accounts != nil {
+			allAccounts = append(allAccounts, accounts...)
+		}
+
+		if !resp.HasNextToken() {
+			break
+		}
+		pageToken = resp.GetNextToken()
 	}
-	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(httpResp.Body)
-		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
-	}
-
-	if resp.GetAccounts() == nil {
+	if allAccounts == nil {
 		return []externalEonSdkAPI.RestoreAccount{}, nil
 	}
 
-	return resp.GetAccounts(), nil
+	return allAccounts, nil
 }
 
 // ConnectSourceAccount connects a new source account

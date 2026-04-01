@@ -221,13 +221,22 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 		// Check if this is a 409 Conflict (account already exists)
 		var apiErr *client.APIError
 		if errors.As(err, &apiErr) && apiErr.StatusCode == 409 {
-			existingID := r.findExistingAccountID(ctx, cloudProvider, data)
-			title, detail := conflictErrorMessage("Source Account", existingID)
-			resp.Diagnostics.AddError(title, fmt.Sprintf("%s\n\nOriginal error: %s", detail, err.Error()))
+			// Treat 409 as success — adopt the existing account into state
+			existing := r.findExistingAccount(ctx, cloudProvider, data)
+			if existing == nil {
+				resp.Diagnostics.AddError("Source Account Already Exists",
+					fmt.Sprintf("A source account with this configuration already exists but could not be found via the API.\n\nOriginal error: %s", err.Error()))
+				return
+			}
+			tflog.Info(ctx, "Source account already exists (409 Conflict), adopting into state", map[string]interface{}{
+				"id":   existing.Id,
+				"name": existing.GetName(),
+			})
+			account = existing
+		} else {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to connect source account: %s", err))
 			return
 		}
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to connect source account: %s", err))
-		return
 	}
 
 	// Update state from response
@@ -449,15 +458,15 @@ func (r *SourceAccountResource) ImportState(ctx context.Context, req resource.Im
 	})
 }
 
-// findExistingAccountID attempts to find the ID of an existing source account
-// that matches the given configuration. Returns empty string if not found.
-func (r *SourceAccountResource) findExistingAccountID(ctx context.Context, cloudProvider CloudProvider, data SourceAccountResourceModel) string {
+// findExistingAccount attempts to find an existing source account
+// that matches the given configuration. Returns nil if not found.
+func (r *SourceAccountResource) findExistingAccount(ctx context.Context, cloudProvider CloudProvider, data SourceAccountResourceModel) *externalEonSdkAPI.SourceAccount {
 	accounts, err := r.client.ListSourceAccounts(ctx)
 	if err != nil {
-		tflog.Debug(ctx, "Failed to list source accounts to find existing ID", map[string]interface{}{
+		tflog.Debug(ctx, "Failed to list source accounts to find existing account", map[string]interface{}{
 			"error": err.Error(),
 		})
-		return ""
+		return nil
 	}
 
 	for _, account := range accounts {
@@ -470,25 +479,24 @@ func (r *SourceAccountResource) findExistingAccountID(ctx context.Context, cloud
 			if data.Aws != nil && account.SourceAccountAttributes.HasAws() {
 				awsAttrs := account.SourceAccountAttributes.GetAws()
 				if awsAttrs.GetRoleArn() == data.Aws.RoleArn.ValueString() {
-					return account.Id
+					return &account
 				}
 			}
 		case CloudProviderAzure:
 			if data.Azure != nil && account.SourceAccountAttributes.HasAzure() {
-				// Match by subscription_id (the unique identifier for Azure accounts)
 				if account.GetProviderAccountId() == data.Azure.SubscriptionId.ValueString() {
-					return account.Id
+					return &account
 				}
 			}
 		case CloudProviderGCP:
 			if data.Gcp != nil && account.SourceAccountAttributes.HasGcp() {
-				// Match by project_id (the unique identifier for GCP accounts)
 				if account.GetProviderAccountId() == data.Gcp.ProjectId.ValueString() {
-					return account.Id
+					return &account
 				}
 			}
 		}
 	}
 
-	return ""
+	return nil
 }
+

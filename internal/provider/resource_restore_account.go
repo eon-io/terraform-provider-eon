@@ -221,13 +221,22 @@ func (r *RestoreAccountResource) Create(ctx context.Context, req resource.Create
 		// Check if this is a 409 Conflict (account already exists)
 		var apiErr *client.APIError
 		if errors.As(err, &apiErr) && apiErr.StatusCode == 409 {
-			existingID := r.findExistingAccountID(ctx, cloudProvider, data)
-			title, detail := conflictErrorMessage("Restore Account", existingID)
-			resp.Diagnostics.AddError(title, fmt.Sprintf("%s\n\nOriginal error: %s", detail, err.Error()))
+			// Treat 409 as success — adopt the existing account into state
+			existing := r.findExistingAccount(ctx, cloudProvider, data)
+			if existing == nil {
+				resp.Diagnostics.AddError("Restore Account Already Exists",
+					fmt.Sprintf("A restore account with this configuration already exists but could not be found via the API.\n\nOriginal error: %s", err.Error()))
+				return
+			}
+			tflog.Info(ctx, "Restore account already exists (409 Conflict), adopting into state", map[string]interface{}{
+				"id":   existing.Id,
+				"name": existing.GetName(),
+			})
+			account = existing
+		} else {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to connect restore account: %s", err))
 			return
 		}
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to connect restore account: %s", err))
-		return
 	}
 
 	// Update state from response
@@ -467,15 +476,15 @@ func (r *RestoreAccountResource) ImportState(ctx context.Context, req resource.I
 	})
 }
 
-// findExistingAccountID attempts to find the ID of an existing restore account
-// that matches the given configuration. Returns empty string if not found.
-func (r *RestoreAccountResource) findExistingAccountID(ctx context.Context, cloudProvider CloudProvider, data RestoreAccountResourceModel) string {
+// findExistingAccount attempts to find an existing restore account
+// that matches the given configuration. Returns nil if not found.
+func (r *RestoreAccountResource) findExistingAccount(ctx context.Context, cloudProvider CloudProvider, data RestoreAccountResourceModel) *externalEonSdkAPI.RestoreAccount {
 	accounts, err := r.client.ListRestoreAccounts(ctx)
 	if err != nil {
-		tflog.Debug(ctx, "Failed to list restore accounts to find existing ID", map[string]any{
+		tflog.Debug(ctx, "Failed to list restore accounts to find existing account", map[string]any{
 			"error": err.Error(),
 		})
-		return ""
+		return nil
 	}
 
 	for _, account := range accounts {
@@ -488,25 +497,24 @@ func (r *RestoreAccountResource) findExistingAccountID(ctx context.Context, clou
 			if data.Aws != nil && account.RestoreAccountAttributes.HasAws() {
 				awsAttrs := account.RestoreAccountAttributes.GetAws()
 				if awsAttrs.GetRoleArn() == data.Aws.RoleArn.ValueString() {
-					return account.Id
+					return &account
 				}
 			}
 		case CloudProviderAzure:
 			if data.Azure != nil && account.RestoreAccountAttributes.HasAzure() {
-				// Match by subscription_id (the unique identifier for Azure accounts)
 				if account.GetProviderAccountId() == data.Azure.SubscriptionId.ValueString() {
-					return account.Id
+					return &account
 				}
 			}
 		case CloudProviderGCP:
 			if data.Gcp != nil && account.RestoreAccountAttributes.HasGcp() {
-				// Match by project_id (the unique identifier for GCP accounts)
 				if account.GetProviderAccountId() == data.Gcp.ProjectId.ValueString() {
-					return account.Id
+					return &account
 				}
 			}
 		}
 	}
 
-	return ""
+	return nil
 }
+
