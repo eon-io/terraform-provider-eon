@@ -517,4 +517,3 @@ func (r *RestoreAccountResource) findExistingAccount(ctx context.Context, cloudP
 
 	return nil
 }
-
