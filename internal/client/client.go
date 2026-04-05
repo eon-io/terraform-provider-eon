@@ -560,6 +560,72 @@ func (c *EonClient) StartBigQueryDatasetRestore(ctx context.Context, resourceId,
 	return restoreResp.JobId, nil
 }
 
+// ExcludeVolumeFromBackup excludes an EBS volume from future EC2 instance backups
+func (c *EonClient) ExcludeVolumeFromBackup(ctx context.Context, resourceId, volumeId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	baseURL := c.client.GetConfig().Servers[0].URL
+	url := fmt.Sprintf("%s/v1/projects/%s/resources/%s/volumes/%s/exclude", baseURL, c.projectID, resourceId, volumeId)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create exclude volume request: %w", err)
+	}
+
+	httpReq.Header.Set("Accept", "application/json")
+	for key, value := range c.client.GetConfig().DefaultHeader {
+		httpReq.Header.Set(key, value)
+	}
+
+	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq) // #nosec G704 -- URL is built from trusted server configuration, not user input
+	if apiErr := c.handleAPIError(err, httpResp, "failed to exclude volume from backup"); apiErr != nil {
+		return apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
+	}
+
+	return nil
+}
+
+// CancelVolumeBackupExclusion cancels the backup exclusion of a volume, including it in future backups
+func (c *EonClient) CancelVolumeBackupExclusion(ctx context.Context, resourceId, volumeId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	baseURL := c.client.GetConfig().Servers[0].URL
+	url := fmt.Sprintf("%s/v1/projects/%s/resources/%s/volumes/%s/include", baseURL, c.projectID, resourceId, volumeId)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cancel volume exclusion request: %w", err)
+	}
+
+	httpReq.Header.Set("Accept", "application/json")
+	for key, value := range c.client.GetConfig().DefaultHeader {
+		httpReq.Header.Set(key, value)
+	}
+
+	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq) // #nosec G704 -- URL is built from trusted server configuration, not user input
+	if apiErr := c.handleAPIError(err, httpResp, "failed to cancel volume backup exclusion"); apiErr != nil {
+		return apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
+	}
+
+	return nil
+}
+
 // GetSnapshot retrieves a snapshot by ID
 func (c *EonClient) GetSnapshot(ctx context.Context, snapshotId string) (*externalEonSdkAPI.Snapshot, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {

@@ -417,3 +417,13 @@ func (m *MockEonClient) DeleteRole(ctx context.Context, roleId string) error {
 	delete(m.Roles, roleId)
 	return nil
 }
+
+// ExcludeVolumeFromBackup mocks excluding a volume from backup
+func (m *MockEonClient) ExcludeVolumeFromBackup(ctx context.Context, resourceId, volumeId string) error {
+	return nil
+}
+
+// CancelVolumeBackupExclusion mocks cancelling a volume backup exclusion
+func (m *MockEonClient) CancelVolumeBackupExclusion(ctx context.Context, resourceId, volumeId string) error {
+	return nil
+}
