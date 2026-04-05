@@ -4,6 +4,7 @@ page_title: "eon_volume_backup_exclusion Resource - terraform-provider-eon"
 subcategory: ""
 description: |-
   Excludes a specific EBS volume from future EC2 instance backups. Root volumes cannot be excluded.
+  When this resource is created, the volume is excluded from backup. When destroyed, the volume is included back in future backups.
 ---
 
 # eon_volume_backup_exclusion (Resource)
@@ -37,12 +38,3 @@ resource "eon_volume_backup_exclusion" "data_volume" {
 
 - `resource_id` (String) Eon-assigned ID of the EC2 instance resource.
 - `volume_id` (String) Eon-assigned ID of the EBS volume to exclude from backup.
-
-## Import
-
-Import is supported using the following syntax:
-
-```shell
-# Volume backup exclusions can be imported using resource_id/volume_id format
-terraform import eon_volume_backup_exclusion.example <resource_id>/<volume_id>
-```
