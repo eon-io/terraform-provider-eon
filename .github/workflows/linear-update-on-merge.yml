@@ -1,4 +1,5 @@
 name: Update Linear on Merge
+# Test trigger: EON-8985
 
 on:
   pull_request:
