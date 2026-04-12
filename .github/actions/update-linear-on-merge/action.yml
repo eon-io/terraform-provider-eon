@@ -1,0 +1,33 @@
+name: "Update Linear on Merge"
+description: "Update Linear ticket to Deployed state when a PR is merged"
+inputs:
+  linear_api_key:
+    description: "Linear API key"
+    required: true
+  pr_title:
+    description: "Pull request title"
+    required: true
+  pr_branch:
+    description: "Pull request head branch name"
+    required: true
+  pr_body:
+    description: "Pull request body"
+    required: false
+    default: ""
+runs:
+  using: "composite"
+  steps:
+    - name: Install Python dependencies
+      shell: bash
+      run: |
+        pip install --quiet --no-cache-dir requests==2.32.5
+    - name: Update Linear ticket
+      shell: bash
+      env:
+        LINEAR_API_KEY: ${{ inputs.linear_api_key }}
+      run: |
+        python3 "${{ github.action_path }}/update_linear_on_merge.py" \
+          --pr-title "${{ inputs.pr_title }}" \
+          --pr-branch "${{ inputs.pr_branch }}" \
+          --pr-body "${{ inputs.pr_body }}" \
+          --linear-api-key "${{ inputs.linear_api_key }}"
