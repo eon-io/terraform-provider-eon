@@ -77,9 +77,9 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 				DeprecationMessage:  "Use 'aws { role_arn = \"...\" }' instead.",
 			},
 			"status": schema.StringAttribute{
-				MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
+				MarkdownDescription: "Connection status of the source account. The provider automatically reconnects accounts that drift to `DISCONNECTED`. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers:       []planmodifier.String{AlwaysConnected()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Date and time the source account was connected to the Eon project.",
@@ -346,16 +346,158 @@ func (r *SourceAccountResource) Read(ctx context.Context, req resource.ReadReque
 }
 
 func (r *SourceAccountResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data SourceAccountResourceModel
+	var plan SourceAccountResourceModel
+	var state SourceAccountResourceModel
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	resp.Diagnostics.AddWarning("Update Not Supported", "Most source account changes require replacement. Please update your configuration to force replacement if needed.")
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	accountId := state.Id.ValueString()
+
+	// Step 1: Update mutable fields (name, role_arn) if changed.
+	updateReq := r.buildUpdateRequest(plan, state)
+	if updateReq != nil {
+		tflog.Info(ctx, "Updating source account", map[string]interface{}{
+			"id": accountId,
+		})
+
+		_, err := r.client.UpdateSourceAccount(ctx, accountId, *updateReq)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Update Failed",
+				fmt.Sprintf("Unable to update source account %s: %s", accountId, err),
+			)
+			return
+		}
+	}
+
+	// Step 2: Reconnect if the account is DISCONNECTED.
+	if state.Status.ValueString() == "DISCONNECTED" {
+		tflog.Info(ctx, "Source account is disconnected, attempting reconnect", map[string]interface{}{
+			"id": accountId,
+		})
+
+		_, err := r.client.ReconnectSourceAccount(ctx, accountId)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Reconnect Failed",
+				fmt.Sprintf("Unable to reconnect source account %s: %s", accountId, err),
+			)
+			return
+		}
+
+		tflog.Info(ctx, "Source account reconnected", map[string]interface{}{
+			"id": accountId,
+		})
+	}
+
+	// Step 3: Read the account back from the API to sync all fields.
+	newState, err := r.readSourceAccount(ctx, accountId, plan)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Read After Update Failed",
+			fmt.Sprintf("Unable to read source account %s after update: %s", accountId, err),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
+}
+
+// buildUpdateRequest compares plan and state and returns an UpdateSourceAccountRequest
+// if any mutable fields changed. Returns nil if nothing needs updating.
+func (r *SourceAccountResource) buildUpdateRequest(plan, state SourceAccountResourceModel) *client.UpdateSourceAccountRequest {
+	var req client.UpdateSourceAccountRequest
+	var changed bool
+
+	if plan.Name.ValueString() != state.Name.ValueString() {
+		name := plan.Name.ValueString()
+		req.Name = &name
+		changed = true
+	}
+
+	if plan.Aws != nil && state.Aws != nil &&
+		plan.Aws.RoleArn.ValueString() != state.Aws.RoleArn.ValueString() {
+		roleArn := plan.Aws.RoleArn.ValueString()
+		req.SourceAccountAttributes = &client.UpdateSourceAccountAttributes{
+			Aws: &client.UpdateAwsSourceAccountAttributes{
+				RoleArn: &roleArn,
+			},
+		}
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+	return &req
+}
+
+// readSourceAccount fetches a source account by ID and maps it to the resource model.
+// The plan is used to preserve user-configured values for fields not returned by the API.
+func (r *SourceAccountResource) readSourceAccount(ctx context.Context, accountId string, plan SourceAccountResourceModel) (*SourceAccountResourceModel, error) {
+	accounts, err := r.client.ListSourceAccounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list source accounts: %w", err)
+	}
+
+	for _, account := range accounts {
+		if account.Id != accountId {
+			continue
+		}
+
+		data := SourceAccountResourceModel{
+			Id:                types.StringValue(account.Id),
+			Name:              types.StringValue(account.GetName()),
+			Status:            types.StringValue(string(account.Status)),
+			ProviderAccountId: types.StringValue(account.GetProviderAccountId()),
+			CreatedAt:         plan.CreatedAt,
+			UpdatedAt:         types.StringValue(time.Now().Format(time.RFC3339)),
+		}
+
+		cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
+		data.CloudProvider = types.StringValue(cloudProvider.String())
+
+		switch cloudProvider {
+		case CloudProviderAWS:
+			if account.SourceAccountAttributes.HasAws() {
+				awsAttrs := account.SourceAccountAttributes.GetAws()
+				data.Aws = &AwsAccountConfigModel{
+					RoleArn: types.StringValue(awsAttrs.GetRoleArn()),
+				}
+				data.Role = types.StringValue(awsAttrs.GetRoleArn())
+			}
+		case CloudProviderAzure:
+			if account.SourceAccountAttributes.HasAzure() {
+				azureAttrs := account.SourceAccountAttributes.GetAzure()
+				data.Azure = &AzureAccountConfigModel{
+					TenantId:       types.StringValue(azureAttrs.GetTenantId()),
+					SubscriptionId: types.StringValue(account.GetProviderAccountId()),
+				}
+			}
+			data.Role = types.StringNull()
+		case CloudProviderGCP:
+			if account.SourceAccountAttributes.HasGcp() {
+				gcpAttrs := account.SourceAccountAttributes.GetGcp()
+				data.Gcp = &GcpAccountConfigModel{
+					ProjectId:      types.StringValue(account.GetProviderAccountId()),
+					ServiceAccount: types.StringValue(gcpAttrs.GetServiceAccount()),
+				}
+			}
+			data.Role = types.StringNull()
+		}
+
+		return &data, nil
+	}
+
+	return nil, fmt.Errorf("source account %s not found", accountId)
 }
 
 func (r *SourceAccountResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
