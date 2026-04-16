@@ -215,10 +215,78 @@ type UpdateAwsSourceAccountAttributes struct {
 	RoleArn *string
 }
 
-// UpdateSourceAccount updates mutable fields of a source account.
-// TODO: Replace with real API call when the endpoint is available.
+// updateSourceAccountAPIBody matches the API's expected JSON structure for
+// PATCH /v1/projects/{projectId}/source-accounts/{accountId}.
+type updateSourceAccountAPIBody struct {
+	Name                    *string                          `json:"name,omitempty"`
+	SourceAccountAttributes *updateSourceAccountAPIAttrsBody `json:"sourceAccountAttributes,omitempty"`
+}
+
+type updateSourceAccountAPIAttrsBody struct {
+	Aws *updateAwsAPIBody `json:"aws,omitempty"`
+}
+
+type updateAwsAPIBody struct {
+	RoleArn *string `json:"roleArn,omitempty"`
+}
+
+// updateSourceAccountAPIResponse wraps the API response.
+type updateSourceAccountAPIResponse struct {
+	SourceAccount externalEonSdkAPI.SourceAccount `json:"sourceAccount"`
+}
+
+// UpdateSourceAccount updates mutable fields of a source account via
+// PATCH /v1/projects/{projectId}/source-accounts/{accountId}.
 func (c *EonClient) UpdateSourceAccount(ctx context.Context, accountId string, req UpdateSourceAccountRequest) (*externalEonSdkAPI.SourceAccount, error) {
-	return nil, fmt.Errorf("UpdateSourceAccount API not yet implemented")
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	body := updateSourceAccountAPIBody{Name: req.Name}
+	if req.SourceAccountAttributes != nil && req.SourceAccountAttributes.Aws != nil {
+		body.SourceAccountAttributes = &updateSourceAccountAPIAttrsBody{
+			Aws: &updateAwsAPIBody{
+				RoleArn: req.SourceAccountAttributes.Aws.RoleArn,
+			},
+		}
+	}
+
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update request: %w", err)
+	}
+
+	baseURL := c.client.GetConfig().Servers[0].URL
+	url := fmt.Sprintf("%s/v1/projects/%s/source-accounts/%s", baseURL, c.projectID, accountId)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create update request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+	for key, value := range c.client.GetConfig().DefaultHeader {
+		httpReq.Header.Set(key, value)
+	}
+
+	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq) // #nosec G704 -- URL is built from trusted server configuration
+	if apiErr := c.handleAPIError(err, httpResp, "failed to update source account"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
+	}
+
+	var resp updateSourceAccountAPIResponse
+	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+		// If decoding fails, return nil — the caller re-reads via List anyway.
+		return nil, nil
+	}
+	return &resp.SourceAccount, nil
 }
 
 // ReconnectSourceAccount reconnects a previously disconnected source account

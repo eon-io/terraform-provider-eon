@@ -89,7 +89,6 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "Date and time the source account was last updated.",
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -360,6 +359,7 @@ func (r *SourceAccountResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	accountId := state.Id.ValueString()
+	var latestAccount *externalEonSdkAPI.SourceAccount
 
 	// Step 1: Update mutable fields (name, role_arn) if changed.
 	updateReq := r.buildUpdateRequest(plan, state)
@@ -368,7 +368,7 @@ func (r *SourceAccountResource) Update(ctx context.Context, req resource.UpdateR
 			"id": accountId,
 		})
 
-		_, err := r.client.UpdateSourceAccount(ctx, accountId, *updateReq)
+		account, err := r.client.UpdateSourceAccount(ctx, accountId, *updateReq)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Update Failed",
@@ -376,6 +376,7 @@ func (r *SourceAccountResource) Update(ctx context.Context, req resource.UpdateR
 			)
 			return
 		}
+		latestAccount = account
 	}
 
 	// Step 2: Reconnect if the account is DISCONNECTED.
@@ -384,7 +385,7 @@ func (r *SourceAccountResource) Update(ctx context.Context, req resource.UpdateR
 			"id": accountId,
 		})
 
-		_, err := r.client.ReconnectSourceAccount(ctx, accountId)
+		account, err := r.client.ReconnectSourceAccount(ctx, accountId)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Reconnect Failed",
@@ -392,22 +393,28 @@ func (r *SourceAccountResource) Update(ctx context.Context, req resource.UpdateR
 			)
 			return
 		}
+		latestAccount = account
 
 		tflog.Info(ctx, "Source account reconnected", map[string]interface{}{
 			"id": accountId,
 		})
 	}
 
-	// Step 3: Read the account back from the API to sync all fields.
-	newState, err := r.readSourceAccount(ctx, accountId, plan)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Read After Update Failed",
-			fmt.Sprintf("Unable to read source account %s after update: %s", accountId, err),
-		)
+	// Step 3: Build new state from the API response, or read back if no response was returned.
+	if latestAccount == nil {
+		fetched, err := r.readSourceAccount(ctx, accountId, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Read After Update Failed",
+				fmt.Sprintf("Unable to read source account %s after update: %s", accountId, err),
+			)
+			return
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, fetched)...)
 		return
 	}
 
+	newState := r.mapAccountToState(latestAccount, plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
 }
 
@@ -440,8 +447,54 @@ func (r *SourceAccountResource) buildUpdateRequest(plan, state SourceAccountReso
 	return &req
 }
 
+// mapAccountToState maps a SourceAccount API response to the Terraform resource model.
+// The plan is used to preserve fields not returned by the API (timestamps).
+func (r *SourceAccountResource) mapAccountToState(account *externalEonSdkAPI.SourceAccount, plan SourceAccountResourceModel) *SourceAccountResourceModel {
+	data := SourceAccountResourceModel{
+		Id:                types.StringValue(account.Id),
+		Name:              types.StringValue(account.GetName()),
+		Status:            types.StringValue(string(account.Status)),
+		ProviderAccountId: types.StringValue(account.GetProviderAccountId()),
+		CreatedAt:         plan.CreatedAt,
+		UpdatedAt:         types.StringValue(time.Now().Format(time.RFC3339)),
+	}
+
+	cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
+	data.CloudProvider = types.StringValue(cloudProvider.String())
+
+	switch cloudProvider {
+	case CloudProviderAWS:
+		if account.SourceAccountAttributes.HasAws() {
+			awsAttrs := account.SourceAccountAttributes.GetAws()
+			data.Aws = &AwsAccountConfigModel{
+				RoleArn: types.StringValue(awsAttrs.GetRoleArn()),
+			}
+			data.Role = types.StringValue(awsAttrs.GetRoleArn())
+		}
+	case CloudProviderAzure:
+		if account.SourceAccountAttributes.HasAzure() {
+			azureAttrs := account.SourceAccountAttributes.GetAzure()
+			data.Azure = &AzureAccountConfigModel{
+				TenantId:       types.StringValue(azureAttrs.GetTenantId()),
+				SubscriptionId: types.StringValue(account.GetProviderAccountId()),
+			}
+		}
+		data.Role = types.StringNull()
+	case CloudProviderGCP:
+		if account.SourceAccountAttributes.HasGcp() {
+			gcpAttrs := account.SourceAccountAttributes.GetGcp()
+			data.Gcp = &GcpAccountConfigModel{
+				ProjectId:      types.StringValue(account.GetProviderAccountId()),
+				ServiceAccount: types.StringValue(gcpAttrs.GetServiceAccount()),
+			}
+		}
+		data.Role = types.StringNull()
+	}
+
+	return &data
+}
+
 // readSourceAccount fetches a source account by ID and maps it to the resource model.
-// The plan is used to preserve user-configured values for fields not returned by the API.
 func (r *SourceAccountResource) readSourceAccount(ctx context.Context, accountId string, plan SourceAccountResourceModel) (*SourceAccountResourceModel, error) {
 	accounts, err := r.client.ListSourceAccounts(ctx)
 	if err != nil {
@@ -452,49 +505,7 @@ func (r *SourceAccountResource) readSourceAccount(ctx context.Context, accountId
 		if account.Id != accountId {
 			continue
 		}
-
-		data := SourceAccountResourceModel{
-			Id:                types.StringValue(account.Id),
-			Name:              types.StringValue(account.GetName()),
-			Status:            types.StringValue(string(account.Status)),
-			ProviderAccountId: types.StringValue(account.GetProviderAccountId()),
-			CreatedAt:         plan.CreatedAt,
-			UpdatedAt:         types.StringValue(time.Now().Format(time.RFC3339)),
-		}
-
-		cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
-		data.CloudProvider = types.StringValue(cloudProvider.String())
-
-		switch cloudProvider {
-		case CloudProviderAWS:
-			if account.SourceAccountAttributes.HasAws() {
-				awsAttrs := account.SourceAccountAttributes.GetAws()
-				data.Aws = &AwsAccountConfigModel{
-					RoleArn: types.StringValue(awsAttrs.GetRoleArn()),
-				}
-				data.Role = types.StringValue(awsAttrs.GetRoleArn())
-			}
-		case CloudProviderAzure:
-			if account.SourceAccountAttributes.HasAzure() {
-				azureAttrs := account.SourceAccountAttributes.GetAzure()
-				data.Azure = &AzureAccountConfigModel{
-					TenantId:       types.StringValue(azureAttrs.GetTenantId()),
-					SubscriptionId: types.StringValue(account.GetProviderAccountId()),
-				}
-			}
-			data.Role = types.StringNull()
-		case CloudProviderGCP:
-			if account.SourceAccountAttributes.HasGcp() {
-				gcpAttrs := account.SourceAccountAttributes.GetGcp()
-				data.Gcp = &GcpAccountConfigModel{
-					ProjectId:      types.StringValue(account.GetProviderAccountId()),
-					ServiceAccount: types.StringValue(gcpAttrs.GetServiceAccount()),
-				}
-			}
-			data.Role = types.StringNull()
-		}
-
-		return &data, nil
+		return r.mapAccountToState(&account, plan), nil
 	}
 
 	return nil, fmt.Errorf("source account %s not found", accountId)
@@ -641,3 +652,4 @@ func (r *SourceAccountResource) findExistingAccount(ctx context.Context, cloudPr
 
 	return nil
 }
+
