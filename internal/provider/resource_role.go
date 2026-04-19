@@ -28,10 +28,10 @@ type RoleResource struct {
 }
 
 type RoleResourceModel struct {
-	Id                      types.String `tfsdk:"id"`
-	Name                    types.String `tfsdk:"name"`
-	PermissionGrants        types.List   `tfsdk:"permission_grants"`
-	AccessConditions        types.List   `tfsdk:"access_conditions"`
+	Id                       types.String `tfsdk:"id"`
+	Name                     types.String `tfsdk:"name"`
+	PermissionGrants         types.List   `tfsdk:"permission_grants"`
+	AccessConditions         types.List   `tfsdk:"access_conditions"`
 	RestoreDestinationLimits types.Object `tfsdk:"restore_destination_limits"`
 }
 

@@ -28,11 +28,11 @@ type RolesDataSourceModel struct {
 }
 
 type RoleModel struct {
-	Id                      types.String `tfsdk:"id"`
-	Name                    types.String `tfsdk:"name"`
-	IsBuiltInRole           types.Bool   `tfsdk:"is_built_in_role"`
-	PermissionGrants        types.List   `tfsdk:"permission_grants"`
-	AccessConditions        types.List   `tfsdk:"access_conditions"`
+	Id                       types.String `tfsdk:"id"`
+	Name                     types.String `tfsdk:"name"`
+	IsBuiltInRole            types.Bool   `tfsdk:"is_built_in_role"`
+	PermissionGrants         types.List   `tfsdk:"permission_grants"`
+	AccessConditions         types.List   `tfsdk:"access_conditions"`
 	RestoreDestinationLimits types.Object `tfsdk:"restore_destination_limits"`
 }
 
