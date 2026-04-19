@@ -111,6 +111,10 @@ output "role_ids_by_name" {
 <a id="nestedatt--roles"></a>
 ### Nested Schema for `roles`
 
+Optional:
+
+- `restore_destination_limits` (Attributes) Optional limits on which restore destination accounts are allowed or denied for this role. (see [below for nested schema](#nestedatt--roles--restore_destination_limits))
+
 Read-Only:
 
 - `access_conditions` (Attributes List) Optional list of access conditions that can be referenced by permission_grants to restrict the scope of permissions. (see [below for nested schema](#nestedatt--roles--access_conditions))
@@ -118,6 +122,15 @@ Read-Only:
 - `is_built_in_role` (Boolean) Whether the role is a built-in role provided by Eon (true) or a custom role (false). Built-in roles cannot be modified or deleted.
 - `name` (String) Display name of the role.
 - `permission_grants` (Attributes List) List of permissions granted by the role. (see [below for nested schema](#nestedatt--roles--permission_grants))
+
+<a id="nestedatt--roles--restore_destination_limits"></a>
+### Nested Schema for `roles.restore_destination_limits`
+
+Read-Only:
+
+- `effect` (String) Effect of the limit (e.g. ALLOW, DENY).
+- `restore_account_provider_ids` (List of String) List of restore account provider IDs to match against.
+
 
 <a id="nestedatt--roles--access_conditions"></a>
 ### Nested Schema for `roles.access_conditions`
