@@ -244,9 +244,7 @@ func (r *RestoreAccountResource) Create(ctx context.Context, req resource.Create
 	data.Status = types.StringValue(string(account.Status))
 	data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
 
-	if account.RestoreAccountAttributes.HasCloudProvider() {
-		data.CloudProvider = types.StringValue(string(account.RestoreAccountAttributes.GetCloudProvider()))
-	}
+	data.CloudProvider = types.StringValue(string(account.RestoreAccountAttributes.GetCloudProvider()))
 
 	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
@@ -292,11 +290,8 @@ func (r *RestoreAccountResource) Read(ctx context.Context, req resource.ReadRequ
 			data.Status = types.StringValue(string(account.Status))
 			data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
 
-			var cloudProvider CloudProvider
-			if account.RestoreAccountAttributes.HasCloudProvider() {
-				cloudProvider = CloudProvider(account.RestoreAccountAttributes.GetCloudProvider())
-				data.CloudProvider = types.StringValue(cloudProvider.String())
-			}
+			cloudProvider := CloudProvider(account.RestoreAccountAttributes.GetCloudProvider())
+			data.CloudProvider = types.StringValue(cloudProvider.String())
 
 			// Populate cloud-specific blocks from API response
 			switch cloudProvider {
@@ -414,11 +409,8 @@ func (r *RestoreAccountResource) ImportState(ctx context.Context, req resource.I
 			data.Status = types.StringValue(string(account.Status))
 			data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
 
-			var cloudProvider CloudProvider
-			if account.RestoreAccountAttributes.HasCloudProvider() {
-				cloudProvider = CloudProvider(account.RestoreAccountAttributes.GetCloudProvider())
-				data.CloudProvider = types.StringValue(cloudProvider.String())
-			}
+			cloudProvider := CloudProvider(account.RestoreAccountAttributes.GetCloudProvider())
+			data.CloudProvider = types.StringValue(cloudProvider.String())
 
 			// Populate cloud-specific blocks from API response
 			switch cloudProvider {

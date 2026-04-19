@@ -333,7 +333,7 @@ func (c *EonClient) GetRestoreJob(ctx context.Context, jobId string) (*externalE
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.JobsAPI.GetRestoreJob(ctx, jobId, c.projectID).Execute()
+	resp, httpResp, err := c.client.JobsAPI.GetRestoreJob(ctx, c.projectID, jobId).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get restore job"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -376,7 +376,7 @@ func (c *EonClient) GetResourceById(ctx context.Context, resourceId string) (*ex
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.ResourcesAPI.GetResource(ctx, resourceId, c.projectID).Execute()
+	resp, httpResp, err := c.client.ResourcesAPI.GetResource(ctx, c.projectID, resourceId).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get resource"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -610,7 +610,7 @@ func (c *EonClient) GetSnapshot(ctx context.Context, snapshotId string) (*extern
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.GetSnapshot(ctx, snapshotId, c.projectID).Execute()
+	resp, httpResp, err := c.client.SnapshotsAPI.GetSnapshot(ctx, c.projectID, snapshotId).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get snapshot"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -689,7 +689,7 @@ func (c *EonClient) GetBackupPolicy(ctx context.Context, policyId string) (*exte
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.BackupPoliciesAPI.GetBackupPolicy(ctx, policyId, c.projectID).Execute()
+	resp, httpResp, err := c.client.BackupPoliciesAPI.GetBackupPolicy(ctx, c.projectID, policyId).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get backup policy"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -733,7 +733,7 @@ func (c *EonClient) UpdateBackupPolicy(ctx context.Context, policyId string, req
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.BackupPoliciesAPI.UpdateBackupPolicy(ctx, policyId, c.projectID).UpdateBackupPolicyRequest(req).Execute()
+	resp, httpResp, err := c.client.BackupPoliciesAPI.UpdateBackupPolicy(ctx, c.projectID, policyId).UpdateBackupPolicyRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to update backup policy"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -754,7 +754,7 @@ func (c *EonClient) DeleteBackupPolicy(ctx context.Context, policyId string) err
 		return fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	httpResp, err := c.client.BackupPoliciesAPI.DeleteBackupPolicy(ctx, policyId, c.projectID).Execute()
+	httpResp, err := c.client.BackupPoliciesAPI.DeleteBackupPolicy(ctx, c.projectID, policyId).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to delete backup policy"); apiErr != nil {
 		return apiErr
 	}
@@ -798,7 +798,7 @@ func (c *EonClient) GetVault(ctx context.Context, vaultId string) (*externalEonS
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.VaultsAPI.GetVault(ctx, vaultId, c.projectID).Execute()
+	resp, httpResp, err := c.client.VaultsAPI.GetVault(ctx, c.projectID, vaultId).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get vault"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -822,7 +822,7 @@ func (c *EonClient) UpdateVault(ctx context.Context, vaultId string, req externa
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.VaultsAPI.UpdateVault(ctx, vaultId, c.projectID).UpdateVaultRequest(req).Execute()
+	resp, httpResp, err := c.client.VaultsAPI.UpdateVault(ctx, c.projectID, vaultId).UpdateVaultRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to update vault"); apiErr != nil {
 		return nil, apiErr
 	}

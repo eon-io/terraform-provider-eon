@@ -124,11 +124,7 @@ func (d *RestoreAccountsDataSource) Read(ctx context.Context, req datasource.Rea
 			UpdatedAt:         types.StringNull(),
 		}
 
-		if account.RestoreAccountAttributes.HasCloudProvider() {
-			accountModel.Provider = types.StringValue(string(account.RestoreAccountAttributes.GetCloudProvider()))
-		} else {
-			accountModel.Provider = types.StringNull()
-		}
+		accountModel.Provider = types.StringValue(string(account.RestoreAccountAttributes.GetCloudProvider()))
 
 		data.Accounts = append(data.Accounts, accountModel)
 	}

@@ -1474,10 +1474,11 @@ func (r *RestoreJobResource) createGcpCloudSqlRestore(ctx context.Context, data 
 		sqlTarget.Labels = &sqlLabels
 	}
 
+	nullableSqlTarget := externalEonSdkAPI.NewNullableGcpCloudSqlTarget(sqlTarget)
 	apiReq := externalEonSdkAPI.RestoreGcpCloudSqlRequest{
 		RestoreAccountId: data.RestoreAccountId.ValueString(),
 		Destination: externalEonSdkAPI.GcpCloudSqlRestoreDestination{
-			GcpCloudSql: sqlTarget,
+			GcpCloudSql: *nullableSqlTarget,
 		},
 	}
 
