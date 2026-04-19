@@ -688,6 +688,93 @@ func TestCreateHighFrequencyIntervalConfig(t *testing.T) {
 	}
 }
 
+// TestAwsNativePitrPlanConfig tests the AWS native PITR backup policy plan SDK construction
+func TestAwsNativePitrPlanConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		retentionDays int64
+		resourceType  string
+		shouldError   bool
+	}{
+		{
+			name:          "valid RDS PITR plan with 7 day retention",
+			retentionDays: 7,
+			resourceType:  "AWS_RDS",
+			shouldError:   false,
+		},
+		{
+			name:          "valid RDS PITR plan with 1 day retention (minimum)",
+			retentionDays: 1,
+			resourceType:  "AWS_RDS",
+			shouldError:   false,
+		},
+		{
+			name:          "valid RDS PITR plan with 35 day retention (maximum)",
+			retentionDays: 35,
+			resourceType:  "AWS_RDS",
+			shouldError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			retentionDays, err := SafeInt32Conversion(tt.retentionDays)
+			assert.NoError(t, err, "Should convert retention days to int32")
+
+			resourceType := externalEonSdkAPI.NewAwsNativePitrBackupResourceType()
+			resourceType.SetResourceType(externalEonSdkAPI.ResourceType(tt.resourceType))
+			assert.Equal(t, externalEonSdkAPI.ResourceType(tt.resourceType), resourceType.GetResourceType())
+
+			plan := externalEonSdkAPI.NewAwsNativePitrBackupPolicyPlan(retentionDays, *resourceType)
+			assert.NotNil(t, plan, "Plan should not be nil")
+			assert.Equal(t, retentionDays, plan.GetRetentionDays(), "Retention days should match")
+			planResourceType := plan.GetResourceType()
+			assert.Equal(t, externalEonSdkAPI.ResourceType(tt.resourceType), planResourceType.GetResourceType(), "Resource type should match")
+
+			backupPlan := externalEonSdkAPI.NewBackupPolicyPlan(externalEonSdkAPI.BACKUP_POLICY_TYPE_AWS_NATIVE_PITR)
+			backupPlan.SetAwsNativePitrPlan(*plan)
+			assert.True(t, backupPlan.HasAwsNativePitrPlan(), "Should have AWS native PITR plan set")
+			assert.Equal(t, externalEonSdkAPI.BACKUP_POLICY_TYPE_AWS_NATIVE_PITR, backupPlan.GetBackupPolicyType())
+		})
+	}
+}
+
+// TestAwsNativePitrCreateWithMockClient tests creation of AWS_NATIVE_PITR policy with mock client
+func TestAwsNativePitrCreateWithMockClient(t *testing.T) {
+	t.Parallel()
+
+	mockClient := client.NewMockEonClient()
+
+	resourceType := externalEonSdkAPI.NewAwsNativePitrBackupResourceType()
+	resourceType.SetResourceType(externalEonSdkAPI.AWS_RDS)
+
+	pitrPlan := externalEonSdkAPI.NewAwsNativePitrBackupPolicyPlan(7, *resourceType)
+
+	backupPlan := externalEonSdkAPI.NewBackupPolicyPlan(externalEonSdkAPI.BACKUP_POLICY_TYPE_AWS_NATIVE_PITR)
+	backupPlan.SetAwsNativePitrPlan(*pitrPlan)
+
+	createReq := externalEonSdkAPI.NewCreateBackupPolicyRequest(
+		"rds-pitr-policy",
+		*externalEonSdkAPI.NewBackupPolicyResourceSelector(
+			externalEonSdkAPI.ResourceSelectorMode("ALL"),
+		),
+		*backupPlan,
+	)
+	createReq.SetEnabled(true)
+
+	policy, err := mockClient.CreateBackupPolicy(context.Background(), *createReq)
+	assert.NoError(t, err, "Create should not error")
+	assert.NotNil(t, policy, "Policy should not be nil")
+	assert.Equal(t, "rds-pitr-policy", policy.Name)
+	assert.True(t, policy.Enabled)
+	assert.NotEmpty(t, policy.Id)
+	assert.Equal(t, 1, mockClient.CreateCalls)
+}
+
 // TestStandardIntervalConversion validates the minutes-to-hours conversion for standard policies
 func TestStandardIntervalConversion(t *testing.T) {
 	t.Parallel()

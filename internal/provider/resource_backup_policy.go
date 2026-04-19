@@ -55,6 +55,11 @@ type HighFrequencyPlanModel struct {
 	BackupSchedules types.List `tfsdk:"backup_schedules"`
 }
 
+type AwsNativePitrPlanModel struct {
+	RetentionDays types.Int64  `tfsdk:"retention_days"`
+	ResourceType  types.String `tfsdk:"resource_type"`
+}
+
 type BackupScheduleModel struct {
 	VaultId        types.String `tfsdk:"vault_id"`
 	RetentionDays  types.Int64  `tfsdk:"retention_days"`
@@ -576,7 +581,7 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 				Required:            true,
 				Attributes: map[string]schema.Attribute{
 					"backup_policy_type": schema.StringAttribute{
-						MarkdownDescription: "Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', or 'PITR'",
+						MarkdownDescription: "Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', 'PITR', or 'AWS_NATIVE_PITR'",
 						Required:            true,
 					},
 					"standard_plan": schema.SingleNestedAttribute{
@@ -769,6 +774,20 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 										},
 									},
 								},
+							},
+						},
+					},
+					"aws_native_pitr_plan": schema.SingleNestedAttribute{
+						MarkdownDescription: "AWS native PITR (Point-in-Time Recovery) backup plan for RDS/Aurora continuous backups",
+						Optional:            true,
+						Attributes: map[string]schema.Attribute{
+							"retention_days": schema.Int64Attribute{
+								MarkdownDescription: "Number of days to retain continuous backups using AWS Backup. AWS allows 1-35 days for RDS/Aurora continuous backups",
+								Required:            true,
+							},
+							"resource_type": schema.StringAttribute{
+								MarkdownDescription: "Resource type for PITR backup, e.g. 'AWS_RDS'",
+								Required:            true,
 							},
 						},
 					},
@@ -971,10 +990,34 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		)
 		backupPlan.SetHighFrequencyPlan(*highFrequencyPlan)
 
+	case "AWS_NATIVE_PITR":
+		awsNativePitrPlanObj := backupPlanAttrs["aws_native_pitr_plan"].(types.Object)
+		var awsNativePitrPlanModel AwsNativePitrPlanModel
+		diags = awsNativePitrPlanObj.As(ctx, &awsNativePitrPlanModel, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
+		retentionDays, err := SafeInt32Conversion(awsNativePitrPlanModel.RetentionDays.ValueInt64())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Invalid Retention Days",
+				fmt.Sprintf("Failed to validate retention days: %s", err),
+			)
+			return
+		}
+
+		resourceType := externalEonSdkAPI.NewAwsNativePitrBackupResourceType()
+		resourceType.SetResourceType(externalEonSdkAPI.ResourceType(awsNativePitrPlanModel.ResourceType.ValueString()))
+
+		awsNativePitrPlan := externalEonSdkAPI.NewAwsNativePitrBackupPolicyPlan(retentionDays, *resourceType)
+		backupPlan.SetAwsNativePitrPlan(*awsNativePitrPlan)
+
 	default:
 		resp.Diagnostics.AddError(
 			"Unsupported Backup Policy Type",
-			fmt.Sprintf("Backup policy type '%s' is not supported. Only STANDARD, HIGH_FREQUENCY, and PITR are currently supported.",
+			fmt.Sprintf("Backup policy type '%s' is not supported. Supported types: STANDARD, PITR, HIGH_FREQUENCY, AWS_NATIVE_PITR.",
 				backupPolicyType.ValueString()),
 		)
 		return
@@ -1215,10 +1258,34 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		)
 		backupPlan.SetHighFrequencyPlan(*highFrequencyPlan)
 
+	case "AWS_NATIVE_PITR":
+		awsNativePitrPlanObj := backupPlanAttrs["aws_native_pitr_plan"].(types.Object)
+		var awsNativePitrPlanModel AwsNativePitrPlanModel
+		diags := awsNativePitrPlanObj.As(ctx, &awsNativePitrPlanModel, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
+		retentionDays, err := SafeInt32Conversion(awsNativePitrPlanModel.RetentionDays.ValueInt64())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Invalid Retention Days",
+				fmt.Sprintf("Failed to validate retention days: %s", err),
+			)
+			return
+		}
+
+		resourceType := externalEonSdkAPI.NewAwsNativePitrBackupResourceType()
+		resourceType.SetResourceType(externalEonSdkAPI.ResourceType(awsNativePitrPlanModel.ResourceType.ValueString()))
+
+		awsNativePitrPlan := externalEonSdkAPI.NewAwsNativePitrBackupPolicyPlan(retentionDays, *resourceType)
+		backupPlan.SetAwsNativePitrPlan(*awsNativePitrPlan)
+
 	default:
 		resp.Diagnostics.AddError(
 			"Unsupported Backup Policy Type",
-			fmt.Sprintf("Backup policy type '%s' is not supported. Only STANDARD and PITR are currently supported.",
+			fmt.Sprintf("Backup policy type '%s' is not supported. Supported types: STANDARD, PITR, HIGH_FREQUENCY, AWS_NATIVE_PITR.",
 				backupPolicyType.ValueString()),
 		)
 		return
