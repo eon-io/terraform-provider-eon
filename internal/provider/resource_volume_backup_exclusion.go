@@ -47,7 +47,7 @@ func (r *VolumeBackupExclusionResource) Schema(ctx context.Context, req resource
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"volume_id": schema.StringAttribute{
-				MarkdownDescription: "Eon-assigned ID of the EBS volume to exclude from backup.",
+				MarkdownDescription: "AWS EBS volume ID (`vol-…`) of the volume to exclude from backup. The volume must be attached to the EC2 instance and must not be the root volume.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},

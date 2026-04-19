@@ -27,7 +27,7 @@ terraform {
 # Example: Exclude a specific EBS volume from EC2 instance backups
 resource "eon_volume_backup_exclusion" "data_volume" {
   resource_id = "1ee34dc5-0a7c-4e56-a820-917371e05c8d" # EC2 instance resource ID in Eon
-  volume_id   = "2ff45ed6-1b8d-5f67-b931-a28482f16d9e" # EBS volume ID in Eon
+  volume_id   = "vol-049df61146c064d1c"                # AWS EBS volume ID
 }
 ```
 
@@ -37,4 +37,4 @@ resource "eon_volume_backup_exclusion" "data_volume" {
 ### Required
 
 - `resource_id` (String) Eon-assigned ID of the EC2 instance resource.
-- `volume_id` (String) Eon-assigned ID of the EBS volume to exclude from backup.
+- `volume_id` (String) AWS EBS volume ID (`vol-…`) of the volume to exclude from backup. The volume must be attached to the EC2 instance and must not be the root volume.
