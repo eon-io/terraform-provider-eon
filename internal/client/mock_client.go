@@ -402,9 +402,7 @@ func (m *MockEonClient) UpdateRole(ctx context.Context, roleId string, req exter
 	}
 	r.Name = req.GetName()
 	r.PermissionGrants = permissionGrantInputToGrant(req.GetPermissionGrants())
-	if req.AccessConditions != nil {
-		r.AccessConditions = req.AccessConditions
-	}
+	r.AccessConditions = req.AccessConditions
 	if req.HasRestoreDestinationLimits() {
 		rdl := req.GetRestoreDestinationLimits()
 		r.RestoreDestinationLimits = *externalEonSdkAPI.NewNullableRestoreDestinationLimits(&rdl)
