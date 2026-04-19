@@ -187,9 +187,12 @@ func (d *RolesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		rdlVal := types.ObjectNull(restoreDestinationLimitsAttrTypes)
 		if r.HasRestoreDestinationLimits() {
 			rdl := r.GetRestoreDestinationLimits()
-			if v, d := flattenRestoreDestinationLimits(rdl); !d.HasError() {
-				rdlVal = v
+			v, d := flattenRestoreDestinationLimits(rdl)
+			if d.HasError() {
+				resp.Diagnostics.Append(d...)
+				return
 			}
+			rdlVal = v
 		}
 
 		data.Roles = append(data.Roles, RoleModel{
