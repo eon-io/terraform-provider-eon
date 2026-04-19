@@ -505,12 +505,22 @@ output "backup_policies_summary" {
 
 Required:
 
-- `backup_policy_type` (String) Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', or 'PITR'
+- `backup_policy_type` (String) Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', 'PITR', or 'AWS_NATIVE_PITR'
 
 Optional:
 
+- `aws_native_pitr_plan` (Attributes) AWS native PITR (Point-in-Time Recovery) backup plan for RDS/Aurora continuous backups (see [below for nested schema](#nestedatt--backup_plan--aws_native_pitr_plan))
 - `high_frequency_plan` (Attributes) High frequency backup plan configuration (see [below for nested schema](#nestedatt--backup_plan--high_frequency_plan))
 - `standard_plan` (Attributes) Standard backup plan configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan))
+
+<a id="nestedatt--backup_plan--aws_native_pitr_plan"></a>
+### Nested Schema for `backup_plan.aws_native_pitr_plan`
+
+Required:
+
+- `resource_type` (String) Resource type for PITR backup, e.g. 'AWS_RDS'
+- `retention_days` (Number) Number of days to retain continuous backups using AWS Backup. AWS allows 1-35 days for RDS/Aurora continuous backups
+
 
 <a id="nestedatt--backup_plan--high_frequency_plan"></a>
 ### Nested Schema for `backup_plan.high_frequency_plan`

@@ -75,7 +75,7 @@ resource "local_file" "backup_policy_report" {
 
 Read-Only:
 
-- `backup_policy_type` (String) The type of the policy. Possible values: `UNSPECIFIED`, `STANDARD`, `HIGH_FREQUENCY`.
+- `backup_policy_type` (String) The type of the policy. Possible values: `UNSPECIFIED`, `STANDARD`, `HIGH_FREQUENCY`, `PITR`, `AWS_NATIVE_PITR`.
 - `enabled` (Boolean) Whether the backup policy is enabled.
 - `id` (String) Backup policy ID.
 - `name` (String) Backup policy display name.
