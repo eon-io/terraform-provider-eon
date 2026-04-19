@@ -238,6 +238,8 @@ func (r *RoleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		if rdl != nil {
 			updateReq.SetRestoreDestinationLimits(*rdl)
 		}
+	} else {
+		updateReq.SetRestoreDestinationLimitsNil()
 	}
 
 	tflog.Debug(ctx, "Updating role", map[string]interface{}{
