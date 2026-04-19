@@ -614,6 +614,43 @@ func roleResourceIdConditionToSDK(ctx context.Context, obj types.Object) (*exter
 	return externalEonSdkAPI.NewResourceIdCondition(op, list), nil
 }
 
+// restoreDestinationLimitsAttrTypes is the attr type map for restore_destination_limits.
+var restoreDestinationLimitsAttrTypes = map[string]attr.Type{
+	"effect":                       types.StringType,
+	"restore_account_provider_ids": types.ListType{ElemType: types.StringType},
+}
+
+// restoreDestinationLimitsToSDK converts a Terraform restore_destination_limits object to the SDK type.
+func restoreDestinationLimitsToSDK(ctx context.Context, obj types.Object) (*externalEonSdkAPI.RestoreDestinationLimits, diag.Diagnostics) {
+	if obj.IsNull() || obj.IsUnknown() {
+		return nil, nil
+	}
+	attrs := obj.Attributes()
+	effect := externalEonSdkAPI.AccessConditionEffect(attrs["effect"].(types.String).ValueString())
+	var ids []string
+	if d := attrs["restore_account_provider_ids"].(types.List).ElementsAs(ctx, &ids, false); d.HasError() {
+		return nil, d
+	}
+	return externalEonSdkAPI.NewRestoreDestinationLimits(effect, ids), nil
+}
+
+// flattenRestoreDestinationLimits converts an SDK RestoreDestinationLimits to a Terraform types.Object.
+func flattenRestoreDestinationLimits(rdl externalEonSdkAPI.RestoreDestinationLimits) (types.Object, diag.Diagnostics) {
+	ids := rdl.GetRestoreAccountProviderIds()
+	idVals := make([]attr.Value, len(ids))
+	for i, id := range ids {
+		idVals[i] = types.StringValue(id)
+	}
+	idList, d := types.ListValue(types.StringType, idVals)
+	if d.HasError() {
+		return types.ObjectNull(restoreDestinationLimitsAttrTypes), d
+	}
+	return types.ObjectValue(restoreDestinationLimitsAttrTypes, map[string]attr.Value{
+		"effect":                       types.StringValue(string(rdl.GetEffect())),
+		"restore_account_provider_ids": idList,
+	})
+}
+
 // roleAccessConditionAttrTypes is the attr type map for one access condition (id, effect, expression).
 var roleAccessConditionAttrTypes = map[string]attr.Type{
 	"id":         types.StringType,

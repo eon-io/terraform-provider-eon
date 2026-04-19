@@ -140,6 +140,22 @@ resource "eon_role" "prod_ec2_only" {
   ]
 }
 
+# Example: Role with restore_destination_limits (restrict which restore accounts can be used)
+resource "eon_role" "restricted_restores" {
+  name = "Restricted Restore Operator (Custom)"
+
+  permission_grants = [
+    { permission = "restores.create" },
+    { permission = "inventory.view" },
+  ]
+
+  # Allow restores only to specific restore account providers
+  restore_destination_limits = {
+    effect                       = "ALLOW"
+    restore_account_provider_ids = ["account-provider-id-1", "account-provider-id-2"]
+  }
+}
+
 # For built-in roles in eon_idp_group, use the eon_builtin_roles data source (stable keys), not lookup by display name.
 ```
 
@@ -154,6 +170,7 @@ resource "eon_role" "prod_ec2_only" {
 ### Optional
 
 - `access_conditions` (Attributes List) Optional list of access conditions that can be referenced by permission_grants to restrict the scope of permissions. (see [below for nested schema](#nestedatt--access_conditions))
+- `restore_destination_limits` (Attributes) Optional limits on which restore destination accounts are allowed or denied for this role. (see [below for nested schema](#nestedatt--restore_destination_limits))
 
 ### Read-Only
 
@@ -511,3 +528,12 @@ Required:
 
 - `operator` (String) Operator: IN or NOT_IN
 - `vpcs` (List of String) List of VPCs
+
+
+<a id="nestedatt--restore_destination_limits"></a>
+### Nested Schema for `restore_destination_limits`
+
+Required:
+
+- `effect` (String) Effect of the limit (e.g. ALLOW, DENY).
+- `restore_account_provider_ids` (List of String) List of restore account provider IDs to match against.

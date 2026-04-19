@@ -374,6 +374,10 @@ func (m *MockEonClient) CreateRole(ctx context.Context, req externalEonSdkAPI.Cr
 	if req.AccessConditions != nil {
 		role.AccessConditions = req.AccessConditions
 	}
+	if req.HasRestoreDestinationLimits() {
+		rdl := req.GetRestoreDestinationLimits()
+		role.RestoreDestinationLimits = *externalEonSdkAPI.NewNullableRestoreDestinationLimits(&rdl)
+	}
 	m.Roles[id] = role
 	return role, nil
 }
@@ -400,6 +404,12 @@ func (m *MockEonClient) UpdateRole(ctx context.Context, roleId string, req exter
 	r.PermissionGrants = permissionGrantInputToGrant(req.GetPermissionGrants())
 	if req.AccessConditions != nil {
 		r.AccessConditions = req.AccessConditions
+	}
+	if req.HasRestoreDestinationLimits() {
+		rdl := req.GetRestoreDestinationLimits()
+		r.RestoreDestinationLimits = *externalEonSdkAPI.NewNullableRestoreDestinationLimits(&rdl)
+	} else {
+		r.RestoreDestinationLimits.Unset()
 	}
 	m.Roles[roleId] = r
 	return r, nil

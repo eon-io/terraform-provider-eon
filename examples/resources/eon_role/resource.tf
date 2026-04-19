@@ -125,4 +125,20 @@ resource "eon_role" "prod_ec2_only" {
   ]
 }
 
+# Example: Role with restore_destination_limits (restrict which restore accounts can be used)
+resource "eon_role" "restricted_restores" {
+  name = "Restricted Restore Operator (Custom)"
+
+  permission_grants = [
+    { permission = "restores.create" },
+    { permission = "inventory.view" },
+  ]
+
+  # Allow restores only to specific restore account providers
+  restore_destination_limits = {
+    effect                       = "ALLOW"
+    restore_account_provider_ids = ["account-provider-id-1", "account-provider-id-2"]
+  }
+}
+
 # For built-in roles in eon_idp_group, use the eon_builtin_roles data source (stable keys), not lookup by display name.

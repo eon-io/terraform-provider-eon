@@ -28,11 +28,12 @@ type RolesDataSourceModel struct {
 }
 
 type RoleModel struct {
-	Id               types.String `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	IsBuiltInRole    types.Bool   `tfsdk:"is_built_in_role"`
-	PermissionGrants types.List   `tfsdk:"permission_grants"`
-	AccessConditions types.List   `tfsdk:"access_conditions"`
+	Id                      types.String `tfsdk:"id"`
+	Name                    types.String `tfsdk:"name"`
+	IsBuiltInRole           types.Bool   `tfsdk:"is_built_in_role"`
+	PermissionGrants        types.List   `tfsdk:"permission_grants"`
+	AccessConditions        types.List   `tfsdk:"access_conditions"`
+	RestoreDestinationLimits types.Object `tfsdk:"restore_destination_limits"`
 }
 
 type PermissionGrantModel struct {
@@ -109,6 +110,22 @@ func (d *RolesDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 								},
 							},
 						},
+						"restore_destination_limits": schema.SingleNestedAttribute{
+							MarkdownDescription: "Optional limits on which restore destination accounts are allowed or denied for this role.",
+							Computed:            true,
+							Optional:            true,
+							Attributes: map[string]schema.Attribute{
+								"effect": schema.StringAttribute{
+									MarkdownDescription: "Effect of the limit (e.g. ALLOW, DENY).",
+									Computed:            true,
+								},
+								"restore_account_provider_ids": schema.ListAttribute{
+									MarkdownDescription: "List of restore account provider IDs to match against.",
+									Computed:            true,
+									ElementType:         types.StringType,
+								},
+							},
+						},
 					},
 				},
 			},
@@ -167,12 +184,21 @@ func (d *RolesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			}
 		}
 
+		rdlVal := types.ObjectNull(restoreDestinationLimitsAttrTypes)
+		if r.HasRestoreDestinationLimits() {
+			rdl := r.GetRestoreDestinationLimits()
+			if v, d := flattenRestoreDestinationLimits(rdl); !d.HasError() {
+				rdlVal = v
+			}
+		}
+
 		data.Roles = append(data.Roles, RoleModel{
-			Id:               types.StringValue(r.GetId()),
-			Name:             types.StringValue(r.GetName()),
-			IsBuiltInRole:    types.BoolValue(r.GetIsBuiltInRole()),
-			PermissionGrants: permGrantsVal,
-			AccessConditions: accessCondsVal,
+			Id:                       types.StringValue(r.GetId()),
+			Name:                     types.StringValue(r.GetName()),
+			IsBuiltInRole:            types.BoolValue(r.GetIsBuiltInRole()),
+			PermissionGrants:         permGrantsVal,
+			AccessConditions:         accessCondsVal,
+			RestoreDestinationLimits: rdlVal,
 		})
 	}
 

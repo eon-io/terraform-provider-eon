@@ -28,10 +28,11 @@ type RoleResource struct {
 }
 
 type RoleResourceModel struct {
-	Id               types.String `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	PermissionGrants types.List   `tfsdk:"permission_grants"`
-	AccessConditions types.List   `tfsdk:"access_conditions"`
+	Id                      types.String `tfsdk:"id"`
+	Name                    types.String `tfsdk:"name"`
+	PermissionGrants        types.List   `tfsdk:"permission_grants"`
+	AccessConditions        types.List   `tfsdk:"access_conditions"`
+	RestoreDestinationLimits types.Object `tfsdk:"restore_destination_limits"`
 }
 
 type RolePermissionGrantModel struct {
@@ -99,6 +100,21 @@ func (r *RoleResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 					},
 				},
 			},
+			"restore_destination_limits": schema.SingleNestedAttribute{
+				MarkdownDescription: "Optional limits on which restore destination accounts are allowed or denied for this role.",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"effect": schema.StringAttribute{
+						MarkdownDescription: "Effect of the limit (e.g. ALLOW, DENY).",
+						Required:            true,
+					},
+					"restore_account_provider_ids": schema.ListAttribute{
+						MarkdownDescription: "List of restore account provider IDs to match against.",
+						Required:            true,
+						ElementType:         types.StringType,
+					},
+				},
+			},
 		},
 	}
 }
@@ -143,6 +159,17 @@ func (r *RoleResource) Create(ctx context.Context, req resource.CreateRequest, r
 			return
 		}
 		createReq.AccessConditions = accessConds
+	}
+
+	if !data.RestoreDestinationLimits.IsNull() && !data.RestoreDestinationLimits.IsUnknown() {
+		rdl, diags := restoreDestinationLimitsToSDK(ctx, data.RestoreDestinationLimits)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		if rdl != nil {
+			createReq.SetRestoreDestinationLimits(*rdl)
+		}
 	}
 
 	tflog.Debug(ctx, "Creating role", map[string]interface{}{
@@ -202,6 +229,17 @@ func (r *RoleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		updateReq.AccessConditions = accessConds
 	}
 
+	if !plan.RestoreDestinationLimits.IsNull() && !plan.RestoreDestinationLimits.IsUnknown() {
+		rdl, diags := restoreDestinationLimitsToSDK(ctx, plan.RestoreDestinationLimits)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		if rdl != nil {
+			updateReq.SetRestoreDestinationLimits(*rdl)
+		}
+	}
+
 	tflog.Debug(ctx, "Updating role", map[string]interface{}{
 		"id": plan.Id.ValueString(),
 	})
@@ -257,6 +295,16 @@ func (r *RoleResource) ImportState(ctx context.Context, req resource.ImportState
 	} else if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 	}
+
+	if role.HasRestoreDestinationLimits() {
+		rdl := role.GetRestoreDestinationLimits()
+		rdlVal, d := flattenRestoreDestinationLimits(rdl)
+		if d.HasError() {
+			resp.Diagnostics.Append(d...)
+		} else {
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("restore_destination_limits"), rdlVal)...)
+		}
+	}
 }
 
 func (r *RoleResource) setModelFromRole(ctx context.Context, data *RoleResourceModel, role *externalEonSdkAPI.Role) {
@@ -270,6 +318,15 @@ func (r *RoleResource) setModelFromRole(ctx context.Context, data *RoleResourceM
 	accessCondsVal, diags := flattenRoleAccessConditions(ctx, role.GetAccessConditions())
 	if !diags.HasError() {
 		data.AccessConditions = accessCondsVal
+	}
+	if role.HasRestoreDestinationLimits() {
+		rdl := role.GetRestoreDestinationLimits()
+		rdlVal, d := flattenRestoreDestinationLimits(rdl)
+		if !d.HasError() {
+			data.RestoreDestinationLimits = rdlVal
+		}
+	} else {
+		data.RestoreDestinationLimits = types.ObjectNull(restoreDestinationLimitsAttrTypes)
 	}
 }
 
