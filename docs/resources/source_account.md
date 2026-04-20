@@ -100,7 +100,7 @@ output "gcp_production_account" {
 - `created_at` (String) Date and time the source account was connected to the Eon project.
 - `id` (String) Eon-assigned account ID.
 - `provider_account_id` (String, Deprecated) Cloud-provider-assigned account ID (AWS account ID or Azure subscription ID). Computed from the `aws` or `azure` block.
-- `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
+- `status` (String) Connection status of the source account. The provider automatically reconnects accounts that drift to `DISCONNECTED`. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
 - `updated_at` (String) Date and time the source account was last updated.
 
 <a id="nestedblock--aws"></a>
