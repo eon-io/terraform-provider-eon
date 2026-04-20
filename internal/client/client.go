@@ -64,6 +64,32 @@ func (c *EonClient) handleAPIError(err error, httpResp *http.Response, baseError
 	return nil
 }
 
+// GetSourceAccount retrieves a source account by ID via
+// GET /v1/projects/{projectId}/source-accounts/{accountId}.
+// Returns an *APIError with StatusCode 404 when the account does not exist.
+func (c *EonClient) GetSourceAccount(ctx context.Context, accountId string) (*externalEonSdkAPI.SourceAccount, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.GetSourceAccount(ctx, c.projectID, accountId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get source account"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	account := resp.GetSourceAccount()
+	return &account, nil
+}
+
 // ListSourceAccounts retrieves all source accounts for the project.
 // It paginates through all pages to return the complete list.
 func (c *EonClient) ListSourceAccounts(ctx context.Context) ([]externalEonSdkAPI.SourceAccount, error) {

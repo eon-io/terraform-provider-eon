@@ -271,75 +271,67 @@ func (r *SourceAccountResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	accounts, err := r.client.ListSourceAccounts(ctx)
+	account, err := r.client.GetSourceAccount(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read source accounts: %s", err))
-		return
-	}
-
-	var found bool
-	for _, account := range accounts {
-		if account.Id == data.Id.ValueString() {
-			found = true
-			data.Name = types.StringValue(account.GetName())
-			data.Status = types.StringValue(string(account.Status))
-			data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
-
-			cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
-			data.CloudProvider = types.StringValue(cloudProvider.String())
-
-			// Populate cloud-specific blocks from API response
-			switch cloudProvider {
-			case CloudProviderAWS:
-				if account.SourceAccountAttributes.HasAws() {
-					awsAttrs := account.SourceAccountAttributes.GetAws()
-					data.Aws = &AwsAccountConfigModel{
-						RoleArn: types.StringValue(awsAttrs.GetRoleArn()),
-					}
-					// Also populate deprecated role field for backward compatibility
-					data.Role = types.StringValue(awsAttrs.GetRoleArn())
-				}
-				data.Azure = nil
-				data.Gcp = nil
-			case CloudProviderAzure:
-				if account.SourceAccountAttributes.HasAzure() {
-					azureAttrs := account.SourceAccountAttributes.GetAzure()
-					data.Azure = &AzureAccountConfigModel{
-						TenantId:       types.StringValue(azureAttrs.GetTenantId()),
-						SubscriptionId: types.StringValue(account.GetProviderAccountId()), // subscription_id is the provider_account_id
-					}
-					// ResourceGroupName is not returned in the output model for source accounts
-				}
-				data.Aws = nil
-				data.Gcp = nil
-				data.Role = types.StringNull()
-			case CloudProviderGCP:
-				if account.SourceAccountAttributes.HasGcp() {
-					gcpAttrs := account.SourceAccountAttributes.GetGcp()
-					data.Gcp = &GcpAccountConfigModel{
-						ProjectId:      types.StringValue(account.GetProviderAccountId()), // project_id is the provider_account_id
-						ServiceAccount: types.StringValue(gcpAttrs.GetServiceAccount()),
-					}
-				}
-				data.Aws = nil
-				data.Azure = nil
-				data.Role = types.StringNull()
-			}
-
-			if data.CreatedAt.IsNull() || data.CreatedAt.IsUnknown() {
-				data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
-			}
-			if data.UpdatedAt.IsNull() || data.UpdatedAt.IsUnknown() {
-				data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
-			}
-
-			break
+		var apiErr *client.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
+			resp.State.RemoveResource(ctx)
+			return
 		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read source account: %s", err))
+		return
 	}
 
-	if !found {
-		resp.State.RemoveResource(ctx)
-		return
+	data.Name = types.StringValue(account.GetName())
+	data.Status = types.StringValue(string(account.Status))
+	data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
+
+	cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
+	data.CloudProvider = types.StringValue(cloudProvider.String())
+
+	// Populate cloud-specific blocks from API response
+	switch cloudProvider {
+	case CloudProviderAWS:
+		if account.SourceAccountAttributes.HasAws() {
+			awsAttrs := account.SourceAccountAttributes.GetAws()
+			data.Aws = &AwsAccountConfigModel{
+				RoleArn: types.StringValue(awsAttrs.GetRoleArn()),
+			}
+			// Also populate deprecated role field for backward compatibility
+			data.Role = types.StringValue(awsAttrs.GetRoleArn())
+		}
+		data.Azure = nil
+		data.Gcp = nil
+	case CloudProviderAzure:
+		if account.SourceAccountAttributes.HasAzure() {
+			azureAttrs := account.SourceAccountAttributes.GetAzure()
+			data.Azure = &AzureAccountConfigModel{
+				TenantId:       types.StringValue(azureAttrs.GetTenantId()),
+				SubscriptionId: types.StringValue(account.GetProviderAccountId()), // subscription_id is the provider_account_id
+			}
+			// ResourceGroupName is not returned in the output model for source accounts
+		}
+		data.Aws = nil
+		data.Gcp = nil
+		data.Role = types.StringNull()
+	case CloudProviderGCP:
+		if account.SourceAccountAttributes.HasGcp() {
+			gcpAttrs := account.SourceAccountAttributes.GetGcp()
+			data.Gcp = &GcpAccountConfigModel{
+				ProjectId:      types.StringValue(account.GetProviderAccountId()), // project_id is the provider_account_id
+				ServiceAccount: types.StringValue(gcpAttrs.GetServiceAccount()),
+			}
+		}
+		data.Aws = nil
+		data.Azure = nil
+		data.Role = types.StringNull()
+	}
+
+	if data.CreatedAt.IsNull() || data.CreatedAt.IsUnknown() {
+		data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	}
+	if data.UpdatedAt.IsNull() || data.UpdatedAt.IsUnknown() {
+		data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	}
 
 	// Surface account statuses the provider cannot auto-remediate so the user
@@ -512,19 +504,11 @@ func (r *SourceAccountResource) mapAccountToState(account *externalEonSdkAPI.Sou
 
 // readSourceAccount fetches a source account by ID and maps it to the resource model.
 func (r *SourceAccountResource) readSourceAccount(ctx context.Context, accountId string, plan SourceAccountResourceModel) (*SourceAccountResourceModel, error) {
-	accounts, err := r.client.ListSourceAccounts(ctx)
+	account, err := r.client.GetSourceAccount(ctx, accountId)
 	if err != nil {
-		return nil, fmt.Errorf("unable to list source accounts: %w", err)
+		return nil, fmt.Errorf("unable to get source account: %w", err)
 	}
-
-	for _, account := range accounts {
-		if account.Id != accountId {
-			continue
-		}
-		return r.mapAccountToState(&account, plan), nil
-	}
-
-	return nil, fmt.Errorf("source account %s not found", accountId)
+	return r.mapAccountToState(account, plan), nil
 }
 
 func (r *SourceAccountResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -553,70 +537,60 @@ func (r *SourceAccountResource) Delete(ctx context.Context, req resource.DeleteR
 func (r *SourceAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 
-	accounts, err := r.client.ListSourceAccounts(ctx)
+	account, err := r.client.GetSourceAccount(ctx, req.ID)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read source accounts during import: %s", err))
+		var apiErr *client.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
+			resp.Diagnostics.AddError(
+				"Resource Not Found",
+				fmt.Sprintf("Source account with ID %s not found", req.ID),
+			)
+			return
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read source account during import: %s", err))
 		return
 	}
 
-	var found bool
 	var data SourceAccountResourceModel
+	data.Id = types.StringValue(account.Id)
+	data.Name = types.StringValue(account.GetName())
+	data.Status = types.StringValue(string(account.Status))
+	data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
 
-	for _, account := range accounts {
-		if account.Id == req.ID {
-			found = true
+	cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
+	data.CloudProvider = types.StringValue(cloudProvider.String())
 
-			data.Id = types.StringValue(account.Id)
-			data.Name = types.StringValue(account.GetName())
-			data.Status = types.StringValue(string(account.Status))
-			data.ProviderAccountId = types.StringValue(account.GetProviderAccountId())
-
-			cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
-			data.CloudProvider = types.StringValue(cloudProvider.String())
-
-			// Populate cloud-specific blocks from API response
-			switch cloudProvider {
-			case CloudProviderAWS:
-				if account.SourceAccountAttributes.HasAws() {
-					awsAttrs := account.SourceAccountAttributes.GetAws()
-					data.Aws = &AwsAccountConfigModel{
-						RoleArn: types.StringValue(awsAttrs.GetRoleArn()),
-					}
-					// Also populate deprecated role field for backward compatibility
-					data.Role = types.StringValue(awsAttrs.GetRoleArn())
-				}
-			case CloudProviderAzure:
-				if account.SourceAccountAttributes.HasAzure() {
-					azureAttrs := account.SourceAccountAttributes.GetAzure()
-					data.Azure = &AzureAccountConfigModel{
-						TenantId:       types.StringValue(azureAttrs.GetTenantId()),
-						SubscriptionId: types.StringValue(account.GetProviderAccountId()),
-					}
-				}
-			case CloudProviderGCP:
-				if account.SourceAccountAttributes.HasGcp() {
-					gcpAttrs := account.SourceAccountAttributes.GetGcp()
-					data.Gcp = &GcpAccountConfigModel{
-						ProjectId:      types.StringValue(account.GetProviderAccountId()),
-						ServiceAccount: types.StringValue(gcpAttrs.GetServiceAccount()),
-					}
-				}
+	// Populate cloud-specific blocks from API response
+	switch cloudProvider {
+	case CloudProviderAWS:
+		if account.SourceAccountAttributes.HasAws() {
+			awsAttrs := account.SourceAccountAttributes.GetAws()
+			data.Aws = &AwsAccountConfigModel{
+				RoleArn: types.StringValue(awsAttrs.GetRoleArn()),
 			}
-
-			data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
-			data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
-
-			break
+			// Also populate deprecated role field for backward compatibility
+			data.Role = types.StringValue(awsAttrs.GetRoleArn())
+		}
+	case CloudProviderAzure:
+		if account.SourceAccountAttributes.HasAzure() {
+			azureAttrs := account.SourceAccountAttributes.GetAzure()
+			data.Azure = &AzureAccountConfigModel{
+				TenantId:       types.StringValue(azureAttrs.GetTenantId()),
+				SubscriptionId: types.StringValue(account.GetProviderAccountId()),
+			}
+		}
+	case CloudProviderGCP:
+		if account.SourceAccountAttributes.HasGcp() {
+			gcpAttrs := account.SourceAccountAttributes.GetGcp()
+			data.Gcp = &GcpAccountConfigModel{
+				ProjectId:      types.StringValue(account.GetProviderAccountId()),
+				ServiceAccount: types.StringValue(gcpAttrs.GetServiceAccount()),
+			}
 		}
 	}
 
-	if !found {
-		resp.Diagnostics.AddError(
-			"Resource Not Found",
-			fmt.Sprintf("Source account with ID %s not found", req.ID),
-		)
-		return
-	}
+	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 
