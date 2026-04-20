@@ -7,20 +7,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// alwaysConnectedModifier is a plan modifier that always plans "CONNECTED"
-// for the status field. This causes Terraform to detect drift when the API
-// reports a non-CONNECTED status and trigger an Update (reconnect).
-type alwaysConnectedModifier struct{}
+// reconnectIfDisconnectedModifier is a plan modifier that flips the planned
+// status to "CONNECTED" when the state reports "DISCONNECTED". This causes
+// Terraform to detect drift and trigger an Update (which performs a reconnect).
+// Other non-CONNECTED states (e.g. INSUFFICIENT_PERMISSIONS) are preserved
+// as-is since they require manual intervention.
+type reconnectIfDisconnectedModifier struct{}
 
-func (m alwaysConnectedModifier) Description(_ context.Context) string {
-	return "Plans status as CONNECTED so that a disconnected account triggers an update (reconnect)."
+func (m reconnectIfDisconnectedModifier) Description(_ context.Context) string {
+	return "Plans status as CONNECTED when the current state is DISCONNECTED so that the next apply triggers a reconnect."
 }
 
-func (m alwaysConnectedModifier) MarkdownDescription(ctx context.Context) string {
+func (m reconnectIfDisconnectedModifier) MarkdownDescription(ctx context.Context) string {
 	return m.Description(ctx)
 }
 
-func (m alwaysConnectedModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+func (m reconnectIfDisconnectedModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
 	// On create the state is nil — let the API populate the initial value.
 	if req.State.Raw.IsNull() {
 		return
@@ -38,7 +40,9 @@ func (m alwaysConnectedModifier) PlanModifyString(_ context.Context, req planmod
 	resp.PlanValue = req.StateValue
 }
 
-// AlwaysConnected returns a plan modifier that forces the planned value to "CONNECTED".
-func AlwaysConnected() planmodifier.String {
-	return alwaysConnectedModifier{}
+// ReconnectOnDisconnected returns a plan modifier that flips the planned
+// status to "CONNECTED" when the state is "DISCONNECTED", triggering an
+// Update on the next apply so the provider can attempt a reconnect.
+func ReconnectOnDisconnected() planmodifier.String {
+	return reconnectIfDisconnectedModifier{}
 }

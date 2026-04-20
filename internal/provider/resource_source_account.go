@@ -79,7 +79,7 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 			"status": schema.StringAttribute{
 				MarkdownDescription: "Connection status of the source account. The provider automatically reconnects accounts that drift to `DISCONNECTED`. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{AlwaysConnected()},
+				PlanModifiers:       []planmodifier.String{ReconnectOnDisconnected()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Date and time the source account was connected to the Eon project.",
@@ -89,6 +89,7 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "Date and time the source account was last updated.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -339,6 +340,21 @@ func (r *SourceAccountResource) Read(ctx context.Context, req resource.ReadReque
 	if !found {
 		resp.State.RemoveResource(ctx)
 		return
+	}
+
+	// Surface account statuses the provider cannot auto-remediate so the user
+	// sees them in plan output. DISCONNECTED is handled by the plan modifier
+	// and the Update flow; anything else non-CONNECTED needs manual attention.
+	status := data.Status.ValueString()
+	if status != "" && status != "CONNECTED" && status != "DISCONNECTED" {
+		resp.Diagnostics.AddAttributeWarning(
+			path.Root("status"),
+			"Source Account Requires Manual Intervention",
+			fmt.Sprintf(
+				"Source account %s is in status %q. The provider cannot automatically remediate this state; resolve the underlying issue in the Eon console or cloud provider and re-run.",
+				data.Id.ValueString(), status,
+			),
+		)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
