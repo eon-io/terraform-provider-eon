@@ -991,7 +991,14 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		backupPlan.SetHighFrequencyPlan(*highFrequencyPlan)
 
 	case "AWS_NATIVE_PITR":
-		awsNativePitrPlanObj := backupPlanAttrs["aws_native_pitr_plan"].(types.Object)
+		awsNativePitrPlanObj, ok := backupPlanAttrs["aws_native_pitr_plan"].(types.Object)
+		if !ok || awsNativePitrPlanObj.IsNull() || awsNativePitrPlanObj.IsUnknown() {
+			resp.Diagnostics.AddError(
+				"Missing AWS Native PITR Plan",
+				"The 'aws_native_pitr_plan' attribute is required when backup_policy_type is 'AWS_NATIVE_PITR'.",
+			)
+			return
+		}
 		var awsNativePitrPlanModel AwsNativePitrPlanModel
 		diags = awsNativePitrPlanObj.As(ctx, &awsNativePitrPlanModel, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
@@ -1259,7 +1266,14 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		backupPlan.SetHighFrequencyPlan(*highFrequencyPlan)
 
 	case "AWS_NATIVE_PITR":
-		awsNativePitrPlanObj := backupPlanAttrs["aws_native_pitr_plan"].(types.Object)
+		awsNativePitrPlanObj, ok := backupPlanAttrs["aws_native_pitr_plan"].(types.Object)
+		if !ok || awsNativePitrPlanObj.IsNull() || awsNativePitrPlanObj.IsUnknown() {
+			resp.Diagnostics.AddError(
+				"Missing AWS Native PITR Plan",
+				"The 'aws_native_pitr_plan' attribute is required when backup_policy_type is 'AWS_NATIVE_PITR'.",
+			)
+			return
+		}
 		var awsNativePitrPlanModel AwsNativePitrPlanModel
 		diags := awsNativePitrPlanObj.As(ctx, &awsNativePitrPlanModel, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
