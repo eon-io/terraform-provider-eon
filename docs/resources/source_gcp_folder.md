@@ -15,15 +15,15 @@ Connects a GCP folder to the Eon project. All GCP projects within the folder (an
 ```terraform
 # Example: Connect a GCP folder for backup operations
 resource "eon_source_gcp_folder" "production" {
-  organization_id              = "123456789012"
-  folder_id                    = "987654321098"
+  organization_id               = "123456789012"
+  folder_id                     = "987654321098"
   management_service_account_id = "eon-sa@my-management-project.iam.gserviceaccount.com"
 }
 
 # Example: Connect a GCP folder with project exclusion patterns
 resource "eon_source_gcp_folder" "production_filtered" {
-  organization_id              = "123456789012"
-  folder_id                    = "987654321098"
+  organization_id               = "123456789012"
+  folder_id                     = "987654321098"
   management_service_account_id = "eon-sa@my-management-project.iam.gserviceaccount.com"
 
   exclude_project_patterns = [
@@ -66,11 +66,3 @@ output "production_folder" {
 - `name` (String) Display name of the GCP folder in Eon.
 - `state` (String) Connection state of the GCP folder. Possible values: `ACTIVE`, `INACTIVE`.
 - `updated_at` (String) Date and time the GCP folder was last updated.
-
-## Import
-
-Import is supported using the following syntax:
-
-```shell
-terraform import eon_source_gcp_folder.example <eon-folder-id>
-```

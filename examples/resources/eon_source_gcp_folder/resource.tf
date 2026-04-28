@@ -1,14 +1,14 @@
 # Example: Connect a GCP folder for backup operations
 resource "eon_source_gcp_folder" "production" {
-  organization_id              = "123456789012"
-  folder_id                    = "987654321098"
+  organization_id               = "123456789012"
+  folder_id                     = "987654321098"
   management_service_account_id = "eon-sa@my-management-project.iam.gserviceaccount.com"
 }
 
 # Example: Connect a GCP folder with project exclusion patterns
 resource "eon_source_gcp_folder" "production_filtered" {
-  organization_id              = "123456789012"
-  folder_id                    = "987654321098"
+  organization_id               = "123456789012"
+  folder_id                     = "987654321098"
   management_service_account_id = "eon-sa@my-management-project.iam.gserviceaccount.com"
 
   exclude_project_patterns = [
