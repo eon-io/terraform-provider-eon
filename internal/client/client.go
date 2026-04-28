@@ -1287,3 +1287,278 @@ func (c *EonClient) DeleteRole(ctx context.Context, roleId string) error {
 
 	return nil
 }
+
+// GcpOrganization represents a GCP organization or folder returned by the API.
+type GcpOrganization struct {
+	Id                         string   `json:"id"`
+	Name                       string   `json:"name"`
+	OrganizationId             string   `json:"organizationId"`
+	FolderId                   string   `json:"folderId,omitempty"`
+	ManagementProjectId        string   `json:"managementProjectId"`
+	ManagementServiceAccountId string   `json:"managementServiceAccountId"`
+	State                      string   `json:"state"`
+	ExcludeProjectPatterns     []string `json:"excludeProjectPatterns,omitempty"`
+}
+
+// ConnectGcpOrganizationRequest is the request body for connecting a GCP organization.
+type ConnectGcpOrganizationRequest struct {
+	OrganizationId             string   `json:"organizationId"`
+	ManagementServiceAccountId string   `json:"managementServiceAccountId"`
+	ExcludeProjectPatterns     []string `json:"excludeProjectPatterns,omitempty"`
+}
+
+// ConnectGcpFolderRequest is the request body for connecting a GCP folder.
+type ConnectGcpFolderRequest struct {
+	OrganizationId             string   `json:"organizationId"`
+	FolderId                   string   `json:"folderId"`
+	ManagementServiceAccountId string   `json:"managementServiceAccountId"`
+	ExcludeProjectPatterns     []string `json:"excludeProjectPatterns,omitempty"`
+}
+
+type connectGcpOrganizationResponse struct {
+	GcpOrganization GcpOrganization `json:"gcpOrganization"`
+}
+
+type connectGcpFolderResponse struct {
+	GcpFolder GcpOrganization `json:"gcpFolder"`
+}
+
+type listGcpOrganizationsResponse struct {
+	GcpOrganizations []GcpOrganization `json:"gcpOrganizations"`
+	NextToken        string            `json:"nextToken,omitempty"`
+	TotalCount       int               `json:"totalCount,omitempty"`
+}
+
+type listGcpFoldersResponse struct {
+	GcpFolders []GcpOrganization `json:"gcpFolders"`
+	NextToken  string            `json:"nextToken,omitempty"`
+	TotalCount int               `json:"totalCount,omitempty"`
+}
+
+// doJSONRequest builds and executes an HTTP request with JSON body, returning the response.
+func (c *EonClient) doJSONRequest(ctx context.Context, method, url string, reqBody interface{}) (*http.Response, error) {
+	var bodyReader io.Reader
+	if reqBody != nil {
+		body, err := json.Marshal(reqBody)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		bodyReader = bytes.NewReader(body)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	if reqBody != nil {
+		httpReq.Header.Set("Content-Type", "application/json")
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	for key, value := range c.client.GetConfig().DefaultHeader {
+		httpReq.Header.Set(key, value)
+	}
+
+	return c.client.GetConfig().HTTPClient.Do(httpReq) // #nosec G704 -- URL is built from trusted server configuration, not user input
+}
+
+// gcpBaseURL returns the base API URL for GCP organization/folder endpoints.
+func (c *EonClient) gcpBaseURL() string {
+	return c.client.GetConfig().Servers[0].URL
+}
+
+// ConnectGcpOrganization connects a GCP organization to the project.
+func (c *EonClient) ConnectGcpOrganization(ctx context.Context, req ConnectGcpOrganizationRequest) (*GcpOrganization, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1/projects/%s/gcp-organizations", c.gcpBaseURL(), c.projectID)
+
+	httpResp, err := c.doJSONRequest(ctx, http.MethodPost, url, req)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to connect GCP organization"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(respBody),
+		}
+	}
+
+	var resp connectGcpOrganizationResponse
+	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+		return nil, fmt.Errorf("failed to decode GCP organization response: %w", err)
+	}
+
+	return &resp.GcpOrganization, nil
+}
+
+// ListGcpOrganizations retrieves all GCP organizations for the project.
+func (c *EonClient) ListGcpOrganizations(ctx context.Context) ([]GcpOrganization, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	var allOrgs []GcpOrganization
+	var pageToken string
+
+	for {
+		url := fmt.Sprintf("%s/v1/projects/%s/gcp-organizations?pageSize=50", c.gcpBaseURL(), c.projectID)
+		if pageToken != "" {
+			url += "&pageToken=" + pageToken
+		}
+
+		httpResp, err := c.doJSONRequest(ctx, http.MethodGet, url, nil)
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list GCP organizations"); apiErr != nil {
+			return nil, apiErr
+		}
+		defer httpResp.Body.Close()
+
+		if httpResp.StatusCode != http.StatusOK {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
+		}
+
+		var resp listGcpOrganizationsResponse
+		if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+			return nil, fmt.Errorf("failed to decode GCP organizations response: %w", err)
+		}
+
+		allOrgs = append(allOrgs, resp.GcpOrganizations...)
+
+		if resp.NextToken == "" {
+			break
+		}
+		pageToken = resp.NextToken
+	}
+
+	if allOrgs == nil {
+		return []GcpOrganization{}, nil
+	}
+
+	return allOrgs, nil
+}
+
+// DeactivateGcpOrganization deactivates a GCP organization and its accounts.
+func (c *EonClient) DeactivateGcpOrganization(ctx context.Context, organizationId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1/projects/%s/gcp-organizations/%s/deactivate", c.gcpBaseURL(), c.projectID, organizationId)
+
+	httpResp, err := c.doJSONRequest(ctx, http.MethodPatch, url, nil)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to deactivate GCP organization"); apiErr != nil {
+		return apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
+	}
+
+	return nil
+}
+
+// ConnectGcpFolder connects a GCP folder to the project.
+func (c *EonClient) ConnectGcpFolder(ctx context.Context, req ConnectGcpFolderRequest) (*GcpOrganization, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1/projects/%s/gcp-folders", c.gcpBaseURL(), c.projectID)
+
+	httpResp, err := c.doJSONRequest(ctx, http.MethodPost, url, req)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to connect GCP folder"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(respBody),
+		}
+	}
+
+	var resp connectGcpFolderResponse
+	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+		return nil, fmt.Errorf("failed to decode GCP folder response: %w", err)
+	}
+
+	return &resp.GcpFolder, nil
+}
+
+// ListGcpFolders retrieves all GCP folders for the project.
+func (c *EonClient) ListGcpFolders(ctx context.Context) ([]GcpOrganization, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	var allFolders []GcpOrganization
+	var pageToken string
+
+	for {
+		url := fmt.Sprintf("%s/v1/projects/%s/gcp-folders?pageSize=50", c.gcpBaseURL(), c.projectID)
+		if pageToken != "" {
+			url += "&pageToken=" + pageToken
+		}
+
+		httpResp, err := c.doJSONRequest(ctx, http.MethodGet, url, nil)
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list GCP folders"); apiErr != nil {
+			return nil, apiErr
+		}
+		defer httpResp.Body.Close()
+
+		if httpResp.StatusCode != http.StatusOK {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
+		}
+
+		var resp listGcpFoldersResponse
+		if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+			return nil, fmt.Errorf("failed to decode GCP folders response: %w", err)
+		}
+
+		allFolders = append(allFolders, resp.GcpFolders...)
+
+		if resp.NextToken == "" {
+			break
+		}
+		pageToken = resp.NextToken
+	}
+
+	if allFolders == nil {
+		return []GcpOrganization{}, nil
+	}
+
+	return allFolders, nil
+}
+
+// DeactivateGcpFolder deactivates a GCP folder and its accounts.
+func (c *EonClient) DeactivateGcpFolder(ctx context.Context, folderId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1/projects/%s/gcp-folders/%s/deactivate", c.gcpBaseURL(), c.projectID, folderId)
+
+	httpResp, err := c.doJSONRequest(ctx, http.MethodPatch, url, nil)
+	if apiErr := c.handleAPIError(err, httpResp, "failed to deactivate GCP folder"); apiErr != nil {
+		return apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
+	}
+
+	return nil
+}

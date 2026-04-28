@@ -175,6 +175,8 @@ func (p *EonProvider) Resources(ctx context.Context) []func() resource.Resource 
 	return []func() resource.Resource{
 		NewSourceAccountResource,
 		NewSourceAwsOrganizationalUnitResource,
+		NewSourceGcpOrganizationResource,
+		NewSourceGcpFolderResource,
 		NewRestoreAccountResource,
 		NewRestoreJobResource,
 		NewBackupPolicyResource,
@@ -189,6 +191,8 @@ func (p *EonProvider) DataSources(ctx context.Context) []func() datasource.DataS
 	return []func() datasource.DataSource{
 		NewSourceAccountsDataSource,
 		NewSourceAwsOrganizationalUnitsDataSource,
+		NewSourceGcpOrganizationsDataSource,
+		NewSourceGcpFoldersDataSource,
 		NewRestoreAccountsDataSource,
 		NewSnapshotDataSource,
 		NewBackupPoliciesDataSource,
