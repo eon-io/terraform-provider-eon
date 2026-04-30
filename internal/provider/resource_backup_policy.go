@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
@@ -1069,6 +1071,14 @@ func (r *BackupPolicyResource) Read(ctx context.Context, req resource.ReadReques
 
 	policy, err := r.client.GetBackupPolicy(ctx, data.Id.ValueString())
 	if err != nil {
+		var apiErr *client.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+			tflog.Warn(ctx, "Backup policy not found, removing from state", map[string]interface{}{
+				"id": data.Id.ValueString(),
+			})
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read backup policy: %s", err))
 		return
 	}
