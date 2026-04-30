@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
@@ -374,19 +375,29 @@ func (r *RestoreAccountResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	tflog.Debug(ctx, "Disconnecting restore account", map[string]interface{}{
-		"id": data.Id.ValueString(),
-	})
+	id := data.Id.ValueString()
 
-	err := r.client.DisconnectRestoreAccount(ctx, data.Id.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to disconnect restore account: %s", err))
+	if strings.EqualFold(data.Status.ValueString(), "CONNECTED") {
+		tflog.Debug(ctx, "Disconnecting restore account before delete", map[string]interface{}{"id": id})
+		if err := r.client.DisconnectRestoreAccount(ctx, id); err != nil {
+			tflog.Warn(ctx, "Disconnect failed during delete; proceeding to delete anyway", map[string]interface{}{
+				"id":    id,
+				"error": err.Error(),
+			})
+			resp.Diagnostics.AddWarning(
+				"Disconnect Failed",
+				fmt.Sprintf("Could not disconnect restore account before delete (proceeding with delete): %s", err),
+			)
+		}
+	}
+
+	tflog.Debug(ctx, "Deleting restore account", map[string]interface{}{"id": id})
+	if err := r.client.DeleteRestoreAccount(ctx, id); err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete restore account: %s", err))
 		return
 	}
 
-	tflog.Debug(ctx, "Restore account disconnected", map[string]interface{}{
-		"id": data.Id.ValueString(),
-	})
+	tflog.Debug(ctx, "Restore account deleted", map[string]interface{}{"id": id})
 }
 
 func (r *RestoreAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
