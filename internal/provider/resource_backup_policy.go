@@ -1933,13 +1933,8 @@ func createBackupPolicyExpression(ctx context.Context, data *ResourceSelectorMod
 					return nil, fmt.Errorf("failed to parse data_classes list in operand")
 				}
 
-				var dataClassEnums []externalEonSdkAPI.DataClass
-				for _, dc := range dataClasses {
-					dataClassEnums = append(dataClassEnums, externalEonSdkAPI.DataClass(dc))
-				}
-
 				operator := externalEonSdkAPI.ListOperators(dataClassesCondition.Operator.ValueString())
-				dataClassesConditionApi := externalEonSdkAPI.NewDataClassesCondition(operator, dataClassEnums)
+				dataClassesConditionApi := externalEonSdkAPI.NewDataClassesCondition(operator, dataClasses)
 				operandExpr.SetDataClasses(*dataClassesConditionApi)
 			}
 
