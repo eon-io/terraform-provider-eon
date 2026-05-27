@@ -225,16 +225,6 @@ func (c *EonClient) DisconnectSourceAccount(ctx context.Context, accountId strin
 	return nil
 }
 
-// DeleteSourceAccount deletes a source account.
-//
-// TODO(EON-11410): This is a stub. The eon-sdk-go client does not yet expose a
-// DeleteSourceAccount API. Once the SDK is updated, replace this stub with a
-// real call to c.client.AccountsAPI.DeleteSourceAccount following the same
-// pattern as DisconnectSourceAccount above.
-func (c *EonClient) DeleteSourceAccount(ctx context.Context, accountId string) error {
-	return fmt.Errorf("DeleteSourceAccount is not yet implemented: pending SDK support (EON-11410)")
-}
-
 // UpdateSourceAccountRequest contains the fields that can be updated on a source account.
 type UpdateSourceAccountRequest struct {
 	Name                    *string
