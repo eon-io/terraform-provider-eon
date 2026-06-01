@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
@@ -519,19 +520,29 @@ func (r *SourceAccountResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	tflog.Debug(ctx, "Disconnecting source account", map[string]interface{}{
-		"id": data.Id.ValueString(),
-	})
+	id := data.Id.ValueString()
 
-	err := r.client.DisconnectSourceAccount(ctx, data.Id.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to disconnect source account: %s", err))
+	if strings.EqualFold(data.Status.ValueString(), "CONNECTED") {
+		tflog.Debug(ctx, "Disconnecting source account before delete", map[string]interface{}{"id": id})
+		if err := r.client.DisconnectSourceAccount(ctx, id); err != nil {
+			tflog.Warn(ctx, "Disconnect failed during delete; proceeding to delete anyway", map[string]interface{}{
+				"id":    id,
+				"error": err.Error(),
+			})
+			resp.Diagnostics.AddWarning(
+				"Disconnect Failed",
+				fmt.Sprintf("Could not disconnect source account before delete (proceeding with delete): %s", err),
+			)
+		}
+	}
+
+	tflog.Debug(ctx, "Deleting source account", map[string]interface{}{"id": id})
+	if err := r.client.DeleteSourceAccount(ctx, id); err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete source account: %s", err))
 		return
 	}
 
-	tflog.Debug(ctx, "Source account disconnected", map[string]interface{}{
-		"id": data.Id.ValueString(),
-	})
+	tflog.Debug(ctx, "Source account deleted", map[string]interface{}{"id": id})
 }
 
 func (r *SourceAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
