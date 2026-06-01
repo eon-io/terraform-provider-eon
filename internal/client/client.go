@@ -225,6 +225,27 @@ func (c *EonClient) DisconnectSourceAccount(ctx context.Context, accountId strin
 	return nil
 }
 
+// DeleteSourceAccount fully removes a source account from the project.
+// Callers should typically Disconnect first if the account is still connected.
+func (c *EonClient) DeleteSourceAccount(ctx context.Context, accountId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.AccountsAPI.DeleteSourceAccount(ctx, c.projectID, accountId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to delete source account"); apiErr != nil {
+		return apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // UpdateSourceAccountRequest contains the fields that can be updated on a source account.
 type UpdateSourceAccountRequest struct {
 	Name                    *string
