@@ -502,11 +502,7 @@ func roleDataClassesConditionToSDK(ctx context.Context, obj types.Object) (*exte
 	op := externalEonSdkAPI.ListOperators(attrs["operator"].(types.String).ValueString())
 	var list []string
 	_ = attrs["data_classes"].(types.List).ElementsAs(ctx, &list, false)
-	dcs := make([]externalEonSdkAPI.DataClass, len(list))
-	for i, s := range list {
-		dcs[i] = externalEonSdkAPI.DataClass(s)
-	}
-	c := externalEonSdkAPI.NewDataClassesCondition(op, dcs)
+	c := externalEonSdkAPI.NewDataClassesCondition(op, list)
 	return c, nil
 }
 
