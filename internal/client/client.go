@@ -470,6 +470,69 @@ func (c *EonClient) DeleteRestoreAccount(ctx context.Context, accountId string) 
 	return nil
 }
 
+// GetRestoreAccountConnectivityConfig retrieves the connectivity configuration of a restore account.
+func (c *EonClient) GetRestoreAccountConnectivityConfig(ctx context.Context, accountId string) (*externalEonSdkAPI.RestoreAccountConnectivityConfig, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.GetRestoreAccountConnectivityConfig(ctx, accountId, c.projectID).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get restore account connectivity config"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	config := resp.GetRestoreAccountConfig()
+	return &config, nil
+}
+
+// UpdateRestoreAccountConnectivityConfig updates the connectivity configuration of a restore account.
+func (c *EonClient) UpdateRestoreAccountConnectivityConfig(ctx context.Context, accountId string, req externalEonSdkAPI.UpdateRestoreAccountConnectivityConfigRequest) (*externalEonSdkAPI.RestoreAccountConnectivityConfig, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.UpdateRestoreAccountConnectivityConfig(ctx, accountId, c.projectID).UpdateRestoreAccountConnectivityConfigRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to update restore account connectivity config"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	config := resp.GetRestoreAccountConfig()
+	return &config, nil
+}
+
+// DeleteRestoreAccountConnectivityConfig deletes the connectivity configuration of a restore
+// account, reverting it to the default settings.
+func (c *EonClient) DeleteRestoreAccountConnectivityConfig(ctx context.Context, accountId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.AccountsAPI.DeleteRestoreAccountConnectivityConfig(ctx, accountId, c.projectID).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to delete restore account connectivity config"); apiErr != nil {
+		return apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // GetRestoreJob retrieves a restore job by ID
 func (c *EonClient) GetRestoreJob(ctx context.Context, jobId string) (*externalEonSdkAPI.RestoreJob, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {

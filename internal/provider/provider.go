@@ -176,6 +176,7 @@ func (p *EonProvider) Resources(ctx context.Context) []func() resource.Resource 
 		NewSourceAccountResource,
 		NewSourceAwsOrganizationalUnitResource,
 		NewRestoreAccountResource,
+		NewRestoreAccountConnectivityConfigResource,
 		NewRestoreJobResource,
 		NewBackupPolicyResource,
 		NewVaultResource,
