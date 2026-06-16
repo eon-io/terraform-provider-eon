@@ -1,116 +1,41 @@
-# Onboarding an AWS Organizational Unit to Eon is a TWO-part operation:
+# Onboarding an AWS Organizational Unit is a TWO-part operation:
 #
-#   1. eon_source_aws_organizational_unit (below) registers the OU with Eon. Eon
-#      then DISCOVERS every member account and ASSUMES a role named
-#      `EonSourceAccountRole` in each one.
-#   2. A role named `EonSourceAccountRole` must actually EXIST in every member
-#      account. Registration does NOT create it. The service-managed
-#      CloudFormation StackSet below creates it across the whole OU (and, via
-#      auto-deployment, in any account that later joins the OU).
+#   1. eon_source_aws_organizational_unit (below) registers the OU with Eon — Eon
+#      then DISCOVERS the member accounts and ASSUMES `EonSourceAccountRole` in
+#      each one.
+#   2. That role must actually EXIST in every member account. Registration does
+#      NOT create it; a CloudFormation StackSet does.
 #
-# Doing step 1 without step 2 leaves member accounts discovered but with no
-# permissions. This mirrors Eon's official `aws-organization.yml` onboarding,
-# which bundles the same StackSet.
+# Using this resource on its own leaves members discovered but with no
+# permissions. For real onboarding use the `aws-ou-onboarding` module, which does
+# BOTH parts (registration + the StackSet that creates the member roles, plus the
+# management-account discovery role). See modules/aws-ou-onboarding/README.md:
 #
-# Prerequisite: enable CloudFormation trusted access with AWS Organizations once
-# in the management account (`aws cloudformation activate-organizations-access`),
-# otherwise the SERVICE_MANAGED StackSet cannot be created.
+#   module "eon_ou_onboarding" {
+#     source = "github.com/eon-io/terraform-provider-eon//modules/aws-ou-onboarding"
+#
+#     eon_account_id          = "fde6adb5-38bc-45a3-919e-bd9ee17d9ba4"
+#     scanning_account_id     = "388762879875"
+#     organizational_unit_ids = ["ou-abc1-23456789", "ou-abc1-98765432"]
+#   }
 
-variable "eon_account_id" {
-  type        = string
-  description = "Eon-registered account ID (used as the STS ExternalId / confused-deputy guard)."
+# Bare registration — only valid when EonSourceAccountRole already exists in every
+# member account (e.g. deployed by the module above, a separate StackSet, or Eon's
+# aws-organization.yml CloudFormation template).
+resource "eon_source_aws_organizational_unit" "production" {
+  role_arn                        = "arn:aws:iam::123456789012:role/EonOrgUnitRole"
+  provider_organizational_unit_id = "ou-abc1-23456789"
 }
 
-variable "organizational_unit_ids" {
-  type        = set(string)
-  description = "AWS Organizational Unit IDs to onboard (e.g. ou-abc1-23456789)."
-}
-
-variable "aws_region" {
-  type        = string
-  description = "Region to deploy the member-account roles in."
-  default     = "us-east-1"
-}
-
-# (1) Discovery role in the management account: lets Eon enumerate the OU's
-# accounts and assume EonSourceAccountRole in each member.
-resource "aws_iam_role" "eon_org_unit" {
-  name = "EonOrgUnitRole"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { AWS = ["arn:aws:iam::058264520728:root", "arn:aws:iam::010438478826:root"] }
-      Action    = "sts:AssumeRole"
-      Condition = { StringEquals = { "sts:ExternalId" = var.eon_account_id } }
-    }]
-  })
-
-  inline_policy {
-    name = "EonOrgUnitPolicy"
-    policy = jsonencode({
-      Version = "2012-10-17"
-      Statement = [
-        {
-          Effect = "Allow"
-          Action = [
-            "organizations:ListAccountsForParent",
-            "organizations:ListOrganizationalUnitsForParent",
-            "organizations:DescribeOrganizationalUnit",
-          ]
-          Resource = "*"
-        },
-        {
-          Effect   = "Allow"
-          Action   = "sts:AssumeRole"
-          Resource = "arn:aws:iam::*:role/EonSourceAccountRole"
-        },
-      ]
-    })
+# Output the organizational unit details
+output "production_ou" {
+  description = "Details of the connected AWS production organizational unit"
+  value = {
+    id                              = eon_source_aws_organizational_unit.production.id
+    name                            = eon_source_aws_organizational_unit.production.name
+    status                          = eon_source_aws_organizational_unit.production.status
+    provider_organizational_unit_id = eon_source_aws_organizational_unit.production.provider_organizational_unit_id
+    provider_management_account_id  = eon_source_aws_organizational_unit.production.provider_management_account_id
+    created_at                      = eon_source_aws_organizational_unit.production.created_at
   }
-}
-
-# (2) Create EonSourceAccountRole in every member account of the OU.
-resource "aws_cloudformation_stack_set" "eon_source_members" {
-  name             = "EonSourceAccountOrgDeployment"
-  permission_model = "SERVICE_MANAGED"
-  capabilities     = ["CAPABILITY_IAM", "CAPABILITY_NAMED_IAM"]
-  template_url     = "https://eon-public-b2b628cc-1d96-4fda-8dae-c3b1ad3ea03b.s3.amazonaws.com/source-account.yml"
-
-  auto_deployment {
-    enabled                          = true
-    retain_stacks_on_account_removal = false
-  }
-
-  managed_execution { active = true }
-
-  parameters = {
-    EonAccountId = var.eon_account_id
-    RoleName     = "EonSourceAccountRole"
-    # source-account.yml exposes EnableS3CdcBackup, EnableEKS, EnableAwsBackup, …
-    # capability flags — set them here as needed; sensible defaults apply otherwise.
-  }
-
-  lifecycle { ignore_changes = [administration_role_arn] }
-}
-
-resource "aws_cloudformation_stack_set_instance" "eon_source_members" {
-  stack_set_name = aws_cloudformation_stack_set.eon_source_members.name
-
-  deployment_targets {
-    organizational_unit_ids = var.organizational_unit_ids
-  }
-
-  region = var.aws_region
-}
-
-# (1, cont.) Register each OU with Eon, only after member roles are being deployed.
-resource "eon_source_aws_organizational_unit" "this" {
-  for_each = var.organizational_unit_ids
-
-  role_arn                        = aws_iam_role.eon_org_unit.arn
-  provider_organizational_unit_id = each.value
-
-  depends_on = [aws_cloudformation_stack_set_instance.eon_source_members]
 }
