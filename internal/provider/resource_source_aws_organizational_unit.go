@@ -45,7 +45,7 @@ func (r *SourceAwsOrganizationalUnitResource) Metadata(ctx context.Context, req 
 func (r *SourceAwsOrganizationalUnitResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Connects a source AWS organizational unit to the Eon project. All AWS accounts within the organizational unit (and its nested OUs) are automatically discovered and available for backup.\n\n" +
-			"**Prerequisite:** connecting an OU only makes Eon discover member accounts and assume a role named `EonSourceAccountRole` in each one — it does not create that role. You must separately deploy `EonSourceAccountRole` into every member account, normally via a service-managed CloudFormation StackSet that auto-deploys to the OU (see the example). Without it, member accounts are discovered but have no permissions.",
+			"**Prerequisite:** connecting an OU only makes Eon discover member accounts and assume a role named `EonSourceAccountRole` in each one — it does not create that role. You must separately deploy `EonSourceAccountRole` into every member account via a service-managed CloudFormation StackSet that auto-deploys to the OU. Eon ships this as `aws-organization.yml` (CloudFormation) and as the `source-account-org` Terraform onboarding module. Without it, member accounts are discovered but have no permissions.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
