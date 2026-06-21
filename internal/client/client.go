@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -405,6 +406,72 @@ func (c *EonClient) DisconnectSourceAwsOrganizationalUnit(ctx context.Context, o
 	}
 
 	return nil
+}
+
+// errRestoreOUNotImplemented is returned by the restore AWS organizational unit
+// client stubs below.
+//
+// TODO(EON-1702): the restore AWS organizational unit endpoints
+// (connect/list/reconnect/disconnect) were just made public in eon-service but
+// eon-sdk-go has not been regenerated yet, so the AccountsAPI bindings and
+// request/response models do not exist. Once the SDK is bumped, wire these
+// methods to c.client.AccountsAPI.{Connect,List,Reconnect,Disconnect}RestoreAwsOrganizationalUnit
+// exactly like the source variants above, and drop the placeholder types.
+var errRestoreOUNotImplemented = errors.New("restore AWS organizational unit support is not yet implemented: pending eon-sdk-go regeneration (EON-1702)")
+
+// ConnectRestoreAwsOrganizationalUnitRequest is a placeholder mirroring the
+// source variant until the generated SDK type exists.
+//
+// TODO(EON-1702): replace with externalEonSdkAPI.ConnectRestoreAwsOrganizationalUnitRequest.
+type ConnectRestoreAwsOrganizationalUnitRequest struct {
+	RoleArn                      string
+	ProviderOrganizationalUnitId string
+}
+
+// RestoreAwsOrganizationalUnit is a placeholder mirroring the source variant
+// until the generated SDK type exists.
+//
+// TODO(EON-1702): replace with externalEonSdkAPI.RestoreAwsOrganizationalUnit.
+type RestoreAwsOrganizationalUnit struct {
+	Id                           string
+	Name                         string
+	RoleArn                      string
+	ProviderOrganizationalUnitId string
+	ProviderManagementAccountId  string
+	Status                       string
+}
+
+// ListRestoreAwsOrganizationalUnits retrieves all restore AWS organizational
+// units for the project.
+//
+// TODO(EON-1702): implement against AccountsAPI.ListRestoreAwsOrganizationalUnits
+// with pagination, mirroring ListSourceAwsOrganizationalUnits.
+func (c *EonClient) ListRestoreAwsOrganizationalUnits(ctx context.Context) ([]RestoreAwsOrganizationalUnit, error) {
+	return nil, errRestoreOUNotImplemented
+}
+
+// ConnectRestoreAwsOrganizationalUnit connects a new restore AWS organizational unit.
+//
+// TODO(EON-1702): implement against AccountsAPI.ConnectRestoreAwsOrganizationalUnit,
+// mirroring ConnectSourceAwsOrganizationalUnit.
+func (c *EonClient) ConnectRestoreAwsOrganizationalUnit(ctx context.Context, req ConnectRestoreAwsOrganizationalUnitRequest) (*RestoreAwsOrganizationalUnit, error) {
+	return nil, errRestoreOUNotImplemented
+}
+
+// ReconnectRestoreAwsOrganizationalUnit reconnects a previously disconnected
+// restore AWS organizational unit.
+//
+// TODO(EON-1702): implement against AccountsAPI.ReconnectRestoreAwsOrganizationalUnit.
+func (c *EonClient) ReconnectRestoreAwsOrganizationalUnit(ctx context.Context, organizationalUnitId string) (*RestoreAwsOrganizationalUnit, error) {
+	return nil, errRestoreOUNotImplemented
+}
+
+// DisconnectRestoreAwsOrganizationalUnit disconnects a restore AWS organizational unit.
+//
+// TODO(EON-1702): implement against AccountsAPI.DisconnectRestoreAwsOrganizationalUnit,
+// mirroring DisconnectSourceAwsOrganizationalUnit.
+func (c *EonClient) DisconnectRestoreAwsOrganizationalUnit(ctx context.Context, organizationalUnitId string) error {
+	return errRestoreOUNotImplemented
 }
 
 // ConnectRestoreAccount connects a new restore account
