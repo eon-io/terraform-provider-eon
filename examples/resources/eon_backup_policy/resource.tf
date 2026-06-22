@@ -182,6 +182,49 @@ resource "eon_backup_policy" "high_frequency_backup" {
   }
 }
 
+# Example: AWS Native PITR backup policy for RDS/Aurora continuous backups
+resource "eon_backup_policy" "aws_native_pitr_backup" {
+  name    = "RDS Production - PITR 7 days"
+  enabled = true
+  resource_selector = {
+    resource_selection_mode = "CONDITIONAL"
+
+    expression = {
+      group = {
+        operator = "AND"
+        operands = [
+          {
+            resource_type = {
+              operator       = "IN"
+              resource_types = ["AWS_RDS"]
+            }
+          },
+          {
+            tag_key_values = {
+              operator = "CONTAINS_ANY_OF"
+              tag_key_values = [
+                {
+                  key   = "env"
+                  value = "prod"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+
+  backup_plan = {
+    backup_policy_type = "AWS_NATIVE_PITR"
+
+    aws_native_pitr_plan = {
+      retention_days = 7
+      resource_type  = "AWS_RDS"
+    }
+  }
+}
+
 # Example: Conditional backup policy using new condition types
 resource "eon_backup_policy" "conditional_backup" {
   name    = "Conditional Production Backup"
@@ -412,6 +455,11 @@ output "high_frequency_backup_policy_id" {
   value       = eon_backup_policy.high_frequency_backup.id
 }
 
+output "aws_native_pitr_backup_policy_id" {
+  description = "ID of the AWS native PITR backup policy"
+  value       = eon_backup_policy.aws_native_pitr_backup.id
+}
+
 output "conditional_backup_policy_id" {
   description = "ID of the conditional backup policy"
   value       = eon_backup_policy.conditional_backup.id
@@ -454,6 +502,11 @@ output "backup_policies_summary" {
       id      = eon_backup_policy.high_frequency_backup.id
       name    = eon_backup_policy.high_frequency_backup.name
       enabled = eon_backup_policy.high_frequency_backup.enabled
+    }
+    aws_native_pitr_backup = {
+      id      = eon_backup_policy.aws_native_pitr_backup.id
+      name    = eon_backup_policy.aws_native_pitr_backup.name
+      enabled = eon_backup_policy.aws_native_pitr_backup.enabled
     }
     conditional_backup = {
       id      = eon_backup_policy.conditional_backup.id
