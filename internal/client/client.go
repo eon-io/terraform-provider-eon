@@ -555,6 +555,31 @@ func (c *EonClient) GetRestoreJob(ctx context.Context, jobId string) (*externalE
 	return &job, nil
 }
 
+// restoreJobIDFromResponse interprets the response from a restore endpoint that
+// may be intercepted by a Multi-Party Approval (MPA) policy. On HTTP 202 the
+// restore job started and its ID is read from the response body. On HTTP 201 the
+// operation was intercepted by an MPA policy and cannot proceed without approval.
+func restoreJobIDFromResponse(resp *externalEonSdkAPI.MPAInterceptedResponse, httpResp *http.Response, action string) (string, error) {
+	switch httpResp.StatusCode {
+	case http.StatusAccepted:
+		body, err := io.ReadAll(httpResp.Body)
+		if err != nil {
+			return "", fmt.Errorf("%s: failed to read response body: %w", action, err)
+		}
+		var initiation externalEonSdkAPI.RestoreJobInitiationResponse
+		if err := json.Unmarshal(body, &initiation); err != nil {
+			return "", fmt.Errorf("%s: failed to parse response: %w", action, err)
+		}
+		return initiation.GetJobId(), nil
+	case http.StatusCreated:
+		mpaReq := resp.GetMpaRequest()
+		return "", fmt.Errorf("%s: operation requires Multi-Party Approval (MPA request ID %q); approve the request and retry", action, mpaReq.GetId())
+	default:
+		body, _ := io.ReadAll(httpResp.Body)
+		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+}
+
 // StartVolumeRestore starts a volume restore job
 func (c *EonClient) StartVolumeRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreVolumeToEbsRequest) (string, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
@@ -568,12 +593,7 @@ func (c *EonClient) StartVolumeRestore(ctx context.Context, resourceId, snapshot
 
 	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
-	}
-
-	return resp.GetJobId(), nil
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start volume restore")
 }
 
 // GetResourceById retrieves a resource by ID
@@ -611,12 +631,7 @@ func (c *EonClient) StartRdsRestore(ctx context.Context, resourceId, snapshotId 
 
 	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
-	}
-
-	return resp.GetJobId(), nil
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start RDS restore")
 }
 
 // StartEc2InstanceRestore starts an EC2 instance restore job
@@ -632,12 +647,7 @@ func (c *EonClient) StartEc2InstanceRestore(ctx context.Context, resourceId, sna
 
 	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
-	}
-
-	return resp.GetJobId(), nil
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start EC2 instance restore")
 }
 
 // StartS3BucketRestore starts an S3 bucket restore job
@@ -653,12 +663,7 @@ func (c *EonClient) StartS3BucketRestore(ctx context.Context, resourceId, snapsh
 
 	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
-	}
-
-	return resp.GetJobId(), nil
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start S3 bucket restore")
 }
 
 // StartS3FileRestore starts an S3 file restore job
@@ -695,12 +700,7 @@ func (c *EonClient) StartGcpVmInstanceRestore(ctx context.Context, resourceId, s
 
 	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
-	}
-
-	return resp.GetJobId(), nil
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start GCP VM instance restore")
 }
 
 // StartGcpDiskRestore starts a GCP disk restore job
@@ -716,12 +716,7 @@ func (c *EonClient) StartGcpDiskRestore(ctx context.Context, resourceId, snapsho
 
 	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
-	}
-
-	return resp.GetJobId(), nil
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start GCP disk restore")
 }
 
 // StartGcpCloudSqlRestore starts a GCP Cloud SQL restore job
@@ -737,12 +732,7 @@ func (c *EonClient) StartGcpCloudSqlRestore(ctx context.Context, resourceId, sna
 
 	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(httpResp.Body)
-		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
-	}
-
-	return resp.GetJobId(), nil
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start GCP Cloud SQL restore")
 }
 
 // BigQueryRestoreDestination represents the destination for a BigQuery dataset restore
