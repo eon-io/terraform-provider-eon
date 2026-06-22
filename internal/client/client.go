@@ -428,7 +428,7 @@ func (c *EonClient) ListRestoreAwsOrganizationalUnits(ctx context.Context) ([]ex
 		if apiErr := c.handleAPIError(err, httpResp, "failed to list restore AWS organizational units"); apiErr != nil {
 			return nil, apiErr
 		}
-		defer httpResp.Body.Close()
+		defer func() { _ = httpResp.Body.Close() }()
 
 		if httpResp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(httpResp.Body)
@@ -463,7 +463,7 @@ func (c *EonClient) ConnectRestoreAwsOrganizationalUnit(ctx context.Context, req
 	if apiErr := c.handleAPIError(err, httpResp, "failed to connect restore AWS organizational unit"); apiErr != nil {
 		return nil, apiErr
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(httpResp.Body)
@@ -484,7 +484,7 @@ func (c *EonClient) DisconnectRestoreAwsOrganizationalUnit(ctx context.Context, 
 	if apiErr := c.handleAPIError(err, httpResp, "failed to disconnect restore AWS organizational unit"); apiErr != nil {
 		return apiErr
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(httpResp.Body)
