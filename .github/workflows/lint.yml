@@ -70,6 +70,10 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
       - name: Install gosec
+        # gosec@latest may require a newer Go toolchain than go.mod; allow
+        # the toolchain to be fetched on demand (setup-go@v6 defaults to local).
+        env:
+          GOTOOLCHAIN: auto
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
       - name: Run gosec security scan
         run: gosec ./...
