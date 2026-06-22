@@ -75,7 +75,7 @@ func (r *OAuthTokenRefresher) Authenticate() error {
 	if err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
