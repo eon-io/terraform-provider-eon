@@ -68,10 +68,10 @@ jobs:
         run: go build -v ./...
 
       - name: Test GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: latest
-          args: release --snapshot --clean --skip-sign
+          args: release --snapshot --clean --skip=sign
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
