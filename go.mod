@@ -8,7 +8,7 @@ require (
 	github.com/eon-io/eon-sdk-go v1.147.0
 	github.com/hashicorp/terraform-plugin-docs v0.24.0
 	github.com/hashicorp/terraform-plugin-framework v1.13.0
-	github.com/hashicorp/terraform-plugin-log v0.9.0
+	github.com/hashicorp/terraform-plugin-log v0.10.0
 	github.com/stretchr/testify v1.11.1
 )
 
