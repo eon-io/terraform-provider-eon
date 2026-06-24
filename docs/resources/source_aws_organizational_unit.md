@@ -3,26 +3,28 @@
 page_title: "eon_source_aws_organizational_unit Resource - terraform-provider-eon"
 subcategory: ""
 description: |-
-  Connects a source AWS organizational unit to the Eon project. All AWS accounts within the organizational unit (and its nested OUs) will be automatically discovered and available for backup.
+  Connects a source AWS organizational unit to the Eon project. All AWS accounts within the organizational unit (and its nested OUs) are automatically discovered and available for backup.
+  Prerequisite: connecting an OU only makes Eon discover member accounts and assume a role named EonSourceAccountRole in each one — it does not create that role. You must separately deploy EonSourceAccountRole into every member account via a service-managed CloudFormation StackSet that auto-deploys to the OU. Eon ships this as aws-organization.yml (CloudFormation) and as the source-account-org Terraform onboarding module. Without it, member accounts are discovered but have no permissions.
 ---
 
 # eon_source_aws_organizational_unit (Resource)
 
-Connects a source AWS organizational unit to the Eon project. All AWS accounts within the organizational unit (and its nested OUs) will be automatically discovered and available for backup.
+Connects a source AWS organizational unit to the Eon project. All AWS accounts within the organizational unit (and its nested OUs) are automatically discovered and available for backup.
+
+**Prerequisite:** connecting an OU only makes Eon discover member accounts and assume a role named `EonSourceAccountRole` in each one — it does not create that role. You must separately deploy `EonSourceAccountRole` into every member account via a service-managed CloudFormation StackSet that auto-deploys to the OU. Eon ships this as `aws-organization.yml` (CloudFormation) and as the `source-account-org` Terraform onboarding module. Without it, member accounts are discovered but have no permissions.
 
 ## Example Usage
 
 ```terraform
-# Example: Connect an AWS organizational unit for backup operations
+# Connecting an OU registers it with Eon: Eon then DISCOVERS the member accounts
+# and ASSUMES `EonSourceAccountRole` in each. It does NOT create that role —
+# you must deploy it into every member account separately (a CloudFormation
+# StackSet that auto-deploys to the OU). Eon ships this as `aws-organization.yml`
+# (CloudFormation) and as the `source-account-org` Terraform onboarding module.
+# Without it, members are discovered but have no permissions.
 resource "eon_source_aws_organizational_unit" "production" {
-  role_arn                        = "arn:aws:iam::123456789012:role/EonOrgUnitRole"
+  role_arn                        = "arn:aws:iam::123456789012:role/EonOrganizationAccountRole"
   provider_organizational_unit_id = "ou-abc1-23456789"
-}
-
-# Example: Connect another AWS organizational unit
-resource "eon_source_aws_organizational_unit" "staging" {
-  role_arn                        = "arn:aws:iam::987654321098:role/EonOrgUnitRole"
-  provider_organizational_unit_id = "ou-def2-98765432"
 }
 
 # Output the organizational unit details

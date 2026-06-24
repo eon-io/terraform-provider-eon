@@ -16,18 +16,18 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-var _ resource.Resource = &SourceAwsOrganizationalUnitResource{}
-var _ resource.ResourceWithImportState = &SourceAwsOrganizationalUnitResource{}
+var _ resource.Resource = &RestoreAwsOrganizationalUnitResource{}
+var _ resource.ResourceWithImportState = &RestoreAwsOrganizationalUnitResource{}
 
-func NewSourceAwsOrganizationalUnitResource() resource.Resource {
-	return &SourceAwsOrganizationalUnitResource{}
+func NewRestoreAwsOrganizationalUnitResource() resource.Resource {
+	return &RestoreAwsOrganizationalUnitResource{}
 }
 
-type SourceAwsOrganizationalUnitResource struct {
+type RestoreAwsOrganizationalUnitResource struct {
 	client *client.EonClient
 }
 
-type SourceAwsOrganizationalUnitResourceModel struct {
+type RestoreAwsOrganizationalUnitResourceModel struct {
 	Id                           types.String `tfsdk:"id"`
 	Name                         types.String `tfsdk:"name"`
 	RoleArn                      types.String `tfsdk:"role_arn"`
@@ -38,14 +38,14 @@ type SourceAwsOrganizationalUnitResourceModel struct {
 	UpdatedAt                    types.String `tfsdk:"updated_at"`
 }
 
-func (r *SourceAwsOrganizationalUnitResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_source_aws_organizational_unit"
+func (r *RestoreAwsOrganizationalUnitResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_restore_aws_organizational_unit"
 }
 
-func (r *SourceAwsOrganizationalUnitResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *RestoreAwsOrganizationalUnitResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Connects a source AWS organizational unit to the Eon project. All AWS accounts within the organizational unit (and its nested OUs) are automatically discovered and available for backup.\n\n" +
-			"**Prerequisite:** connecting an OU only makes Eon discover member accounts and assume a role named `EonSourceAccountRole` in each one — it does not create that role. You must separately deploy `EonSourceAccountRole` into every member account via a service-managed CloudFormation StackSet that auto-deploys to the OU. Eon ships this as `aws-organization.yml` (CloudFormation) and as the `source-account-org` Terraform onboarding module. Without it, member accounts are discovered but have no permissions.",
+		MarkdownDescription: "Connects a restore AWS organizational unit to the Eon project. All AWS accounts within the organizational unit (and its nested OUs) are automatically discovered and available as restore targets.\n\n" +
+			"**Prerequisite:** connecting an OU only makes Eon discover member accounts and assume a role named `EonRestoreAccountRole` in each one — it does not create that role. You must separately deploy `EonRestoreAccountRole` into every member account via a service-managed CloudFormation StackSet that auto-deploys to the OU. Without it, member accounts are discovered but have no permissions.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -78,12 +78,12 @@ func (r *SourceAwsOrganizationalUnitResource) Schema(ctx context.Context, req re
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
-				MarkdownDescription: "Date and time the source AWS organizational unit was connected to the Eon project.",
+				MarkdownDescription: "Date and time the restore AWS organizational unit was connected to the Eon project.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
-				MarkdownDescription: "Date and time the source AWS organizational unit was last updated.",
+				MarkdownDescription: "Date and time the restore AWS organizational unit was last updated.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -91,7 +91,7 @@ func (r *SourceAwsOrganizationalUnitResource) Schema(ctx context.Context, req re
 	}
 }
 
-func (r *SourceAwsOrganizationalUnitResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *RestoreAwsOrganizationalUnitResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -105,27 +105,27 @@ func (r *SourceAwsOrganizationalUnitResource) Configure(ctx context.Context, req
 	r.client = client
 }
 
-func (r *SourceAwsOrganizationalUnitResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data SourceAwsOrganizationalUnitResourceModel
+func (r *RestoreAwsOrganizationalUnitResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data RestoreAwsOrganizationalUnitResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	connectReq := externalEonSdkAPI.ConnectSourceAwsOrganizationalUnitRequest{
+	connectReq := externalEonSdkAPI.ConnectRestoreAwsOrganizationalUnitRequest{
 		RoleArn:                      data.RoleArn.ValueString(),
 		ProviderOrganizationalUnitId: data.ProviderOrganizationalUnitId.ValueString(),
 	}
 
-	tflog.Debug(ctx, "Connecting source AWS organizational unit", map[string]interface{}{
+	tflog.Debug(ctx, "Connecting restore AWS organizational unit", map[string]interface{}{
 		"role_arn":                        data.RoleArn.ValueString(),
 		"provider_organizational_unit_id": data.ProviderOrganizationalUnitId.ValueString(),
 	})
 
-	ou, err := r.client.ConnectSourceAwsOrganizationalUnit(ctx, connectReq)
+	ou, err := r.client.ConnectRestoreAwsOrganizationalUnit(ctx, connectReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to connect source AWS organizational unit: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to connect restore AWS organizational unit: %s", err))
 		return
 	}
 
@@ -138,7 +138,7 @@ func (r *SourceAwsOrganizationalUnitResource) Create(ctx context.Context, req re
 	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 
-	tflog.Debug(ctx, "Source AWS organizational unit connected", map[string]interface{}{
+	tflog.Debug(ctx, "Restore AWS organizational unit connected", map[string]interface{}{
 		"id":     data.Id.ValueString(),
 		"name":   data.Name.ValueString(),
 		"status": data.Status.ValueString(),
@@ -147,17 +147,17 @@ func (r *SourceAwsOrganizationalUnitResource) Create(ctx context.Context, req re
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *SourceAwsOrganizationalUnitResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data SourceAwsOrganizationalUnitResourceModel
+func (r *RestoreAwsOrganizationalUnitResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data RestoreAwsOrganizationalUnitResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	ous, err := r.client.ListSourceAwsOrganizationalUnits(ctx)
+	ous, err := r.client.ListRestoreAwsOrganizationalUnits(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read source AWS organizational units: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read restore AWS organizational units: %s", err))
 		return
 	}
 
@@ -190,53 +190,53 @@ func (r *SourceAwsOrganizationalUnitResource) Read(ctx context.Context, req reso
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *SourceAwsOrganizationalUnitResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data SourceAwsOrganizationalUnitResourceModel
+func (r *RestoreAwsOrganizationalUnitResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data RestoreAwsOrganizationalUnitResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	resp.Diagnostics.AddWarning("Update Not Supported", "Most source AWS organizational unit changes require replacement. Please update your configuration to force replacement if needed.")
+	resp.Diagnostics.AddWarning("Update Not Supported", "Most restore AWS organizational unit changes require replacement. Please update your configuration to force replacement if needed.")
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *SourceAwsOrganizationalUnitResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data SourceAwsOrganizationalUnitResourceModel
+func (r *RestoreAwsOrganizationalUnitResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data RestoreAwsOrganizationalUnitResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "Disconnecting source AWS organizational unit", map[string]interface{}{
+	tflog.Debug(ctx, "Disconnecting restore AWS organizational unit", map[string]interface{}{
 		"id": data.Id.ValueString(),
 	})
 
-	err := r.client.DisconnectSourceAwsOrganizationalUnit(ctx, data.Id.ValueString())
+	err := r.client.DisconnectRestoreAwsOrganizationalUnit(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to disconnect source AWS organizational unit: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to disconnect restore AWS organizational unit: %s", err))
 		return
 	}
 
-	tflog.Debug(ctx, "Source AWS organizational unit disconnected", map[string]interface{}{
+	tflog.Debug(ctx, "Restore AWS organizational unit disconnected", map[string]interface{}{
 		"id": data.Id.ValueString(),
 	})
 }
 
-func (r *SourceAwsOrganizationalUnitResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *RestoreAwsOrganizationalUnitResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 
-	ous, err := r.client.ListSourceAwsOrganizationalUnits(ctx)
+	ous, err := r.client.ListRestoreAwsOrganizationalUnits(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read source AWS organizational units during import: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read restore AWS organizational units during import: %s", err))
 		return
 	}
 
 	var found bool
-	var data SourceAwsOrganizationalUnitResourceModel
+	var data RestoreAwsOrganizationalUnitResourceModel
 
 	for _, ou := range ous {
 		if ou.GetId() == req.ID {
@@ -258,14 +258,14 @@ func (r *SourceAwsOrganizationalUnitResource) ImportState(ctx context.Context, r
 	if !found {
 		resp.Diagnostics.AddError(
 			"Resource Not Found",
-			fmt.Sprintf("Source AWS organizational unit with ID %s not found", req.ID),
+			fmt.Sprintf("Restore AWS organizational unit with ID %s not found", req.ID),
 		)
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 
-	tflog.Info(ctx, "Successfully imported source AWS organizational unit", map[string]interface{}{
+	tflog.Info(ctx, "Successfully imported restore AWS organizational unit", map[string]interface{}{
 		"id":     data.Id.ValueString(),
 		"name":   data.Name.ValueString(),
 		"status": data.Status.ValueString(),
