@@ -45,11 +45,3 @@ resource "eon_gcs_bucket_configuration" "bucket" {
 ### Read-Only
 
 - `id` (String) Eon-assigned ID of the inventory resource. Mirrors `resource_id`.
-
-## Import
-
-Import is supported using the following syntax:
-
-```shell
-terraform import eon_gcs_bucket_configuration.bucket "1ee34dc5-0a7c-4e56-a820-917371e05c8d"
-```
