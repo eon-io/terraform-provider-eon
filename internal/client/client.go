@@ -184,6 +184,30 @@ func (c *EonClient) ListRestoreAccounts(ctx context.Context) ([]externalEonSdkAP
 	return allAccounts, nil
 }
 
+// GetRestoreAccount retrieves a single restore account by ID.
+func (c *EonClient) GetRestoreAccount(ctx context.Context, accountId string) (*externalEonSdkAPI.RestoreAccount, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.GetRestoreAccount(ctx, c.projectID, accountId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get restore account"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	account := resp.GetRestoreAccount()
+	return &account, nil
+}
+
 // ConnectSourceAccount connects a new source account
 func (c *EonClient) ConnectSourceAccount(ctx context.Context, req externalEonSdkAPI.ConnectSourceAccountRequest) (*externalEonSdkAPI.SourceAccount, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
