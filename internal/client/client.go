@@ -194,7 +194,7 @@ func (c *EonClient) GetRestoreAccount(ctx context.Context, accountId string) (*e
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get restore account"); apiErr != nil {
 		return nil, apiErr
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
