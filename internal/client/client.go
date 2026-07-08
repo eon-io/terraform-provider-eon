@@ -672,12 +672,14 @@ func (c *EonClient) GetCloudResourceConfiguration(ctx context.Context, resourceI
 		}
 	}
 
-	var config CloudResourceConfiguration
-	if err := json.NewDecoder(httpResp.Body).Decode(&config); err != nil {
+	var response struct {
+		ObjectStoreScanMethod CloudResourceConfiguration `json:"objectStoreScanMethod"`
+	}
+	if err := json.NewDecoder(httpResp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode resource configuration response: %w", err)
 	}
 
-	return &config, nil
+	return &response.ObjectStoreScanMethod, nil
 }
 
 // UpdateCloudResourceConfiguration partially updates the configuration of an inventory resource.

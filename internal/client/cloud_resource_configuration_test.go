@@ -53,8 +53,10 @@ func TestGetCloudResourceConfiguration(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Header:     http.Header{"Content-Type": []string{"application/json"}},
 			Body: io.NopCloser(strings.NewReader(`{
-			"cdcBackup": {"systemControlled": true},
-			"inventoryBackup": {"systemControlled": false, "enabled": false}
+			"objectStoreScanMethod": {
+				"cdcBackup": {"systemControlled": true},
+				"inventoryBackup": {"systemControlled": false, "enabled": false}
+			}
 		}`)),
 		}, nil
 	}))
