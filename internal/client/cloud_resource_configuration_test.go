@@ -46,7 +46,7 @@ func TestGetCloudResourceConfiguration(t *testing.T) {
 
 	c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "/api/projects/project-1/inventory/resource-1/configuration", r.URL.Path)
+		assert.Equal(t, "/api/v1/projects/project-1/resources/resource-1/object-store-scan-method", r.URL.Path)
 		assert.Equal(t, "application/json", r.Header.Get("Accept"))
 
 		return &http.Response{
@@ -74,7 +74,7 @@ func TestUpdateCloudResourceConfiguration(t *testing.T) {
 
 	c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		assert.Equal(t, http.MethodPatch, r.Method)
-		assert.Equal(t, "/api/projects/project-1/inventory/resource-1/configuration", r.URL.Path)
+		assert.Equal(t, "/api/v1/projects/project-1/resources/resource-1/object-store-scan-method", r.URL.Path)
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 		assert.Equal(t, "application/json", r.Header.Get("Accept"))
 

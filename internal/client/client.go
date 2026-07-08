@@ -646,7 +646,7 @@ func (c *EonClient) GetCloudResourceConfiguration(ctx context.Context, resourceI
 	}
 
 	baseURL := c.client.GetConfig().Servers[0].URL
-	url := fmt.Sprintf("%s/projects/%s/inventory/%s/configuration", baseURL, c.projectID, resourceId)
+	url := fmt.Sprintf("%s/v1/projects/%s/resources/%s/object-store-scan-method", baseURL, c.projectID, resourceId)
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -687,7 +687,7 @@ func (c *EonClient) UpdateCloudResourceConfiguration(ctx context.Context, resour
 	}
 
 	baseURL := c.client.GetConfig().Servers[0].URL
-	url := fmt.Sprintf("%s/projects/%s/inventory/%s/configuration", baseURL, c.projectID, resourceId)
+	url := fmt.Sprintf("%s/v1/projects/%s/resources/%s/object-store-scan-method", baseURL, c.projectID, resourceId)
 
 	body, err := json.Marshal(req)
 	if err != nil {
