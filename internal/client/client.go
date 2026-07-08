@@ -37,6 +37,25 @@ type EonClient struct {
 	tokenRefresher TokenRefresher
 }
 
+// CloudResourceBackupMethodConfig represents the auto/user-controlled backup method
+// configuration used by GCS bucket scan detection and full-scan settings.
+type CloudResourceBackupMethodConfig struct {
+	Enabled          *bool `json:"enabled,omitempty"`
+	SystemControlled *bool `json:"systemControlled,omitempty"`
+}
+
+// CloudResourceConfiguration represents the supported inventory resource configuration fields.
+type CloudResourceConfiguration struct {
+	CdcBackup       CloudResourceBackupMethodConfig `json:"cdcBackup"`
+	InventoryBackup CloudResourceBackupMethodConfig `json:"inventoryBackup"`
+}
+
+// UpdateCloudResourceConfigurationRequest represents a partial inventory resource configuration update.
+type UpdateCloudResourceConfigurationRequest struct {
+	CdcBackup       *CloudResourceBackupMethodConfig `json:"cdcBackup,omitempty"`
+	InventoryBackup *CloudResourceBackupMethodConfig `json:"inventoryBackup,omitempty"`
+}
+
 // GetProjectID returns the project ID
 func (c *EonClient) GetProjectID() string {
 	return c.projectID
@@ -639,6 +658,91 @@ func (c *EonClient) DeleteRestoreAccountConnectivityConfig(ctx context.Context, 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(httpResp.Body)
 		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// GetCloudResourceConfiguration retrieves the configuration of an inventory resource.
+func (c *EonClient) GetCloudResourceConfiguration(ctx context.Context, resourceId string) (*CloudResourceConfiguration, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	baseURL := c.client.GetConfig().Servers[0].URL
+	url := fmt.Sprintf("%s/v1/projects/%s/resources/%s/object-store-scan-method", baseURL, c.projectID, resourceId)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create get resource configuration request: %w", err)
+	}
+
+	httpReq.Header.Set("Accept", "application/json")
+	for key, value := range c.client.GetConfig().DefaultHeader {
+		httpReq.Header.Set(key, value)
+	}
+
+	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq) // #nosec G704 -- URL is built from trusted server configuration, not user input
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get resource configuration"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	var response struct {
+		ObjectStoreScanMethod CloudResourceConfiguration `json:"objectStoreScanMethod"`
+	}
+	if err := json.NewDecoder(httpResp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode resource configuration response: %w", err)
+	}
+
+	return &response.ObjectStoreScanMethod, nil
+}
+
+// UpdateCloudResourceConfiguration partially updates the configuration of an inventory resource.
+func (c *EonClient) UpdateCloudResourceConfiguration(ctx context.Context, resourceId string, req UpdateCloudResourceConfigurationRequest) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	baseURL := c.client.GetConfig().Servers[0].URL
+	url := fmt.Sprintf("%s/v1/projects/%s/resources/%s/object-store-scan-method", baseURL, c.projectID, resourceId)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal resource configuration request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create update resource configuration request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+	for key, value := range c.client.GetConfig().DefaultHeader {
+		httpReq.Header.Set(key, value)
+	}
+
+	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq) // #nosec G704 -- URL is built from trusted server configuration, not user input
+	if apiErr := c.handleAPIError(err, httpResp, "failed to update resource configuration"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusNoContent && httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
 	}
 
 	return nil
