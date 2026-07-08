@@ -683,7 +683,7 @@ func restoreJobIDFromResponse(resp *externalEonSdkAPI.MPAInterceptedResponse, ht
 		}
 		return initiation.GetJobId(), nil
 	case http.StatusCreated:
-		mpaReq := resp.GetMpaRequest()
+		mpaReq := resp.GetActionApprovalRequest()
 		return "", fmt.Errorf("%s: operation requires Multi-Party Approval (MPA request ID %q); approve the request and retry", action, mpaReq.GetId())
 	default:
 		body, _ := io.ReadAll(httpResp.Body)
