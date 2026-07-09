@@ -697,7 +697,7 @@ func (c *EonClient) GetRestoreAccountConnectivityConfig(ctx context.Context, acc
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.GetRestoreAccountConnectivityConfig(ctx, accountId, c.projectID).Execute()
+	resp, httpResp, err := c.client.AccountsAPI.GetRestoreAccountConnectivityConfig(ctx, c.projectID, accountId).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to get restore account connectivity config"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -718,7 +718,7 @@ func (c *EonClient) UpdateRestoreAccountConnectivityConfig(ctx context.Context, 
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.UpdateRestoreAccountConnectivityConfig(ctx, accountId, c.projectID).UpdateRestoreAccountConnectivityConfigRequest(req).Execute()
+	resp, httpResp, err := c.client.AccountsAPI.UpdateRestoreAccountConnectivityConfig(ctx, c.projectID, accountId).UpdateRestoreAccountConnectivityConfigRequest(req).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to update restore account connectivity config"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -740,7 +740,7 @@ func (c *EonClient) DeleteRestoreAccountConnectivityConfig(ctx context.Context, 
 		return fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	httpResp, err := c.client.AccountsAPI.DeleteRestoreAccountConnectivityConfig(ctx, accountId, c.projectID).Execute()
+	httpResp, err := c.client.AccountsAPI.DeleteRestoreAccountConnectivityConfig(ctx, c.projectID, accountId).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to delete restore account connectivity config"); apiErr != nil {
 		return apiErr
 	}
