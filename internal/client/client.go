@@ -600,6 +600,97 @@ func (c *EonClient) DeleteRestoreAccount(ctx context.Context, accountId string) 
 	return nil
 }
 
+// UpdateRestoreAccountRequest contains the fields that can be updated on a restore account.
+type UpdateRestoreAccountRequest struct {
+	Name                     *string
+	RestoreAccountAttributes *UpdateRestoreAccountAttributes
+}
+
+// UpdateRestoreAccountAttributes contains cloud-provider-specific attributes to update.
+// The API supports updating AWS (role_arn) and GCP (service_account); Azure attributes
+// are immutable and require replacement.
+type UpdateRestoreAccountAttributes struct {
+	Aws *UpdateAwsRestoreAccountAttributes
+	Gcp *UpdateGcpRestoreAccountAttributes
+}
+
+// UpdateAwsRestoreAccountAttributes contains AWS-specific attributes to update.
+type UpdateAwsRestoreAccountAttributes struct {
+	RoleArn *string
+}
+
+// UpdateGcpRestoreAccountAttributes contains GCP-specific attributes to update.
+type UpdateGcpRestoreAccountAttributes struct {
+	ServiceAccount *string
+}
+
+// UpdateRestoreAccount updates mutable fields of a restore account via
+// PATCH /v1/projects/{projectId}/restore-accounts/{accountId}.
+func (c *EonClient) UpdateRestoreAccount(ctx context.Context, accountId string, req UpdateRestoreAccountRequest) (*externalEonSdkAPI.RestoreAccount, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	sdkReq := externalEonSdkAPI.NewUpdateRestoreAccountRequest()
+	if req.Name != nil {
+		sdkReq.SetName(*req.Name)
+	}
+	if req.RestoreAccountAttributes != nil {
+		attrs := externalEonSdkAPI.NewUpdateRestoreAccountAttributesInput()
+		if req.RestoreAccountAttributes.Aws != nil {
+			awsAttrs := externalEonSdkAPI.UpdateAwsRestoreAccountAttributes{}
+			if req.RestoreAccountAttributes.Aws.RoleArn != nil {
+				awsAttrs.SetRoleArn(*req.RestoreAccountAttributes.Aws.RoleArn)
+			}
+			attrs.SetAws(awsAttrs)
+		}
+		if req.RestoreAccountAttributes.Gcp != nil {
+			gcpAttrs := externalEonSdkAPI.UpdateGcpRestoreAccountAttributes{}
+			if req.RestoreAccountAttributes.Gcp.ServiceAccount != nil {
+				gcpAttrs.SetServiceAccount(*req.RestoreAccountAttributes.Gcp.ServiceAccount)
+			}
+			attrs.SetGcp(gcpAttrs)
+		}
+		sdkReq.SetRestoreAccountAttributes(*attrs)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.UpdateRestoreAccount(ctx, c.projectID, accountId).
+		UpdateRestoreAccountRequest(*sdkReq).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to update restore account"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	account := resp.GetRestoreAccount()
+	return &account, nil
+}
+
+// ReconnectRestoreAccount reconnects a previously disconnected restore account.
+func (c *EonClient) ReconnectRestoreAccount(ctx context.Context, accountId string) (*externalEonSdkAPI.RestoreAccount, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.ReconnectRestoreAccount(ctx, c.projectID, accountId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to reconnect restore account"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	account := resp.GetRestoreAccount()
+	return &account, nil
+}
+
 // GetRestoreAccountConnectivityConfig retrieves the connectivity configuration of a restore account.
 func (c *EonClient) GetRestoreAccountConnectivityConfig(ctx context.Context, accountId string) (*externalEonSdkAPI.RestoreAccountConnectivityConfig, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {

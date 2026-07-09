@@ -78,9 +78,9 @@ func (r *RestoreAccountResource) Schema(ctx context.Context, req resource.Schema
 				DeprecationMessage:  "Use 'aws { role_arn = \"...\" }' instead.",
 			},
 			"status": schema.StringAttribute{
-				MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
+				MarkdownDescription: "Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` restore accounts can be restored to. The provider automatically reconnects accounts that drift to `DISCONNECTED`. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers:       []planmodifier.String{ReconnectOnDisconnected()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Date and time the restore account was connected to the Eon project.",
@@ -343,21 +343,220 @@ func (r *RestoreAccountResource) Read(ctx context.Context, req resource.ReadRequ
 		data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	}
 
+	// Surface account statuses the provider cannot auto-remediate so the user
+	// sees them in plan output. DISCONNECTED is handled by the plan modifier
+	// and the Update flow; anything else non-CONNECTED needs manual attention.
+	status := data.Status.ValueString()
+	if status != "" && status != "CONNECTED" && status != "DISCONNECTED" {
+		resp.Diagnostics.AddAttributeWarning(
+			path.Root("status"),
+			"Restore Account Requires Manual Intervention",
+			fmt.Sprintf(
+				"Restore account %s is in status %q. The provider cannot automatically remediate this state; resolve the underlying issue in the Eon console or cloud provider and re-run.",
+				data.Id.ValueString(), status,
+			),
+		)
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *RestoreAccountResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data RestoreAccountResourceModel
+	var plan RestoreAccountResourceModel
+	var state RestoreAccountResourceModel
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// For now, most changes require replace due to API limitations
-	resp.Diagnostics.AddWarning("Update Not Supported", "Most restore account changes require replacement. Please update your configuration to force replacement if needed.")
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	// Azure restore accounts are immutable via the update API; any change to the
+	// azure block must go through replacement. Reject it here with a clear error
+	// rather than silently no-op'ing (the cloud_provider itself already forces
+	// replacement, so this only fires for edits within the azure block).
+	if azureAttributesChanged(plan.Azure, state.Azure) {
+		resp.Diagnostics.AddError(
+			"Azure Restore Account Update Not Supported",
+			"Azure restore account attributes (tenant_id, subscription_id, resource_group_name) cannot be updated in place. "+
+				"Recreate the resource (e.g. `terraform taint`) to apply these changes.",
+		)
+		return
+	}
+
+	accountId := state.Id.ValueString()
+	var latestAccount *externalEonSdkAPI.RestoreAccount
+
+	// Step 1: Update mutable fields (name, aws.role_arn, gcp.service_account) if changed.
+	updateReq := r.buildUpdateRequest(plan, state)
+	if updateReq != nil {
+		tflog.Info(ctx, "Updating restore account", map[string]interface{}{
+			"id": accountId,
+		})
+
+		account, err := r.client.UpdateRestoreAccount(ctx, accountId, *updateReq)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Update Failed",
+				fmt.Sprintf("Unable to update restore account %s: %s", accountId, err),
+			)
+			return
+		}
+		latestAccount = account
+	}
+
+	// Step 2: Reconnect if the account is DISCONNECTED.
+	if state.Status.ValueString() == "DISCONNECTED" {
+		tflog.Info(ctx, "Restore account is disconnected, attempting reconnect", map[string]interface{}{
+			"id": accountId,
+		})
+
+		account, err := r.client.ReconnectRestoreAccount(ctx, accountId)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Reconnect Failed",
+				fmt.Sprintf("Unable to reconnect restore account %s: %s", accountId, err),
+			)
+			return
+		}
+		latestAccount = account
+
+		tflog.Info(ctx, "Restore account reconnected", map[string]interface{}{
+			"id": accountId,
+		})
+	}
+
+	// Step 3: Build new state from the API response, or read back if no response was returned.
+	if latestAccount == nil {
+		fetched, err := r.readRestoreAccount(ctx, accountId, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Read After Update Failed",
+				fmt.Sprintf("Unable to read restore account %s after update: %s", accountId, err),
+			)
+			return
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, fetched)...)
+		return
+	}
+
+	newState := r.mapAccountToState(latestAccount, plan)
+	resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
+}
+
+// azureAttributesChanged reports whether any azure block attribute differs
+// between plan and state. Restore accounts cannot update azure attributes in
+// place, so such a change must force replacement.
+func azureAttributesChanged(plan, state *AzureAccountConfigModel) bool {
+	if plan == nil || state == nil {
+		return false
+	}
+	return plan.TenantId.ValueString() != state.TenantId.ValueString() ||
+		plan.SubscriptionId.ValueString() != state.SubscriptionId.ValueString() ||
+		plan.ResourceGroupName.ValueString() != state.ResourceGroupName.ValueString()
+}
+
+// buildUpdateRequest compares plan and state and returns an UpdateRestoreAccountRequest
+// if any mutable fields changed. Returns nil if nothing needs updating.
+func (r *RestoreAccountResource) buildUpdateRequest(plan, state RestoreAccountResourceModel) *client.UpdateRestoreAccountRequest {
+	var req client.UpdateRestoreAccountRequest
+	var changed bool
+
+	if plan.Name.ValueString() != state.Name.ValueString() {
+		name := plan.Name.ValueString()
+		req.Name = &name
+		changed = true
+	}
+
+	if plan.Aws != nil && state.Aws != nil &&
+		plan.Aws.RoleArn.ValueString() != state.Aws.RoleArn.ValueString() {
+		roleArn := plan.Aws.RoleArn.ValueString()
+		req.RestoreAccountAttributes = &client.UpdateRestoreAccountAttributes{
+			Aws: &client.UpdateAwsRestoreAccountAttributes{
+				RoleArn: &roleArn,
+			},
+		}
+		changed = true
+	}
+
+	if plan.Gcp != nil && state.Gcp != nil &&
+		plan.Gcp.ServiceAccount.ValueString() != state.Gcp.ServiceAccount.ValueString() {
+		serviceAccount := plan.Gcp.ServiceAccount.ValueString()
+		req.RestoreAccountAttributes = &client.UpdateRestoreAccountAttributes{
+			Gcp: &client.UpdateGcpRestoreAccountAttributes{
+				ServiceAccount: &serviceAccount,
+			},
+		}
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+	return &req
+}
+
+// mapAccountToState maps a RestoreAccount API response to the Terraform resource model.
+// The plan is used to preserve fields not returned by the API (timestamps).
+func (r *RestoreAccountResource) mapAccountToState(account *externalEonSdkAPI.RestoreAccount, plan RestoreAccountResourceModel) *RestoreAccountResourceModel {
+	data := RestoreAccountResourceModel{
+		Id:                types.StringValue(account.Id),
+		Name:              types.StringValue(account.GetName()),
+		Status:            types.StringValue(string(account.Status)),
+		ProviderAccountId: types.StringValue(account.GetProviderAccountId()),
+		CreatedAt:         plan.CreatedAt,
+		UpdatedAt:         types.StringValue(time.Now().Format(time.RFC3339)),
+	}
+
+	cloudProvider := CloudProvider(account.RestoreAccountAttributes.GetCloudProvider())
+	data.CloudProvider = types.StringValue(cloudProvider.String())
+
+	switch cloudProvider {
+	case CloudProviderAWS:
+		if account.RestoreAccountAttributes.HasAws() {
+			awsAttrs := account.RestoreAccountAttributes.GetAws()
+			data.Aws = &AwsAccountConfigModel{
+				RoleArn: types.StringValue(awsAttrs.GetRoleArn()),
+			}
+			data.Role = types.StringValue(awsAttrs.GetRoleArn())
+		}
+	case CloudProviderAzure:
+		if account.RestoreAccountAttributes.HasAzure() {
+			azureAttrs := account.RestoreAccountAttributes.GetAzure()
+			data.Azure = &AzureAccountConfigModel{
+				TenantId:       types.StringValue(azureAttrs.GetTenantId()),
+				SubscriptionId: types.StringValue(account.GetProviderAccountId()),
+			}
+			if azureAttrs.HasResourceGroupName() {
+				data.Azure.ResourceGroupName = types.StringValue(azureAttrs.GetResourceGroupName())
+			}
+		}
+		data.Role = types.StringNull()
+	case CloudProviderGCP:
+		if account.RestoreAccountAttributes.HasGcp() {
+			gcpAttrs := account.RestoreAccountAttributes.GetGcp()
+			data.Gcp = &GcpAccountConfigModel{
+				ProjectId:      types.StringValue(account.GetProviderAccountId()),
+				ServiceAccount: types.StringValue(gcpAttrs.GetServiceAccount()),
+			}
+		}
+		data.Role = types.StringNull()
+	}
+
+	return &data
+}
+
+// readRestoreAccount fetches a restore account by ID and maps it to the resource model.
+func (r *RestoreAccountResource) readRestoreAccount(ctx context.Context, accountId string, plan RestoreAccountResourceModel) (*RestoreAccountResourceModel, error) {
+	account, err := r.client.GetRestoreAccount(ctx, accountId)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get restore account: %w", err)
+	}
+	return r.mapAccountToState(account, plan), nil
 }
 
 func (r *RestoreAccountResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
