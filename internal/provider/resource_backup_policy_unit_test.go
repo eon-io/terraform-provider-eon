@@ -7,6 +7,8 @@ import (
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 	"github.com/eon-io/terraform-provider-eon/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -861,6 +863,55 @@ func TestStandardIntervalConversion(t *testing.T) {
 				assert.NotNil(t, intervalConfig, "SDK should accept the converted hours value")
 				t.Logf("SDK IntervalConfig: %+v", intervalConfig)
 			}
+		})
+	}
+}
+
+func TestApplyScheduleTimezone(t *testing.T) {
+	tests := []struct {
+		name  string
+		tz    types.String
+		want  externalEonSdkAPI.ScheduleTimezone
+		isSet bool
+	}{
+		{name: "resource", tz: types.StringValue("RESOURCE"), want: externalEonSdkAPI.SCHEDULE_TIMEZONE_RESOURCE, isSet: true},
+		{name: "utc", tz: types.StringValue("UTC"), want: externalEonSdkAPI.SCHEDULE_TIMEZONE_UTC, isSet: true},
+		{name: "empty leaves SDK default", tz: types.StringValue(""), want: externalEonSdkAPI.SCHEDULE_TIMEZONE_UTC, isSet: true},
+		{name: "null leaves SDK default", tz: types.StringNull(), want: externalEonSdkAPI.SCHEDULE_TIMEZONE_UTC, isSet: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plan := externalEonSdkAPI.NewStandardBackupPolicyPlan(nil)
+			applyScheduleTimezone(plan, tt.tz)
+			got, ok := plan.GetScheduleTimezoneOk()
+			assert.Equal(t, tt.isSet, ok)
+			assert.Equal(t, tt.want, *got)
+		})
+	}
+}
+
+func TestScheduleTimezoneValidator(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   types.String
+		wantErr bool
+	}{
+		{name: "utc ok", value: types.StringValue("UTC")},
+		{name: "resource ok", value: types.StringValue("RESOURCE")},
+		{name: "null ok", value: types.StringNull()},
+		{name: "unknown ok", value: types.StringUnknown()},
+		{name: "typo rejected", value: types.StringValue("PST"), wantErr: true},
+		{name: "empty rejected", value: types.StringValue(""), wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := &validator.StringResponse{}
+			scheduleTimezoneValidator{}.ValidateString(
+				context.Background(),
+				validator.StringRequest{ConfigValue: tt.value},
+				resp,
+			)
+			assert.Equal(t, tt.wantErr, resp.Diagnostics.HasError())
 		})
 	}
 }

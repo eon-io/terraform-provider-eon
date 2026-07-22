@@ -17,6 +17,10 @@ resource "eon_backup_policy" "daily_backup" {
   backup_plan = {
     backup_policy_type = "STANDARD"
     standard_plan = {
+      # Run every schedule window at the same local hour in each resource's own
+      # region time zone (e.g. 02:00 in both us-east-1 and eu-central-1).
+      # Omit or set "UTC" to run at a fixed UTC hour instead.
+      schedule_timezone = "RESOURCE"
       backup_schedules = [
         {
           vault_id       = "vault-12345678-1234-1234-1234-123456789012"

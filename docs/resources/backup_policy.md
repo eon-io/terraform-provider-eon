@@ -32,6 +32,10 @@ resource "eon_backup_policy" "daily_backup" {
   backup_plan = {
     backup_policy_type = "STANDARD"
     standard_plan = {
+      # Run every schedule window at the same local hour in each resource's own
+      # region time zone (e.g. 02:00 in both us-east-1 and eu-central-1).
+      # Omit or set "UTC" to run at a fixed UTC hour instead.
+      schedule_timezone = "RESOURCE"
       backup_schedules = [
         {
           vault_id       = "vault-12345678-1234-1234-1234-123456789012"
@@ -619,6 +623,10 @@ Optional:
 Required:
 
 - `backup_schedules` (Attributes List) List of backup schedules (see [below for nested schema](#nestedatt--backup_plan--standard_plan--backup_schedules))
+
+Optional:
+
+- `schedule_timezone` (String) Time zone applied to every schedule window on this policy (mirrors the console's "Schedules are in" setting): 'UTC' runs windows at a fixed UTC hour; 'RESOURCE' runs them at the same local hour in each resource's own region time zone. Defaults to 'UTC' when omitted.
 
 <a id="nestedatt--backup_plan--standard_plan--backup_schedules"></a>
 ### Nested Schema for `backup_plan.standard_plan.backup_schedules`

@@ -3,7 +3,7 @@ module github.com/eon-io/terraform-provider-eon
 go 1.25.8
 
 require (
-	github.com/eon-io/eon-sdk-go v1.160.0
+	github.com/eon-io/eon-sdk-go v1.169.0
 	github.com/hashicorp/terraform-plugin-docs v0.25.0
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-log v0.10.0
