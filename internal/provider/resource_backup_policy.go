@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -49,7 +50,8 @@ type ResourceSelectorModel struct {
 }
 
 type StandardPlanModel struct {
-	BackupSchedules types.List `tfsdk:"backup_schedules"`
+	BackupSchedules  types.List   `tfsdk:"backup_schedules"`
+	ScheduleTimezone types.String `tfsdk:"schedule_timezone"`
 }
 
 type HighFrequencyPlanModel struct {
@@ -590,6 +592,11 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 						MarkdownDescription: "Standard backup plan configuration",
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
+							"schedule_timezone": schema.StringAttribute{
+								MarkdownDescription: "Time zone applied to every schedule window on this policy (mirrors the console's \"Schedules are in\" setting): 'UTC' runs windows at a fixed UTC hour; 'RESOURCE' runs them at the same local hour in each resource's own region time zone. Defaults to 'UTC' when omitted.",
+								Optional:            true,
+								Validators:          []validator.String{scheduleTimezoneValidator{}},
+							},
 							"backup_schedules": schema.ListNestedAttribute{
 								MarkdownDescription: "List of backup schedules",
 								Required:            true,
@@ -925,6 +932,7 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		}
 
 		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(backupSchedules)
+		applyScheduleTimezone(standardPlan, standardPlanModel.ScheduleTimezone)
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
@@ -1208,6 +1216,7 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 
 		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(backupSchedules)
+		applyScheduleTimezone(standardPlan, standardPlanModel.ScheduleTimezone)
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
@@ -1395,6 +1404,41 @@ func createDailyConfigFromModel(data *DailyConfigModel) (*externalEonSdkAPI.Dail
 	}
 
 	return dailyConfig, nil
+}
+
+// scheduleTimezoneValidator rejects values outside the SDK's allowed set at plan time. Without it a
+// typo would silently map to UTC on the server (the enum is x-extensible, so unknown values are not
+// rejected there). Sourced from the SDK enum so it stays correct if the allowed set grows.
+type scheduleTimezoneValidator struct{}
+
+func (scheduleTimezoneValidator) Description(_ context.Context) string {
+	return fmt.Sprintf("value must be one of: %v", externalEonSdkAPI.AllowedScheduleTimezoneEnumValues)
+}
+
+func (v scheduleTimezoneValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (scheduleTimezoneValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	got := externalEonSdkAPI.ScheduleTimezone(req.ConfigValue.ValueString())
+	for _, allowed := range externalEonSdkAPI.AllowedScheduleTimezoneEnumValues {
+		if got == allowed {
+			return
+		}
+	}
+	resp.Diagnostics.AddAttributeError(req.Path, "Invalid schedule_timezone",
+		fmt.Sprintf("must be one of %v, got %q", externalEonSdkAPI.AllowedScheduleTimezoneEnumValues, req.ConfigValue.ValueString()))
+}
+
+// applyScheduleTimezone sets the plan-level schedule time zone when the config provides one.
+// An empty value leaves the SDK default (UTC) so existing policies keep their historical behavior.
+func applyScheduleTimezone(plan *externalEonSdkAPI.StandardBackupPolicyPlan, tz types.String) {
+	if v := tz.ValueString(); v != "" {
+		plan.SetScheduleTimezone(externalEonSdkAPI.ScheduleTimezone(v))
+	}
 }
 
 // createStandardScheduleConfig creates a StandardBackupScheduleConfig based on the policy type and frequency
