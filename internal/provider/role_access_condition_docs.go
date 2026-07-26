@@ -24,6 +24,7 @@ var (
 	// Operator / field descriptions (expression level)
 	RoleExprDescOperatorINorNOTIN      = "Operator: IN or NOT_IN"
 	RoleExprDescOperatorContains       = "Operator: CONTAINS_ANY_OF, CONTAINS_NONE_OF, or CONTAINS_ALL_OF"
+	RoleExprDescOperatorString         = "Operator: IN, NOT_IN, CONTAINS, NOT_CONTAINS, STARTS_WITH, NOT_STARTS_WITH, ENDS_WITH, or NOT_ENDS_WITH"
 	RoleExprDescOperatorLogical        = "Logical operator: AND or OR"
 	RoleExprDescListEnvironments       = "List of environments"
 	RoleExprDescListResourceTypes      = "List of resource types"

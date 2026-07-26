@@ -377,7 +377,7 @@ resource "eon_backup_policy" "all_condition_types" {
           },
           {
             resource_name = {
-              operator       = "IN"
+              operator       = "STARTS_WITH"
               resource_names = ["prod-", "critical-"]
             }
           },

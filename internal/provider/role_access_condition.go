@@ -122,7 +122,7 @@ func roleAccessConditionOperandsSchema() map[string]schema.Attribute {
 			MarkdownDescription: RoleExprDescResourceName,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator":       schema.StringAttribute{Required: true},
+				"operator":       schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorString, Required: true},
 				"resource_names": schema.ListAttribute{ElementType: types.StringType, Required: true},
 			},
 		},
@@ -252,7 +252,7 @@ func roleAccessConditionExpressionSchema() map[string]schema.Attribute {
 			MarkdownDescription: RoleExprDescResourceName,
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
-				"operator":       schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorINorNOTIN, Required: true},
+				"operator":       schema.StringAttribute{MarkdownDescription: RoleExprDescOperatorString, Required: true},
 				"resource_names": schema.ListAttribute{MarkdownDescription: RoleExprDescListResourceNames, ElementType: types.StringType, Required: true},
 			},
 		},
@@ -596,7 +596,7 @@ func roleResourceGroupNameConditionToSDK(ctx context.Context, obj types.Object) 
 
 func roleResourceNameConditionToSDK(ctx context.Context, obj types.Object) (*externalEonSdkAPI.ResourceNameCondition, diag.Diagnostics) {
 	attrs := obj.Attributes()
-	op := externalEonSdkAPI.ScalarOperators(attrs["operator"].(types.String).ValueString())
+	op := externalEonSdkAPI.StringOperators(attrs["operator"].(types.String).ValueString())
 	var list []string
 	_ = attrs["resource_names"].(types.List).ElementsAs(ctx, &list, false)
 	return externalEonSdkAPI.NewResourceNameCondition(op, list), nil

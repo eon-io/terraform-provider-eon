@@ -392,7 +392,7 @@ resource "eon_backup_policy" "all_condition_types" {
           },
           {
             resource_name = {
-              operator       = "IN"
+              operator       = "STARTS_WITH"
               resource_names = ["prod-", "critical-"]
             }
           },
@@ -848,7 +848,7 @@ Required:
 
 Required:
 
-- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+- `operator` (String) Operator: 'IN', 'NOT_IN', 'CONTAINS', 'NOT_CONTAINS', 'STARTS_WITH', 'NOT_STARTS_WITH', 'ENDS_WITH', or 'NOT_ENDS_WITH'
 - `resource_names` (List of String) List of resource names
 
 
