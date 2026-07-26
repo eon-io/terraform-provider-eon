@@ -546,7 +546,7 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 													Optional:            true,
 													Attributes: map[string]schema.Attribute{
 														"operator": schema.StringAttribute{
-															MarkdownDescription: "Operator: 'CONTAINS' or 'NOT_CONTAINS'",
+															MarkdownDescription: "Operator: 'IN', 'NOT_IN', 'CONTAINS', 'NOT_CONTAINS', 'STARTS_WITH', 'NOT_STARTS_WITH', 'ENDS_WITH', or 'NOT_ENDS_WITH'",
 															Required:            true,
 														},
 														"resource_names": schema.ListAttribute{
@@ -2140,7 +2140,7 @@ func createBackupPolicyExpression(ctx context.Context, data *ResourceSelectorMod
 					return nil, fmt.Errorf("failed to parse resource_names list in operand")
 				}
 
-				operator := externalEonSdkAPI.ScalarOperators(resourceNameCondition.Operator.ValueString())
+				operator := externalEonSdkAPI.StringOperators(resourceNameCondition.Operator.ValueString())
 				resourceNameConditionApi := externalEonSdkAPI.NewResourceNameCondition(operator, resourceNames)
 				operandExpr.SetResourceName(*resourceNameConditionApi)
 			}

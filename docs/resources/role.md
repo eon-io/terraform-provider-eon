@@ -365,7 +365,7 @@ Required:
 
 Required:
 
-- `operator` (String)
+- `operator` (String) Operator: IN, NOT_IN, CONTAINS, NOT_CONTAINS, STARTS_WITH, NOT_STARTS_WITH, ENDS_WITH, or NOT_ENDS_WITH
 - `resource_names` (List of String)
 
 
@@ -460,7 +460,7 @@ Required:
 
 Required:
 
-- `operator` (String) Operator: IN or NOT_IN
+- `operator` (String) Operator: IN, NOT_IN, CONTAINS, NOT_CONTAINS, STARTS_WITH, NOT_STARTS_WITH, ENDS_WITH, or NOT_ENDS_WITH
 - `resource_names` (List of String) List of resource names
 
 

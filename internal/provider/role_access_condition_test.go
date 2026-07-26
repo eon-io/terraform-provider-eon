@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,55 @@ func TestFlattenRoleAccessConditions_EmptySlice(t *testing.T) {
 	require.False(t, diags.HasError())
 	require.False(t, list.IsNull())
 	assert.Len(t, list.Elements(), 0)
+}
+
+func TestRoleResourceNameConditionToSDK_StringOperator(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	obj, diags := types.ObjectValue(
+		map[string]attr.Type{
+			"operator":       types.StringType,
+			"resource_names": types.ListType{ElemType: types.StringType},
+		},
+		map[string]attr.Value{
+			"operator":       types.StringValue("STARTS_WITH"),
+			"resource_names": types.ListValueMust(types.StringType, []attr.Value{types.StringValue("prod-")}),
+		},
+	)
+	require.False(t, diags.HasError())
+
+	condition, conversionDiags := roleResourceNameConditionToSDK(ctx, obj)
+
+	require.False(t, conversionDiags.HasError())
+	require.NotNil(t, condition)
+	assert.Equal(t, externalEonSdkAPI.STRING_STARTS_WITH_OPERATOR, condition.GetOperator())
+	assert.Equal(t, []string{"prod-"}, condition.GetResourceNames())
+}
+
+func TestFlattenRoleAccessConditions_ResourceNameStringOperator(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	resourceNameCondition := externalEonSdkAPI.NewResourceNameCondition(
+		externalEonSdkAPI.STRING_CONTAINS_OPERATOR,
+		[]string{"critical"},
+	)
+	expr := externalEonSdkAPI.NewAccessConditionalExpression()
+	expr.SetResourceName(*resourceNameCondition)
+	accessCondition := externalEonSdkAPI.NewAccessCondition(
+		"cond-resource-name",
+		externalEonSdkAPI.RULE_EFFECT_INCLUSIVE,
+		*externalEonSdkAPI.NewNullableAccessConditionalExpression(expr),
+	)
+
+	list, diags := flattenRoleAccessConditions(ctx, []externalEonSdkAPI.AccessCondition{*accessCondition})
+
+	require.False(t, diags.HasError())
+	require.Len(t, list.Elements(), 1)
+	expression := list.Elements()[0].(types.Object).Attributes()["expression"].(types.Object)
+	resourceName := expression.Attributes()["resource_name"].(types.Object)
+	assert.Equal(t, "CONTAINS", resourceName.Attributes()["operator"].(types.String).ValueString())
 }
 
 func TestFlattenRoleAccessConditions_SingleConditionEnvironment(t *testing.T) {
