@@ -48,49 +48,33 @@ until it is implemented. The factual fields (`method`, `path`, `status`,
 
 ## Automation
 
-Two workflows close the loop (nothing ever merges automatically — every PR
-opens as a draft for human review):
+The automation runs in the **private `eon-io/eon-service` repository** — the
+same repo that generates and releases `eon-sdk-go` — so no automation secrets
+or workflows live in this public repo. This repo only carries the analyzer
+(`tools/capsync`) and the committed manifest/reports; the eon-service
+workflows check this repo out, run the analyzer here, and push draft PRs back.
+Nothing ever merges automatically.
 
-- **SDK Capability Sync** (`.github/workflows/sdk-capability-sync.yml`) —
-  bumps `eon-sdk-go`, reruns capsync, and opens a draft `sdk-sync` PR with the
-  refreshed gap report and any newly seeded triage proposals. Runs on:
-  - `repository_dispatch` with `event_type: sdk-release` (the SDK release
-    pipeline POSTs `{"event_type":"sdk-release","client_payload":{"version":"vX.Y.Z"}}`
-    to this repo's `/dispatches` endpoint — see the workflow header for the
-    exact curl);
-  - a daily scheduled fallback that compares the latest SDK tag with `go.mod`;
-  - manual `workflow_dispatch`.
+- **`terraform-provider-capability-sync.yml`** (in eon-service) — chained
+  directly off `update-sdk.yml`, the workflow that publishes each `eon-sdk-go`
+  release, so a release triggers the sync in the same run; also runs on a
+  daily scheduled fallback and manual dispatch. It bumps `eon-sdk-go` here,
+  reruns capsync, optionally has Claude finalize the triage of newly
+  discovered operations (`CAPSYNC_LLM_TRIAGE=true`; each decision is recorded
+  as `notes: llm-triage(<version>): ...` and listed in the PR body — merging
+  accepts it, editing the manifest overrides it), and opens a draft `sdk-sync`
+  PR on this repo.
 
-  Optional secret `SDK_SYNC_TOKEN` (PAT with repo scope): when set, CI runs
-  automatically on the PRs this workflow opens; with the default
-  `GITHUB_TOKEN`, GitHub suppresses those runs.
+- **`terraform-provider-capability-implement.yml`** (in eon-service) —
+  dispatched with a capability name from the gap report, manually or
+  automatically by the sync run (`CAPSYNC_AUTO_IMPLEMENT=true`, max 3 per run,
+  settled gaps only). Claude Code implements the capability end to end
+  following this repo's patterns and opens a draft `capability-sync` PR here —
+  one capability per PR.
 
-  **LLM triage** (repository variable `CAPSYNC_LLM_TRIAGE=true` + the
-  `ANTHROPIC_API_KEY` secret): instead of waiting for a human to confirm the
-  heuristically seeded classification of newly discovered operations, Claude
-  reviews each one against the triage policy during the sync run, writes the
-  final classification and a one-line rationale into the manifest (`notes:
-  llm-triage(<version>): ...`), and clears `needs_review` when confident —
-  leaving it set, with an explanation, only for genuinely ambiguous calls.
-  Cleared operations become auto-implementable in the same run. The sync PR
-  body lists every LLM decision; merging the PR accepts them, and editing the
-  manifest overrides them — the diff is the audit trail.
-
-- **Implement Capability** (`.github/workflows/capability-implement.yml`) —
-  dispatched with a capability name from the gap report (e.g.
-  `eon_backup_posture_control`). Claude Code implements it end to end
-  following the repo's existing patterns and opens a draft, labeled PR — one
-  capability per PR, based on `main` or chained off an open sdk-sync branch.
-  Requires the `ANTHROPIC_API_KEY` secret.
-
-  Two dispatch modes:
-  - **Manual** (default): a human picks the capability and runs the workflow.
-  - **Automatic**: set the repository variable `CAPSYNC_AUTO_IMPLEMENT=true`
-    and the sync workflow auto-dispatches implementation jobs (max 3 per run)
-    for every gap whose triage is already settled — i.e. classified in the
-    manifest on a previous run and not flagged `needs_review`. Operations the
-    SDK release just introduced are never auto-implemented; they wait for a
-    human to confirm the seeded classification in the sync PR first.
+Setup lives entirely in eon-service: `SDK_REPO_TOKEN` (repo scope on this
+repo; already used to publish `eon-sdk-go`), `ANTHROPIC_API_KEY`, and the two
+repository variables above.
 
 The manifest keeps both honest: implemented operations flip to `covered` on
 the next run, operations you mark `skip` are never proposed again, and brand
