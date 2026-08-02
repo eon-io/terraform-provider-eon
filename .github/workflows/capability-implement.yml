@@ -1,0 +1,82 @@
+# Implement a capability gap from capabilities/manifest.yaml as a draft PR.
+#
+# Run manually (workflow_dispatch) with the Terraform type name of an approved
+# gap (e.g. eon_backup_posture_control). Claude Code implements the resource
+# or data source end to end following the repo's existing patterns and opens a
+# draft PR for human review. Nothing merges automatically.
+#
+# Requires the ANTHROPIC_API_KEY secret.
+name: Implement Capability
+
+on:
+  workflow_dispatch:
+    inputs:
+      capability:
+        description: 'Terraform type name of the gap to implement (e.g. eon_backup_posture_control)'
+        required: true
+        type: string
+      base_branch:
+        description: 'Branch to base the implementation on (e.g. main or an open sdk-sync branch)'
+        required: false
+        default: 'main'
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.base_branch }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.0"
+          terraform_wrapper: false
+
+      - name: Implement capability with Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            Implement the Terraform capability `${{ github.event.inputs.capability }}` in this provider.
+
+            Ground rules:
+            1. Read capabilities/manifest.yaml and capabilities/gap-report.json to find every SDK
+               operation whose terraform_name is `${{ github.event.inputs.capability }}`, its
+               classification (resource or data_source), and the triage reasoning. If the
+               capability is not an open gap there, stop and report why instead of implementing.
+            2. Study the closest existing implementation in internal/provider and copy its
+               patterns exactly: struct layout, Metadata/Schema/Configure/CRUD/ImportState
+               conventions, `AddError("Client Error", ...)` message style, 404 -> RemoveResource
+               in Read, tflog usage, and MarkdownDescription phrasing. Add EonClient wrapper
+               methods in internal/client/client.go mirroring the neighboring methods.
+            3. Register the new type in internal/provider/provider.go, add an example under
+               examples/resources/ or examples/data-sources/, add unit tests following the
+               existing *_unit_test.go patterns, run `go generate ./...` to produce docs, and
+               run `go run ./tools/capsync -update-manifest` so the manifest flips the
+               operations to covered.
+            4. Verify: gofmt, go vet ./..., go build ./..., go test ./... must all pass.
+            5. Create a branch capability/${{ github.event.inputs.capability }}, commit, push,
+               and open a DRAFT pull request based on `${{ github.event.inputs.base_branch }}`.
+               The PR body must list the capability, the SDK operations it covers, and the
+               triage reasoning copied from the manifest. Apply the label `capability-sync`
+               (create it if missing).
+          claude_args: |
+            --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
