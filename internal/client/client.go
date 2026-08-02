@@ -1336,6 +1336,135 @@ func (c *EonClient) DeleteBackupPolicy(ctx context.Context, policyId string) err
 	return nil
 }
 
+// ListBackupPostureControls retrieves all backup posture controls, handling pagination
+func (c *EonClient) ListBackupPostureControls(ctx context.Context) ([]externalEonSdkAPI.BackupPostureControl, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	var allControls []externalEonSdkAPI.BackupPostureControl
+	var pageToken *string
+
+	for {
+		req := c.client.BackupPostureControlsAPI.ListBackupPostureControls(ctx, c.projectID).
+			ListBackupPostureControlsRequest(externalEonSdkAPI.ListBackupPostureControlsRequest{})
+		if pageToken != nil {
+			req = req.PageToken(*pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list backup posture controls"); apiErr != nil {
+			if httpResp != nil {
+				_ = httpResp.Body.Close()
+			}
+			return nil, apiErr
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			_ = httpResp.Body.Close()
+			return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+		}
+
+		if resp.GetBackupPostureControls() != nil {
+			allControls = append(allControls, resp.GetBackupPostureControls()...)
+		}
+
+		hasMorePages := resp.NextPageToken != nil && *resp.NextPageToken != ""
+
+		_ = httpResp.Body.Close()
+
+		if !hasMorePages {
+			break
+		}
+		pageToken = resp.NextPageToken
+	}
+
+	return allControls, nil
+}
+
+// GetBackupPostureControl retrieves a backup posture control by ID
+func (c *EonClient) GetBackupPostureControl(ctx context.Context, controlId string) (*externalEonSdkAPI.BackupPostureControl, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.BackupPostureControlsAPI.GetBackupPostureControl(ctx, c.projectID, controlId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get backup posture control"); apiErr != nil {
+		return nil, apiErr
+	}
+
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return resp, nil
+}
+
+// CreateBackupPostureControl creates a new backup posture control
+func (c *EonClient) CreateBackupPostureControl(ctx context.Context, req externalEonSdkAPI.CreateBackupPostureControlRequest) (*externalEonSdkAPI.BackupPostureControl, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.BackupPostureControlsAPI.CreateBackupPostureControl(ctx, c.projectID).CreateBackupPostureControlRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to create backup posture control"); apiErr != nil {
+		return nil, apiErr
+	}
+
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return resp, nil
+}
+
+// UpdateBackupPostureControl updates an existing backup posture control
+func (c *EonClient) UpdateBackupPostureControl(ctx context.Context, controlId string, req externalEonSdkAPI.UpdateBackupPostureControlRequest) (*externalEonSdkAPI.BackupPostureControl, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.BackupPostureControlsAPI.UpdateBackupPostureControl(ctx, c.projectID, controlId).UpdateBackupPostureControlRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to update backup posture control"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return resp, nil
+}
+
+// DeleteBackupPostureControl deletes a backup posture control
+func (c *EonClient) DeleteBackupPostureControl(ctx context.Context, controlId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.BackupPostureControlsAPI.DeleteBackupPostureControl(ctx, c.projectID, controlId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to delete backup posture control"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // CreateVault creates a new backup vault
 func (c *EonClient) CreateVault(ctx context.Context, req externalEonSdkAPI.CreateVaultRequest) (*externalEonSdkAPI.BackupVault, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
