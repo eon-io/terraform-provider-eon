@@ -38,6 +38,8 @@ github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=
 github.com/eon-io/eon-sdk-go v1.170.0 h1:/MBBk9WfmqmkrZsJQd+ZSieuFtJ9kS97qfPuHTpDBss=
 github.com/eon-io/eon-sdk-go v1.170.0/go.mod h1:NWrS3rllESPQ7vzryT7+bHkOpNrXbXcnRtaPlv0LScw=
+github.com/eon-io/eon-sdk-go v1.173.0 h1:M5oLdWKUHDKASdin/gApaLSObwQFLMY7k7lBILwpahQ=
+github.com/eon-io/eon-sdk-go v1.173.0/go.mod h1:NWrS3rllESPQ7vzryT7+bHkOpNrXbXcnRtaPlv0LScw=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
 github.com/fatih/color v1.18.0 h1:S8gINlzdQ840/4pfAwic/ZE0djQEH3wM94VfqLTZcOM=
 github.com/fatih/color v1.18.0/go.mod h1:4FelSpRwEGDpQ12mAdzqdOukCy4u8WUtOY6lkT/6HfU=
