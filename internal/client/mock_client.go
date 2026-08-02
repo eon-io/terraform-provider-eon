@@ -15,9 +15,11 @@ type MockEonClient struct {
 	mu sync.RWMutex
 
 	// Storage for mock data
-	BackupPolicies map[string]*externalEonSdkAPI.BackupPolicy
-	IdpGroups      map[string]*externalEonSdkAPI.IdpGroup
-	Roles          map[string]*externalEonSdkAPI.Role
+	BackupPolicies        map[string]*externalEonSdkAPI.BackupPolicy
+	BackupPostureControls map[string]*externalEonSdkAPI.BackupPostureControl
+	IdpGroups             map[string]*externalEonSdkAPI.IdpGroup
+	Idps                  map[string]*externalEonSdkAPI.Idp
+	Roles                 map[string]*externalEonSdkAPI.Role
 
 	// Behavior controls
 	ShouldFailCreate bool
@@ -31,18 +33,32 @@ type MockEonClient struct {
 	ShouldFailIdpGroupRead   bool
 	ShouldFailIdpGroupUpdate bool
 	ShouldFailIdpGroupDelete bool
+	// Backup posture control behavior
+	ShouldFailBackupPostureControlList   bool
+	ShouldFailBackupPostureControlCreate bool
+	ShouldFailBackupPostureControlRead   bool
+	ShouldFailBackupPostureControlUpdate bool
+	ShouldFailBackupPostureControlDelete bool
+	// Identity provider list behavior
+	ShouldFailIdpList bool
 
 	// Call tracking
-	CreateCalls         int
-	ReadCalls           int
-	UpdateCalls         int
-	DeleteCalls         int
-	ListCalls           int
-	IdpGroupListCalls   int
-	IdpGroupCreateCalls int
-	IdpGroupReadCalls   int
-	IdpGroupUpdateCalls int
-	IdpGroupDeleteCalls int
+	CreateCalls                     int
+	ReadCalls                       int
+	UpdateCalls                     int
+	DeleteCalls                     int
+	ListCalls                       int
+	IdpGroupListCalls               int
+	IdpGroupCreateCalls             int
+	IdpGroupReadCalls               int
+	IdpGroupUpdateCalls             int
+	IdpGroupDeleteCalls             int
+	BackupPostureControlListCalls   int
+	BackupPostureControlCreateCalls int
+	BackupPostureControlReadCalls   int
+	BackupPostureControlUpdateCalls int
+	BackupPostureControlDeleteCalls int
+	IdpListCalls                    int
 
 	// Mock configuration
 	ProjectID string
@@ -51,10 +67,12 @@ type MockEonClient struct {
 // NewMockEonClient creates a new mock client with default behavior
 func NewMockEonClient() *MockEonClient {
 	return &MockEonClient{
-		BackupPolicies: make(map[string]*externalEonSdkAPI.BackupPolicy),
-		IdpGroups:      make(map[string]*externalEonSdkAPI.IdpGroup),
-		Roles:          make(map[string]*externalEonSdkAPI.Role),
-		ProjectID:      "mock-project-id",
+		BackupPolicies:        make(map[string]*externalEonSdkAPI.BackupPolicy),
+		BackupPostureControls: make(map[string]*externalEonSdkAPI.BackupPostureControl),
+		IdpGroups:             make(map[string]*externalEonSdkAPI.IdpGroup),
+		Idps:                  make(map[string]*externalEonSdkAPI.Idp),
+		Roles:                 make(map[string]*externalEonSdkAPI.Role),
+		ProjectID:             "mock-project-id",
 	}
 }
 
@@ -434,4 +452,159 @@ func (m *MockEonClient) ExcludeVolumeFromBackup(ctx context.Context, resourceId,
 // CancelVolumeBackupExclusion mocks cancelling a volume backup exclusion
 func (m *MockEonClient) CancelVolumeBackupExclusion(ctx context.Context, resourceId, volumeId string) error {
 	return nil
+}
+
+// Backup posture control mock state
+func (m *MockEonClient) ensureBackupPostureControls() {
+	if m.BackupPostureControls == nil {
+		m.BackupPostureControls = make(map[string]*externalEonSdkAPI.BackupPostureControl)
+	}
+}
+
+func (m *MockEonClient) ensureIdps() {
+	if m.Idps == nil {
+		m.Idps = make(map[string]*externalEonSdkAPI.Idp)
+	}
+}
+
+// ListBackupPostureControls mocks listing backup posture controls.
+func (m *MockEonClient) ListBackupPostureControls(ctx context.Context) ([]externalEonSdkAPI.BackupPostureControl, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.BackupPostureControlListCalls++
+	m.ensureBackupPostureControls()
+
+	if m.ShouldFailBackupPostureControlList {
+		return nil, fmt.Errorf("mock list backup posture controls error")
+	}
+
+	out := make([]externalEonSdkAPI.BackupPostureControl, 0, len(m.BackupPostureControls))
+	for _, c := range m.BackupPostureControls {
+		out = append(out, *c)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Id < out[j].Id })
+	return out, nil
+}
+
+// GetBackupPostureControl mocks getting a backup posture control by ID.
+func (m *MockEonClient) GetBackupPostureControl(ctx context.Context, controlId string) (*externalEonSdkAPI.BackupPostureControl, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.BackupPostureControlReadCalls++
+	m.ensureBackupPostureControls()
+
+	if m.ShouldFailBackupPostureControlRead {
+		return nil, fmt.Errorf("mock get backup posture control error")
+	}
+
+	c, exists := m.BackupPostureControls[controlId]
+	if !exists {
+		return nil, &APIError{StatusCode: 404, Message: "backup posture control not found"}
+	}
+	return c, nil
+}
+
+// CreateBackupPostureControl mocks creating a backup posture control.
+func (m *MockEonClient) CreateBackupPostureControl(ctx context.Context, req externalEonSdkAPI.CreateBackupPostureControlRequest) (*externalEonSdkAPI.BackupPostureControl, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.BackupPostureControlCreateCalls++
+	m.ensureBackupPostureControls()
+
+	if m.ShouldFailBackupPostureControlCreate {
+		return nil, fmt.Errorf("mock create backup posture control error")
+	}
+
+	id := fmt.Sprintf("mock-bpc-%d", m.BackupPostureControlCreateCalls)
+	control := &externalEonSdkAPI.BackupPostureControl{
+		Id:               id,
+		Name:             req.Name,
+		Severity:         req.Severity,
+		ResourceSelector: req.ResourceSelector,
+		Rules:            req.Rules,
+	}
+	m.BackupPostureControls[id] = control
+	return control, nil
+}
+
+// UpdateBackupPostureControl mocks updating a backup posture control.
+func (m *MockEonClient) UpdateBackupPostureControl(ctx context.Context, controlId string, req externalEonSdkAPI.UpdateBackupPostureControlRequest) (*externalEonSdkAPI.BackupPostureControl, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.BackupPostureControlUpdateCalls++
+	m.ensureBackupPostureControls()
+
+	if m.ShouldFailBackupPostureControlUpdate {
+		return nil, fmt.Errorf("mock update backup posture control error")
+	}
+
+	c, exists := m.BackupPostureControls[controlId]
+	if !exists {
+		return nil, &APIError{StatusCode: 404, Message: "backup posture control not found"}
+	}
+	c.Name = req.Name
+	c.Severity = req.Severity
+	c.ResourceSelector = req.ResourceSelector
+	c.Rules = req.Rules
+	m.BackupPostureControls[controlId] = c
+	return c, nil
+}
+
+// DeleteBackupPostureControl mocks deleting a backup posture control.
+func (m *MockEonClient) DeleteBackupPostureControl(ctx context.Context, controlId string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.BackupPostureControlDeleteCalls++
+	m.ensureBackupPostureControls()
+
+	if m.ShouldFailBackupPostureControlDelete {
+		return fmt.Errorf("mock delete backup posture control error")
+	}
+
+	if _, exists := m.BackupPostureControls[controlId]; !exists {
+		return &APIError{StatusCode: 404, Message: "backup posture control not found"}
+	}
+	delete(m.BackupPostureControls, controlId)
+	return nil
+}
+
+// AddMockBackupPostureControl adds a pre-defined mock backup posture control.
+func (m *MockEonClient) AddMockBackupPostureControl(control *externalEonSdkAPI.BackupPostureControl) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ensureBackupPostureControls()
+	m.BackupPostureControls[control.Id] = control
+}
+
+// ListIdps mocks listing identity providers.
+func (m *MockEonClient) ListIdps(ctx context.Context) ([]externalEonSdkAPI.Idp, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.IdpListCalls++
+	m.ensureIdps()
+
+	if m.ShouldFailIdpList {
+		return nil, fmt.Errorf("mock list identity providers error")
+	}
+
+	out := make([]externalEonSdkAPI.Idp, 0, len(m.Idps))
+	for _, idp := range m.Idps {
+		out = append(out, *idp)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Id < out[j].Id })
+	return out, nil
+}
+
+// AddMockIdp adds a pre-defined mock identity provider.
+func (m *MockEonClient) AddMockIdp(idp *externalEonSdkAPI.Idp) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ensureIdps()
+	m.Idps[idp.Id] = idp
 }
