@@ -147,10 +147,10 @@ func writeJSONReport(path string, r *Report) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(out, '\n'), 0o644)
+	return os.WriteFile(path, append(out, '\n'), 0o600)
 }
 
 func writeMarkdownReport(path string, r *Report) error {
@@ -232,10 +232,10 @@ func writeMarkdownReport(path string, r *Report) error {
 		b.WriteString("\n")
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(b.String()), 0o644)
+	return os.WriteFile(path, []byte(b.String()), 0o600)
 }
 
 // cell escapes a string for use inside a markdown table cell.

@@ -39,7 +39,7 @@ type ManifestEntry struct {
 }
 
 func loadManifest(path string) (*Manifest, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) // #nosec G304 -- path comes from a CLI flag of this dev tool
 	if os.IsNotExist(err) {
 		return &Manifest{SDKModule: sdkModule, Operations: map[string]*ManifestEntry{}}, nil
 	}
@@ -109,8 +109,8 @@ func saveManifest(path string, m *Manifest, r *Report) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(path, append([]byte(manifestHeader), out...), 0o644)
+	return os.WriteFile(path, append([]byte(manifestHeader), out...), 0o600)
 }

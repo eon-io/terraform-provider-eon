@@ -76,7 +76,7 @@ func loadSDKSpec(providerDir, version string) (string, []SpecOperation, error) {
 }
 
 func goCmd(dir string, args ...string) (string, error) {
-	cmd := exec.Command("go", args...)
+	cmd := exec.Command("go", args...) // #nosec G204 -- fixed binary; args are built from internal constants and CLI flags of this dev tool
 	cmd.Dir = dir
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -89,7 +89,7 @@ func goCmd(dir string, args ...string) (string, error) {
 
 // parseSpecFile extracts all operations from an OpenAPI 3 YAML document.
 func parseSpecFile(path string) ([]SpecOperation, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) // #nosec G304 -- path comes from the module cache or a CLI flag of this dev tool
 	if err != nil {
 		return nil, err
 	}
