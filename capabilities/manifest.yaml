@@ -1,0 +1,948 @@
+# Capability manifest: every Eon SDK operation, its Terraform triage
+# classification, and its provider coverage status.
+#
+# Generated and updated by 'make gap-report' (tools/capsync). Field ownership:
+#
+#   classification, reason, terraform_name, notes, needs_review
+#       Human-owned triage decisions. capsync seeds them for newly discovered
+#       operations and NEVER overwrites them afterwards. To override a
+#       decision, edit the field and commit; later runs respect the override,
+#       and operations classified 'skip' are never re-proposed.
+#
+#   method, path, status, covered_by, first_seen
+#       Facts recomputed by capsync on every run. Do not edit by hand.
+#
+# classification: resource | data_source | skip
+# status:         covered | covered_internal | gap | skipped
+sdk_module: github.com/eon-io/eon-sdk-go
+sdk_version: v1.173.0
+operations:
+    DeleteRestoreAccountV1:
+        method: DELETE
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_restore_account
+        status: covered
+        covered_by:
+            - eon_restore_account
+        first_seen: v1.173.0
+    DisconnectRestoreAccount:
+        method: POST
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}/disconnect
+        classification: skip
+        reason: Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.
+        status: covered
+        covered_by:
+            - eon_restore_account
+        first_seen: v1.173.0
+    DisconnectSourceAccount:
+        method: POST
+        path: /v1/projects/{projectId}/source-accounts/{accountId}/disconnect
+        classification: skip
+        reason: Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.
+        status: covered
+        covered_by:
+            - eon_source_account
+        first_seen: v1.173.0
+    ReconnectRestoreAccount:
+        method: POST
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}/reconnect
+        classification: skip
+        reason: Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.
+        status: covered
+        covered_by:
+            - eon_restore_account
+        first_seen: v1.173.0
+    ReconnectSourceAccount:
+        method: POST
+        path: /v1/projects/{projectId}/source-accounts/{accountId}/reconnect
+        classification: skip
+        reason: Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.
+        status: covered
+        covered_by:
+            - eon_source_account
+        first_seen: v1.173.0
+    cancelActionApprovalRequest:
+        method: POST
+        path: /v1/projects/{projectId}/action-approvals/my-requests/{requestId}/cancel
+        classification: skip
+        reason: Approval requests are one-shot workflow actions tied to a session, not durable configuration.
+        status: skipped
+        first_seen: v1.173.0
+    cancelResourceBackupExclusion:
+        method: PATCH
+        path: /v1/projects/{projectId}/resources/{id}/include
+        classification: resource
+        reason: Exclude/include pair describes a durable per-object setting; model like the existing eon_volume_backup_exclusion (create = exclude, delete = include).
+        terraform_name: eon_resource_backup_exclusion
+        status: gap
+        first_seen: v1.173.0
+    cancelVolumeBackupExclusion:
+        method: PATCH
+        path: /v1/projects/{projectId}/resources/{id}/volumes/{volumeId}/include
+        classification: resource
+        reason: Exclude/include pair describes a durable per-object setting; model like the existing eon_volume_backup_exclusion (create = exclude, delete = include).
+        terraform_name: eon_volume_backup_exclusion
+        status: covered
+        covered_by:
+            - eon_volume_backup_exclusion
+        first_seen: v1.173.0
+    connectRestoreAccount:
+        method: POST
+        path: /v1/projects/{projectId}/restore-accounts
+        classification: resource
+        reason: 'Create with matching item read: a durable object with stable identity and a real lifecycle.'
+        terraform_name: eon_restore_account
+        status: covered
+        covered_by:
+            - eon_restore_account
+        first_seen: v1.173.0
+    connectRestoreAwsOrganizationalUnit:
+        method: POST
+        path: /v1/projects/{projectId}/restore-aws-organizational-units
+        classification: skip
+        reason: 'NEEDS REVIEW: no triage rule matched; classify manually.'
+        status: covered
+        covered_by:
+            - eon_restore_aws_organizational_unit
+        first_seen: v1.173.0
+    connectSourceAccount:
+        method: POST
+        path: /v1/projects/{projectId}/source-accounts
+        classification: resource
+        reason: 'Create with matching item read: a durable object with stable identity and a real lifecycle.'
+        terraform_name: eon_source_account
+        status: covered
+        covered_by:
+            - eon_source_account
+        first_seen: v1.173.0
+    connectSourceAwsOrganizationalUnit:
+        method: POST
+        path: /v1/projects/{projectId}/source-aws-organizational-units
+        classification: skip
+        reason: 'NEEDS REVIEW: no triage rule matched; classify manually.'
+        status: covered
+        covered_by:
+            - eon_source_aws_organizational_unit
+        first_seen: v1.173.0
+    createActionApprovalRequest:
+        method: POST
+        path: /v1/projects/{projectId}/action-approvals/my-requests/{requestId}/submit
+        classification: skip
+        reason: Approval requests are one-shot workflow actions tied to a session, not durable configuration.
+        status: skipped
+        first_seen: v1.173.0
+    createBackupPolicy:
+        method: POST
+        path: /v1/projects/{projectId}/backup-policies
+        classification: resource
+        reason: 'Create with matching item read: a durable object with stable identity and a real lifecycle.'
+        terraform_name: eon_backup_policy
+        status: covered
+        covered_by:
+            - eon_backup_policy
+        first_seen: v1.173.0
+    createBackupPostureControl:
+        method: POST
+        path: /v1/projects/{projectId}/backup-posture-controls
+        classification: resource
+        reason: 'Create with matching item read: a durable object with stable identity and a real lifecycle.'
+        terraform_name: eon_backup_posture_control
+        status: gap
+        first_seen: v1.173.0
+    createIdpGroup:
+        method: POST
+        path: /v1/idp-groups
+        classification: resource
+        reason: 'Create with matching item read: a durable object with stable identity and a real lifecycle.'
+        terraform_name: eon_idp_group
+        status: covered
+        covered_by:
+            - eon_idp_group
+        first_seen: v1.173.0
+    createRole:
+        method: POST
+        path: /v1/roles
+        classification: resource
+        reason: 'Create with matching item read: a durable object with stable identity and a real lifecycle.'
+        terraform_name: eon_role
+        status: covered
+        covered_by:
+            - eon_role
+        first_seen: v1.173.0
+    createVault:
+        method: POST
+        path: /v1/projects/{projectId}/vaults
+        classification: resource
+        reason: 'Create with matching item read: a durable object with stable identity and a real lifecycle.'
+        terraform_name: eon_vault
+        status: covered
+        covered_by:
+            - eon_vault
+        first_seen: v1.173.0
+    deleteBackupPolicy:
+        method: DELETE
+        path: /v1/projects/{projectId}/backup-policies/{backupPolicyId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_backup_policy
+        status: covered
+        covered_by:
+            - eon_backup_policy
+        first_seen: v1.173.0
+    deleteBackupPostureControl:
+        method: DELETE
+        path: /v1/projects/{projectId}/backup-posture-controls/{controlId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_backup_posture_control
+        status: gap
+        first_seen: v1.173.0
+    deleteIdpGroup:
+        method: DELETE
+        path: /v1/idp-groups/{groupId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_idp_group
+        status: covered
+        covered_by:
+            - eon_idp_group
+        first_seen: v1.173.0
+    deleteRestoreAccountConnectivityConfig:
+        method: DELETE
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}/connectivity-config
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_restore_account_connectivity_config
+        status: covered
+        covered_by:
+            - eon_restore_account_connectivity_config
+        first_seen: v1.173.0
+    deleteRole:
+        method: DELETE
+        path: /v1/roles/{roleId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_role
+        status: covered
+        covered_by:
+            - eon_role
+        first_seen: v1.173.0
+    deleteSourceAccount:
+        method: DELETE
+        path: /v1/projects/{projectId}/source-accounts/{accountId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_source_account
+        status: covered
+        covered_by:
+            - eon_source_account
+        first_seen: v1.173.0
+    disableRestoreAccountMetricsConfig:
+        method: DELETE
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}/metrics-config
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_restore_account_metrics_config
+        status: gap
+        first_seen: v1.173.0
+    disableSourceAccountMetricsConfig:
+        method: DELETE
+        path: /v1/projects/{projectId}/source-accounts/{accountId}/metrics-config
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_source_account_metrics_config
+        status: gap
+        first_seen: v1.173.0
+    disconnectRestoreAwsOrganizationalUnit:
+        method: POST
+        path: /v1/projects/{projectId}/restore-aws-organizational-units/{organizationalUnitId}/disconnect
+        classification: skip
+        reason: Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.
+        status: covered
+        covered_by:
+            - eon_restore_aws_organizational_unit
+        first_seen: v1.173.0
+    disconnectSourceAwsOrganizationalUnit:
+        method: POST
+        path: /v1/projects/{projectId}/source-aws-organizational-units/{organizationalUnitId}/disconnect
+        classification: skip
+        reason: Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.
+        status: covered
+        covered_by:
+            - eon_source_aws_organizational_unit
+        first_seen: v1.173.0
+    enableRestoreAccountMetricsConfig:
+        method: PUT
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}/metrics-config
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_restore_account_metrics_config
+        status: gap
+        first_seen: v1.173.0
+    enableSourceAccountMetricsConfig:
+        method: PUT
+        path: /v1/projects/{projectId}/source-accounts/{accountId}/metrics-config
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_source_account_metrics_config
+        status: gap
+        first_seen: v1.173.0
+    excludeResourceFromBackup:
+        method: PATCH
+        path: /v1/projects/{projectId}/resources/{id}/exclude
+        classification: resource
+        reason: Exclude/include pair describes a durable per-object setting; model like the existing eon_volume_backup_exclusion (create = exclude, delete = include).
+        terraform_name: eon_resource_backup_exclusion
+        status: gap
+        first_seen: v1.173.0
+    excludeVolumeFromBackup:
+        method: PATCH
+        path: /v1/projects/{projectId}/resources/{id}/volumes/{volumeId}/exclude
+        classification: resource
+        reason: Exclude/include pair describes a durable per-object setting; model like the existing eon_volume_backup_exclusion (create = exclude, delete = include).
+        terraform_name: eon_volume_backup_exclusion
+        status: covered
+        covered_by:
+            - eon_volume_backup_exclusion
+        first_seen: v1.173.0
+    getAccessToken:
+        method: POST
+        path: /v1/token
+        classification: skip
+        reason: Authentication, token issuance, and credential rotation are session/security actions, not declarative infrastructure.
+        status: covered_internal
+        covered_by:
+            - internal:client/token_refresher.go
+        first_seen: v1.173.0
+    getAccessTokenOAuth2:
+        method: POST
+        path: /v1/oauth2/token
+        classification: skip
+        reason: Authentication, token issuance, and credential rotation are session/security actions, not declarative infrastructure.
+        status: skipped
+        first_seen: v1.173.0
+    getBackupJob:
+        method: GET
+        path: /v1/projects/{projectId}/backup-jobs/{jobId}
+        classification: skip
+        reason: Job listing/status polling is imperative monitoring of runtime activity; there is no desired state to reconcile.
+        status: skipped
+        first_seen: v1.173.0
+    getBackupPolicy:
+        method: GET
+        path: /v1/projects/{projectId}/backup-policies/{backupPolicyId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_backup_policy
+        status: covered
+        covered_by:
+            - eon_backup_policy
+        first_seen: v1.173.0
+    getBackupPostureControl:
+        method: GET
+        path: /v1/projects/{projectId}/backup-posture-controls/{controlId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_backup_posture_control
+        status: gap
+        first_seen: v1.173.0
+    getDailyStorageSummaries:
+        method: GET
+        path: /v1/projects/{projectId}/dashboard/daily-storage-summary
+        classification: skip
+        reason: Dashboard/metrics endpoints are pure reporting.
+        status: skipped
+        first_seen: v1.173.0
+    getIdpGroup:
+        method: GET
+        path: /v1/idp-groups/{groupId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_idp_group
+        status: covered
+        covered_by:
+            - eon_idp_group
+        first_seen: v1.173.0
+    getMyActionApprovalRequest:
+        method: GET
+        path: /v1/projects/{projectId}/action-approvals/my-requests/{requestId}
+        classification: skip
+        reason: Approval requests are one-shot workflow actions tied to a session, not durable configuration.
+        status: skipped
+        first_seen: v1.173.0
+    getObjectStoreScanMethod:
+        method: GET
+        path: /v1/projects/{projectId}/resources/{id}/object-store-scan-method
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_gcs_bucket_configuration
+        status: covered
+        covered_by:
+            - eon_gcs_bucket_configuration
+        first_seen: v1.173.0
+    getQueryResult:
+        method: GET
+        path: /v1/projects/{projectId}/queries/{queryId}/results
+        classification: skip
+        reason: Ad-hoc query execution against snapshots (run/poll/fetch results) is an imperative job with no durable state.
+        status: skipped
+        first_seen: v1.173.0
+    getQueryStatus:
+        method: GET
+        path: /v1/projects/{projectId}/queries/{queryId}/status
+        classification: skip
+        reason: Ad-hoc query execution against snapshots (run/poll/fetch results) is an imperative job with no durable state.
+        status: skipped
+        first_seen: v1.173.0
+    getResource:
+        method: GET
+        path: /v1/projects/{projectId}/resources/{id}
+        classification: skip
+        reason: Inventory lookup by Eon-assigned resource ID; consumed internally by eon_restore_job. Skipped as standalone surface per the inventory policy — revisit together with listResources if an inventory lookup data source is wanted.
+        needs_review: true
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    getRestoreAccount:
+        method: GET
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_restore_account
+        status: covered
+        covered_by:
+            - eon_restore_account
+        first_seen: v1.173.0
+    getRestoreAccountConnectivityConfig:
+        method: GET
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}/connectivity-config
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_restore_account_connectivity_config
+        status: covered
+        covered_by:
+            - eon_restore_account_connectivity_config
+        first_seen: v1.173.0
+    getRestoreAccountMetricsConfig:
+        method: GET
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}/metrics-config
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_restore_account_metrics_config
+        status: gap
+        first_seen: v1.173.0
+    getRestoreJob:
+        method: GET
+        path: /v1/projects/{projectId}/restore-jobs/{jobId}
+        classification: skip
+        reason: Job status polling — no desired state to reconcile; consumed internally by eon_restore_job to wait for restore completion.
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    getRole:
+        method: GET
+        path: /v1/roles/{roleId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_role
+        status: covered
+        covered_by:
+            - eon_role
+        first_seen: v1.173.0
+    getSnapshot:
+        method: GET
+        path: /v1/projects/{projectId}/snapshots/{id}
+        classification: data_source
+        reason: Read-only lookup whose output is useful as input to other resources.
+        terraform_name: eon_snapshots
+        status: covered
+        covered_by:
+            - eon_restore_job
+            - eon_snapshot
+        first_seen: v1.173.0
+    getSourceAccount:
+        method: GET
+        path: /v1/projects/{projectId}/source-accounts/{accountId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_source_account
+        status: covered
+        covered_by:
+            - eon_source_account
+        first_seen: v1.173.0
+    getSourceAccountMetricsConfig:
+        method: GET
+        path: /v1/projects/{projectId}/source-accounts/{accountId}/metrics-config
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_source_account_metrics_config
+        status: gap
+        first_seen: v1.173.0
+    getVault:
+        method: GET
+        path: /v1/projects/{projectId}/vaults/{vaultId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_vault
+        status: covered
+        covered_by:
+            - eon_vault
+        first_seen: v1.173.0
+    holdSnapshot:
+        method: PATCH
+        path: /v1/projects/{projectId}/snapshots/{id}/hold
+        classification: resource
+        reason: Hold/remove-hold pair describes a durable per-snapshot setting; model as a toggle resource (create = hold, delete = remove hold).
+        terraform_name: eon_snapshot_hold
+        status: gap
+        first_seen: v1.173.0
+    listBackupJobs:
+        method: POST
+        path: /v1/projects/{projectId}/backup-jobs
+        classification: skip
+        reason: Job listing/status polling is imperative monitoring of runtime activity; there is no desired state to reconcile.
+        status: skipped
+        first_seen: v1.173.0
+    listBackupPolicies:
+        method: POST
+        path: /v1/projects/{projectId}/backup-policies/list
+        classification: data_source
+        reason: Read-only lookup whose output is useful as input to other resources.
+        terraform_name: eon_backup_policies
+        status: covered
+        covered_by:
+            - eon_backup_policies
+        first_seen: v1.173.0
+    listBackupPostureControls:
+        method: POST
+        path: /v1/projects/{projectId}/backup-posture-controls/list
+        classification: data_source
+        reason: List lookup mirroring the existing eon_backup_policies data source; ships alongside the eon_backup_posture_control resource.
+        terraform_name: eon_backup_posture_controls
+        status: gap
+        first_seen: v1.173.0
+    listIdpGroups:
+        method: POST
+        path: /v1/idp-groups/list
+        classification: data_source
+        reason: Read-only lookup whose output is useful as input to other resources.
+        terraform_name: eon_idp_groups
+        status: covered
+        covered_by:
+            - eon_idp_groups
+        first_seen: v1.173.0
+    listIdps:
+        method: POST
+        path: /v1/idps/list
+        classification: data_source
+        reason: Read-only lookup of configured identity providers; an IdP ID is required input for eon_idp_group role assignments.
+        terraform_name: eon_idps
+        status: gap
+        first_seen: v1.173.0
+    listPermissions:
+        method: GET
+        path: /v1/permissions
+        classification: data_source
+        reason: Read-only permission catalog; useful input for composing eon_role custom role permission lists.
+        terraform_name: eon_permissions
+        status: gap
+        first_seen: v1.173.0
+    listResourceSnapshots:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots
+        classification: data_source
+        reason: Read-only list of a resource's restorable snapshots — the natural input for eon_restore_job (selecting the snapshot to restore); complements the existing eon_snapshot by-ID lookup.
+        terraform_name: eon_resource_snapshots
+        status: gap
+        first_seen: v1.173.0
+    listResources:
+        method: POST
+        path: /v1/projects/{projectId}/resources
+        classification: skip
+        reason: Inventory listing of Eon-discovered cloud resources — pure inventory per triage policy. Revisit as a lookup data source if practitioners need resource IDs (inputs to eon_restore_job and exclusion resources) resolvable in HCL.
+        needs_review: true
+        status: skipped
+        first_seen: v1.173.0
+    listRestoreAccounts:
+        method: POST
+        path: /v1/projects/{projectId}/restore-accounts/list
+        classification: data_source
+        reason: Read-only lookup whose output is useful as input to other resources.
+        terraform_name: eon_restore_accounts
+        status: covered
+        covered_by:
+            - eon_restore_account
+            - eon_restore_accounts
+        first_seen: v1.173.0
+    listRestoreAwsOrganizationalUnits:
+        method: POST
+        path: /v1/projects/{projectId}/restore-aws-organizational-units/list
+        classification: data_source
+        reason: Read-only lookup whose output is useful as input to other resources.
+        terraform_name: eon_restore_aws_organizational_units
+        status: covered
+        covered_by:
+            - eon_restore_aws_organizational_unit
+            - eon_restore_aws_organizational_units
+        first_seen: v1.173.0
+    listRestoreJobs:
+        method: POST
+        path: /v1/projects/{projectId}/restore-jobs
+        classification: skip
+        reason: Job listing/status polling is imperative monitoring of runtime activity; there is no desired state to reconcile.
+        status: skipped
+        first_seen: v1.173.0
+    listRoles:
+        method: POST
+        path: /v1/roles/list
+        classification: data_source
+        reason: Read-only lookup whose output is useful as input to other resources.
+        terraform_name: eon_roles
+        status: covered
+        covered_by:
+            - eon_roles
+        first_seen: v1.173.0
+    listSourceAccounts:
+        method: POST
+        path: /v1/projects/{projectId}/source-accounts/list
+        classification: data_source
+        reason: Read-only lookup whose output is useful as input to other resources.
+        terraform_name: eon_source_accounts
+        status: covered
+        covered_by:
+            - eon_source_account
+            - eon_source_accounts
+        first_seen: v1.173.0
+    listSourceAwsOrganizationalUnits:
+        method: POST
+        path: /v1/projects/{projectId}/source-aws-organizational-units/list
+        classification: data_source
+        reason: Read-only lookup whose output is useful as input to other resources.
+        terraform_name: eon_source_aws_organizational_units
+        status: covered
+        covered_by:
+            - eon_source_aws_organizational_unit
+            - eon_source_aws_organizational_units
+        first_seen: v1.173.0
+    listVaults:
+        method: POST
+        path: /v1/projects/{projectId}/vaults/list
+        classification: data_source
+        reason: Read-only lookup whose output is useful as input to other resources.
+        terraform_name: eon_vaults
+        status: covered
+        covered_by:
+            - eon_vault
+            - eon_vaults
+        first_seen: v1.173.0
+    overrideDataClasses:
+        method: PATCH
+        path: /v1/projects/{projectId}/resources/{id}/data-classifications
+        classification: resource
+        reason: Override set/remove pair for a resource's data classifications — a durable declarative setting; drift read comes from the parent resource's dataClasses. Model like eon_volume_backup_exclusion (create = override, delete = remove override).
+        terraform_name: eon_resource_data_classes_override
+        status: gap
+        first_seen: v1.173.0
+    overrideEnvironment:
+        method: PATCH
+        path: /v1/projects/{projectId}/resources/{id}/environments
+        classification: resource
+        reason: Override set/remove pair for a resource's environment tag — a durable declarative setting; drift read comes from the parent resource's environment. Model like eon_volume_backup_exclusion (create = override, delete = remove override).
+        terraform_name: eon_resource_environment_override
+        status: gap
+        first_seen: v1.173.0
+    queryCostData:
+        method: POST
+        path: /v1/cost-data
+        classification: skip
+        reason: Cost and billing queries are pure reporting.
+        status: skipped
+        first_seen: v1.173.0
+    reconnectRestoreAwsOrganizationalUnit:
+        method: POST
+        path: /v1/projects/{projectId}/restore-aws-organizational-units/{organizationalUnitId}/reconnect
+        classification: skip
+        reason: Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.
+        status: skipped
+        first_seen: v1.173.0
+    reconnectSourceAwsOrganizationalUnit:
+        method: POST
+        path: /v1/projects/{projectId}/source-aws-organizational-units/{organizationalUnitId}/reconnect
+        classification: skip
+        reason: Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.
+        status: skipped
+        first_seen: v1.173.0
+    removeDataClassesOverride:
+        method: DELETE
+        path: /v1/projects/{projectId}/resources/{id}/data-classifications
+        classification: resource
+        reason: Delete half of the data classifications override pair; see overrideDataClasses.
+        terraform_name: eon_resource_data_classes_override
+        status: gap
+        first_seen: v1.173.0
+    removeEnvironmentOverride:
+        method: DELETE
+        path: /v1/projects/{projectId}/resources/{id}/environments
+        classification: resource
+        reason: Delete half of the environment override pair; see overrideEnvironment.
+        terraform_name: eon_resource_environment_override
+        status: gap
+        first_seen: v1.173.0
+    removeSnapshotHold:
+        method: PATCH
+        path: /v1/projects/{projectId}/snapshots/{id}/remove-hold
+        classification: resource
+        reason: Hold/remove-hold pair describes a durable per-snapshot setting; model as a toggle resource (create = hold, delete = remove hold).
+        terraform_name: eon_snapshot_hold
+        status: gap
+        first_seen: v1.173.0
+    restoreAzureDisk:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-azure-disk
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: gap
+        first_seen: v1.173.0
+    restoreAzureSqlDatabase:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-azure-sql-database
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: gap
+        first_seen: v1.173.0
+    restoreAzureVmInstance:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-azure-vm-instance
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: gap
+        first_seen: v1.173.0
+    restoreBigQueryDataset:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-bigquery-dataset
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    restoreBucket:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-bucket
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    restoreDatabase:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-rds-instance
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    restoreDynamoDBTable:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-dynamo-db-table
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: gap
+        first_seen: v1.173.0
+    restoreEbsVolume:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-ec2-ebs-volume
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    restoreEc2Instance:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-ec2-instance
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    restoreFiles:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-files
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    restoreGcpCloudSql:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-gcp-cloudsql
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    restoreGcpDisk:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-gcp-disk
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    restoreGcpVmInstance:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-gcp-vm-instance
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: covered
+        covered_by:
+            - eon_restore_job
+        first_seen: v1.173.0
+    restoreToEbsSnapshot:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/convert-ec2-ebs-snapshot
+        classification: resource
+        reason: One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.
+        terraform_name: eon_restore_job
+        status: gap
+        first_seen: v1.173.0
+    rotateApiClientSecret:
+        method: POST
+        path: /v1/api-credentials/{clientId}/rotate
+        classification: skip
+        reason: Authentication, token issuance, and credential rotation are session/security actions, not declarative infrastructure.
+        status: skipped
+        first_seen: v1.173.0
+    rotateCurrentApiClientSecret:
+        method: POST
+        path: /v1/api-credentials/current/rotate
+        classification: skip
+        reason: Authentication, token issuance, and credential rotation are session/security actions, not declarative infrastructure.
+        status: skipped
+        first_seen: v1.173.0
+    runQuery:
+        method: POST
+        path: /v1/projects/{projectId}/snapshots/{snapshotId}/databases/query
+        classification: skip
+        reason: Ad-hoc query execution against snapshots (run/poll/fetch results) is an imperative job with no durable state.
+        status: skipped
+        first_seen: v1.173.0
+    takeSnapshot:
+        method: POST
+        path: /v1/projects/{projectId}/resources/{id}/take-snapshot
+        classification: skip
+        reason: Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.
+        status: skipped
+        first_seen: v1.173.0
+    updateBackupPolicy:
+        method: PUT
+        path: /v1/projects/{projectId}/backup-policies/{backupPolicyId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_backup_policy
+        status: covered
+        covered_by:
+            - eon_backup_policy
+        first_seen: v1.173.0
+    updateBackupPostureControl:
+        method: PUT
+        path: /v1/projects/{projectId}/backup-posture-controls/{controlId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_backup_posture_control
+        status: gap
+        first_seen: v1.173.0
+    updateIdpGroup:
+        method: PUT
+        path: /v1/idp-groups/{groupId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_idp_group
+        status: covered
+        covered_by:
+            - eon_idp_group
+        first_seen: v1.173.0
+    updateObjectStoreScanMethod:
+        method: PATCH
+        path: /v1/projects/{projectId}/resources/{id}/object-store-scan-method
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_gcs_bucket_configuration
+        status: covered
+        covered_by:
+            - eon_gcs_bucket_configuration
+        first_seen: v1.173.0
+    updateRestoreAccount:
+        method: PATCH
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_restore_account
+        status: covered
+        covered_by:
+            - eon_restore_account
+        first_seen: v1.173.0
+    updateRestoreAccountConnectivityConfig:
+        method: PUT
+        path: /v1/projects/{projectId}/restore-accounts/{accountId}/connectivity-config
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_restore_account_connectivity_config
+        status: covered
+        covered_by:
+            - eon_restore_account_connectivity_config
+        first_seen: v1.173.0
+    updateRole:
+        method: PUT
+        path: /v1/roles/{roleId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_role
+        status: covered
+        covered_by:
+            - eon_role
+        first_seen: v1.173.0
+    updateSourceAccount:
+        method: PATCH
+        path: /v1/projects/{projectId}/source-accounts/{accountId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_source_account
+        status: covered
+        covered_by:
+            - eon_source_account
+        first_seen: v1.173.0
+    updateVault:
+        method: PATCH
+        path: /v1/projects/{projectId}/vaults/{vaultId}
+        classification: resource
+        reason: 'Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.'
+        terraform_name: eon_vault
+        status: covered
+        covered_by:
+            - eon_vault
+        first_seen: v1.173.0

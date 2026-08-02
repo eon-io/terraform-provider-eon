@@ -1,0 +1,1924 @@
+{
+  "sdk_module": "github.com/eon-io/eon-sdk-go",
+  "sdk_version": "v1.173.0",
+  "stats": {
+    "total": 104,
+    "covered": 58,
+    "covered_internal": 1,
+    "gaps": 27,
+    "skipped": 18,
+    "needs_review": 2,
+    "new_operations": 0
+  },
+  "operations": [
+    {
+      "operation_id": "rotateCurrentApiClientSecret",
+      "method": "POST",
+      "path": "/v1/api-credentials/current/rotate",
+      "tag": "auth",
+      "summary": "Rotate Current API Client Secret",
+      "response_model": "ApiCredentials",
+      "classification": "skip",
+      "reason": "Authentication, token issuance, and credential rotation are session/security actions, not declarative infrastructure.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "rotateApiClientSecret",
+      "method": "POST",
+      "path": "/v1/api-credentials/{clientId}/rotate",
+      "tag": "auth",
+      "summary": "Rotate API Client Secret",
+      "response_model": "ApiCredentials",
+      "path_params": [
+        "clientId"
+      ],
+      "classification": "skip",
+      "reason": "Authentication, token issuance, and credential rotation are session/security actions, not declarative infrastructure.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "queryCostData",
+      "method": "POST",
+      "path": "/v1/cost-data",
+      "tag": "billing",
+      "summary": "Query Cost Data",
+      "request_model": "QueryCostDataRequest",
+      "response_model": "QueryCostDataResponse",
+      "classification": "skip",
+      "reason": "Cost and billing queries are pure reporting.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "createIdpGroup",
+      "method": "POST",
+      "path": "/v1/idp-groups",
+      "tag": "iam",
+      "summary": "Create IdP Group Role Assignment",
+      "request_model": "CreateIdpGroupRequest",
+      "response_model": "CreateIdpGroupResponse",
+      "classification": "resource",
+      "reason": "Create with matching item read: a durable object with stable identity and a real lifecycle.",
+      "terraform_name": "eon_idp_group",
+      "status": "covered",
+      "covered_by": [
+        "eon_idp_group"
+      ]
+    },
+    {
+      "operation_id": "listIdpGroups",
+      "method": "POST",
+      "path": "/v1/idp-groups/list",
+      "tag": "iam",
+      "summary": "List IdP Group Role Assignments",
+      "response_model": "ListIdpGroupsResponse",
+      "classification": "data_source",
+      "reason": "Read-only lookup whose output is useful as input to other resources.",
+      "terraform_name": "eon_idp_groups",
+      "status": "covered",
+      "covered_by": [
+        "eon_idp_groups"
+      ]
+    },
+    {
+      "operation_id": "deleteIdpGroup",
+      "method": "DELETE",
+      "path": "/v1/idp-groups/{groupId}",
+      "tag": "iam",
+      "summary": "Delete IdP Group Role Assignment",
+      "path_params": [
+        "groupId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_idp_group",
+      "status": "covered",
+      "covered_by": [
+        "eon_idp_group"
+      ]
+    },
+    {
+      "operation_id": "getIdpGroup",
+      "method": "GET",
+      "path": "/v1/idp-groups/{groupId}",
+      "tag": "iam",
+      "summary": "Get IdP Group Role Assignment",
+      "response_model": "GetIdpGroupResponse",
+      "path_params": [
+        "groupId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_idp_group",
+      "status": "covered",
+      "covered_by": [
+        "eon_idp_group"
+      ]
+    },
+    {
+      "operation_id": "updateIdpGroup",
+      "method": "PUT",
+      "path": "/v1/idp-groups/{groupId}",
+      "tag": "iam",
+      "summary": "Update IdP Group Role Assignment",
+      "request_model": "UpdateIdpGroupRequest",
+      "response_model": "UpdateIdpGroupResponse",
+      "path_params": [
+        "groupId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_idp_group",
+      "status": "covered",
+      "covered_by": [
+        "eon_idp_group"
+      ]
+    },
+    {
+      "operation_id": "listIdps",
+      "method": "POST",
+      "path": "/v1/idps/list",
+      "tag": "iam",
+      "summary": "List Identity Providers",
+      "response_model": "ListIdpsResponse",
+      "classification": "data_source",
+      "reason": "Read-only lookup of configured identity providers; an IdP ID is required input for eon_idp_group role assignments.",
+      "terraform_name": "eon_idps",
+      "status": "gap"
+    },
+    {
+      "operation_id": "getAccessTokenOAuth2",
+      "method": "POST",
+      "path": "/v1/oauth2/token",
+      "tag": "auth",
+      "summary": "Get Access Token (OAuth 2)",
+      "request_model": "OAuth2TokenRequest",
+      "response_model": "Oauth2TokenResponse",
+      "classification": "skip",
+      "reason": "Authentication, token issuance, and credential rotation are session/security actions, not declarative infrastructure.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "listPermissions",
+      "method": "GET",
+      "path": "/v1/permissions",
+      "tag": "iam",
+      "summary": "List Permissions",
+      "response_model": "ListPermissionsResponse",
+      "classification": "data_source",
+      "reason": "Read-only permission catalog; useful input for composing eon_role custom role permission lists.",
+      "terraform_name": "eon_permissions",
+      "status": "gap"
+    },
+    {
+      "operation_id": "getMyActionApprovalRequest",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/action-approvals/my-requests/{requestId}",
+      "tag": "actionApprovals",
+      "summary": "Get My Action Approval Request",
+      "response_model": "GetMPARequestResponse",
+      "path_params": [
+        "projectId",
+        "requestId"
+      ],
+      "classification": "skip",
+      "reason": "Approval requests are one-shot workflow actions tied to a session, not durable configuration.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "cancelActionApprovalRequest",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/action-approvals/my-requests/{requestId}/cancel",
+      "tag": "actionApprovals",
+      "summary": "Cancel Action Approval Request",
+      "response_model": "CancelMyMPARequestResponse",
+      "path_params": [
+        "projectId",
+        "requestId"
+      ],
+      "classification": "skip",
+      "reason": "Approval requests are one-shot workflow actions tied to a session, not durable configuration.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "createActionApprovalRequest",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/action-approvals/my-requests/{requestId}/submit",
+      "tag": "actionApprovals",
+      "summary": "Create Action Approval Request",
+      "request_model": "SubmitMyMPARequestRequest",
+      "response_model": "SubmitMyMPARequestResponse",
+      "path_params": [
+        "projectId",
+        "requestId"
+      ],
+      "classification": "skip",
+      "reason": "Approval requests are one-shot workflow actions tied to a session, not durable configuration.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "listBackupJobs",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/backup-jobs",
+      "tag": "jobs",
+      "summary": "List Backup Jobs",
+      "request_model": "ListBackupJobsRequest",
+      "response_model": "ListBackupJobsResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "skip",
+      "reason": "Job listing/status polling is imperative monitoring of runtime activity; there is no desired state to reconcile.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "getBackupJob",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/backup-jobs/{jobId}",
+      "tag": "jobs",
+      "summary": "Get Backup Job",
+      "response_model": "GetBackupJobResponse",
+      "path_params": [
+        "projectId",
+        "jobId"
+      ],
+      "classification": "skip",
+      "reason": "Job listing/status polling is imperative monitoring of runtime activity; there is no desired state to reconcile.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "createBackupPolicy",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/backup-policies",
+      "tag": "backupPolicies",
+      "summary": "Create Backup Policy",
+      "request_model": "CreateBackupPolicyRequest",
+      "response_model": "CreateBackupPolicyResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "resource",
+      "reason": "Create with matching item read: a durable object with stable identity and a real lifecycle.",
+      "terraform_name": "eon_backup_policy",
+      "status": "covered",
+      "covered_by": [
+        "eon_backup_policy"
+      ]
+    },
+    {
+      "operation_id": "listBackupPolicies",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/backup-policies/list",
+      "tag": "backupPolicies",
+      "summary": "List Backup Policies",
+      "response_model": "ListBackupPoliciesResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "data_source",
+      "reason": "Read-only lookup whose output is useful as input to other resources.",
+      "terraform_name": "eon_backup_policies",
+      "status": "covered",
+      "covered_by": [
+        "eon_backup_policies"
+      ]
+    },
+    {
+      "operation_id": "deleteBackupPolicy",
+      "method": "DELETE",
+      "path": "/v1/projects/{projectId}/backup-policies/{backupPolicyId}",
+      "tag": "backupPolicies",
+      "summary": "Delete Backup Policy",
+      "path_params": [
+        "projectId",
+        "backupPolicyId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_backup_policy",
+      "status": "covered",
+      "covered_by": [
+        "eon_backup_policy"
+      ]
+    },
+    {
+      "operation_id": "getBackupPolicy",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/backup-policies/{backupPolicyId}",
+      "tag": "backupPolicies",
+      "summary": "Get Backup Policy",
+      "response_model": "GetBackupPolicyResponse",
+      "path_params": [
+        "projectId",
+        "backupPolicyId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_backup_policy",
+      "status": "covered",
+      "covered_by": [
+        "eon_backup_policy"
+      ]
+    },
+    {
+      "operation_id": "updateBackupPolicy",
+      "method": "PUT",
+      "path": "/v1/projects/{projectId}/backup-policies/{backupPolicyId}",
+      "tag": "backupPolicies",
+      "summary": "Update Backup Policy",
+      "request_model": "UpdateBackupPolicyRequest",
+      "response_model": "UpdateBackupPolicyResponse",
+      "path_params": [
+        "projectId",
+        "backupPolicyId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_backup_policy",
+      "status": "covered",
+      "covered_by": [
+        "eon_backup_policy"
+      ]
+    },
+    {
+      "operation_id": "createBackupPostureControl",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/backup-posture-controls",
+      "tag": "backupPostureControls",
+      "summary": "Create a backup posture control",
+      "request_model": "CreateBackupPostureControlRequest",
+      "response_model": "BackupPostureControl",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "resource",
+      "reason": "Create with matching item read: a durable object with stable identity and a real lifecycle.",
+      "terraform_name": "eon_backup_posture_control",
+      "status": "gap"
+    },
+    {
+      "operation_id": "listBackupPostureControls",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/backup-posture-controls/list",
+      "tag": "backupPostureControls",
+      "summary": "List backup posture controls",
+      "request_model": "ListBackupPostureControlsRequest",
+      "response_model": "ListBackupPostureControlsResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "data_source",
+      "reason": "List lookup mirroring the existing eon_backup_policies data source; ships alongside the eon_backup_posture_control resource.",
+      "terraform_name": "eon_backup_posture_controls",
+      "status": "gap"
+    },
+    {
+      "operation_id": "deleteBackupPostureControl",
+      "method": "DELETE",
+      "path": "/v1/projects/{projectId}/backup-posture-controls/{controlId}",
+      "tag": "backupPostureControls",
+      "summary": "Delete a backup posture control",
+      "path_params": [
+        "projectId",
+        "controlId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_backup_posture_control",
+      "status": "gap"
+    },
+    {
+      "operation_id": "getBackupPostureControl",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/backup-posture-controls/{controlId}",
+      "tag": "backupPostureControls",
+      "summary": "Get a backup posture control",
+      "response_model": "BackupPostureControl",
+      "path_params": [
+        "projectId",
+        "controlId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_backup_posture_control",
+      "status": "gap"
+    },
+    {
+      "operation_id": "updateBackupPostureControl",
+      "method": "PUT",
+      "path": "/v1/projects/{projectId}/backup-posture-controls/{controlId}",
+      "tag": "backupPostureControls",
+      "summary": "Update a backup posture control",
+      "request_model": "UpdateBackupPostureControlRequest",
+      "response_model": "BackupPostureControl",
+      "path_params": [
+        "projectId",
+        "controlId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_backup_posture_control",
+      "status": "gap"
+    },
+    {
+      "operation_id": "getDailyStorageSummaries",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/dashboard/daily-storage-summary",
+      "tag": "dashboard",
+      "summary": "Get Daily Storage Summaries",
+      "response_model": "DailyStorageSummaries",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "skip",
+      "reason": "Dashboard/metrics endpoints are pure reporting.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "getQueryResult",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/queries/{queryId}/results",
+      "tag": "databaseSnapshots",
+      "summary": "Get Query Result",
+      "response_model": "QueryDBResultResponse",
+      "path_params": [
+        "projectId",
+        "queryId"
+      ],
+      "classification": "skip",
+      "reason": "Ad-hoc query execution against snapshots (run/poll/fetch results) is an imperative job with no durable state.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "getQueryStatus",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/queries/{queryId}/status",
+      "tag": "databaseSnapshots",
+      "summary": "Get Query Status",
+      "response_model": "QueryDBStatusResponse",
+      "path_params": [
+        "projectId",
+        "queryId"
+      ],
+      "classification": "skip",
+      "reason": "Ad-hoc query execution against snapshots (run/poll/fetch results) is an imperative job with no durable state.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "listResources",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources",
+      "tag": "resources",
+      "summary": "List Resources",
+      "request_model": "ListInventoryRequest",
+      "response_model": "ListResourcesResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "skip",
+      "reason": "Inventory listing of Eon-discovered cloud resources — pure inventory per triage policy. Revisit as a lookup data source if practitioners need resource IDs (inputs to eon_restore_job and exclusion resources) resolvable in HCL.",
+      "status": "skipped",
+      "needs_review": true
+    },
+    {
+      "operation_id": "getResource",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/resources/{id}",
+      "tag": "resources",
+      "summary": "Get Resource",
+      "response_model": "GetResourceResponse",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "skip",
+      "reason": "Inventory lookup by Eon-assigned resource ID; consumed internally by eon_restore_job. Skipped as standalone surface per the inventory policy — revisit together with listResources if an inventory lookup data source is wanted.",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ],
+      "needs_review": true
+    },
+    {
+      "operation_id": "removeDataClassesOverride",
+      "method": "DELETE",
+      "path": "/v1/projects/{projectId}/resources/{id}/data-classifications",
+      "tag": "resources",
+      "summary": "Remove Data Classes Override",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "resource",
+      "reason": "Delete half of the data classifications override pair; see overrideDataClasses.",
+      "terraform_name": "eon_resource_data_classes_override",
+      "status": "gap"
+    },
+    {
+      "operation_id": "overrideDataClasses",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/resources/{id}/data-classifications",
+      "tag": "resources",
+      "summary": "Override Data Classes",
+      "request_model": "OverrideDataClassificationsRequest",
+      "response_model": "OverrideDataClassificationsResponse",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "resource",
+      "reason": "Override set/remove pair for a resource's data classifications — a durable declarative setting; drift read comes from the parent resource's dataClasses. Model like eon_volume_backup_exclusion (create = override, delete = remove override).",
+      "terraform_name": "eon_resource_data_classes_override",
+      "status": "gap"
+    },
+    {
+      "operation_id": "removeEnvironmentOverride",
+      "method": "DELETE",
+      "path": "/v1/projects/{projectId}/resources/{id}/environments",
+      "tag": "resources",
+      "summary": "Remove Environment Override",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "resource",
+      "reason": "Delete half of the environment override pair; see overrideEnvironment.",
+      "terraform_name": "eon_resource_environment_override",
+      "status": "gap"
+    },
+    {
+      "operation_id": "overrideEnvironment",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/resources/{id}/environments",
+      "tag": "resources",
+      "summary": "Override Environment",
+      "request_model": "OverrideEnvironmentRequest",
+      "response_model": "OverrideEnvironmentResponse",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "resource",
+      "reason": "Override set/remove pair for a resource's environment tag — a durable declarative setting; drift read comes from the parent resource's environment. Model like eon_volume_backup_exclusion (create = override, delete = remove override).",
+      "terraform_name": "eon_resource_environment_override",
+      "status": "gap"
+    },
+    {
+      "operation_id": "excludeResourceFromBackup",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/resources/{id}/exclude",
+      "tag": "resources",
+      "summary": "Exclude Resource from Backup",
+      "response_model": "ExcludeFromBackupResponse",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "resource",
+      "reason": "Exclude/include pair describes a durable per-object setting; model like the existing eon_volume_backup_exclusion (create = exclude, delete = include).",
+      "terraform_name": "eon_resource_backup_exclusion",
+      "status": "gap"
+    },
+    {
+      "operation_id": "cancelResourceBackupExclusion",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/resources/{id}/include",
+      "tag": "resources",
+      "summary": "Cancel Resource Backup Exclusion",
+      "response_model": "CancelExclusionFromBackupResponse",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "resource",
+      "reason": "Exclude/include pair describes a durable per-object setting; model like the existing eon_volume_backup_exclusion (create = exclude, delete = include).",
+      "terraform_name": "eon_resource_backup_exclusion",
+      "status": "gap"
+    },
+    {
+      "operation_id": "getObjectStoreScanMethod",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/resources/{id}/object-store-scan-method",
+      "tag": "resources",
+      "summary": "Get object-store scan method",
+      "response_model": "GetObjectStoreScanMethodResponse",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_gcs_bucket_configuration",
+      "status": "covered",
+      "covered_by": [
+        "eon_gcs_bucket_configuration"
+      ]
+    },
+    {
+      "operation_id": "updateObjectStoreScanMethod",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/resources/{id}/object-store-scan-method",
+      "tag": "resources",
+      "summary": "Update object-store scan method",
+      "request_model": "UpdateObjectStoreScanMethodRequest",
+      "response_model": "UpdateObjectStoreScanMethodResponse",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_gcs_bucket_configuration",
+      "status": "covered",
+      "covered_by": [
+        "eon_gcs_bucket_configuration"
+      ]
+    },
+    {
+      "operation_id": "listResourceSnapshots",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots",
+      "tag": "snapshots",
+      "summary": "List Resource Snapshots",
+      "request_model": "ListInventorySnapshotsRequest",
+      "response_model": "ListInventorySnapshotsResponse",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "data_source",
+      "reason": "Read-only list of a resource's restorable snapshots — the natural input for eon_restore_job (selecting the snapshot to restore); complements the existing eon_snapshot by-ID lookup.",
+      "terraform_name": "eon_resource_snapshots",
+      "status": "gap"
+    },
+    {
+      "operation_id": "restoreToEbsSnapshot",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/convert-ec2-ebs-snapshot",
+      "tag": "snapshots",
+      "summary": "Restore to EBS Snapshot",
+      "request_model": "RestoreVolumeToEbsSnapshotRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "gap"
+    },
+    {
+      "operation_id": "restoreAzureDisk",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-azure-disk",
+      "tag": "snapshots",
+      "summary": "Restore Azure Disk",
+      "request_model": "RestoreAzureDiskRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "gap"
+    },
+    {
+      "operation_id": "restoreAzureSqlDatabase",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-azure-sql-database",
+      "tag": "snapshots",
+      "summary": "Restore Azure SQL Database",
+      "request_model": "RestoreAzureSqlDatabaseRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "gap"
+    },
+    {
+      "operation_id": "restoreAzureVmInstance",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-azure-vm-instance",
+      "tag": "snapshots",
+      "summary": "Restore Azure VM Instance",
+      "request_model": "RestoreAzureVmInstanceRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "gap"
+    },
+    {
+      "operation_id": "restoreBigQueryDataset",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-bigquery-dataset",
+      "tag": "snapshots",
+      "summary": "Restore BigQuery Dataset",
+      "request_model": "RestoreBigQueryDatasetRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ]
+    },
+    {
+      "operation_id": "restoreBucket",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-bucket",
+      "tag": "snapshots",
+      "summary": "Restore Bucket",
+      "request_model": "RestoreBucketRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ]
+    },
+    {
+      "operation_id": "restoreDynamoDBTable",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-dynamo-db-table",
+      "tag": "snapshots",
+      "summary": "Restore DynamoDB Table",
+      "request_model": "RestoreDynamoDBTableRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "gap"
+    },
+    {
+      "operation_id": "restoreEbsVolume",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-ec2-ebs-volume",
+      "tag": "snapshots",
+      "summary": "Restore EBS Volume",
+      "request_model": "RestoreVolumeToEbsRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ]
+    },
+    {
+      "operation_id": "restoreEc2Instance",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-ec2-instance",
+      "tag": "snapshots",
+      "summary": "Restore EC2 Instance",
+      "request_model": "RestoreAwsEc2InstanceRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ]
+    },
+    {
+      "operation_id": "restoreFiles",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-files",
+      "tag": "snapshots",
+      "summary": "Restore Files",
+      "request_model": "RestoreFilesRequest",
+      "response_model": "RestoreJobInitiationResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ]
+    },
+    {
+      "operation_id": "restoreGcpCloudSql",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-gcp-cloudsql",
+      "tag": "snapshots",
+      "summary": "Restore GCP Cloud SQL Instance",
+      "request_model": "RestoreGcpCloudSqlRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ]
+    },
+    {
+      "operation_id": "restoreGcpDisk",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-gcp-disk",
+      "tag": "snapshots",
+      "summary": "Restore GCP Disk",
+      "request_model": "RestoreGcpDiskRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ]
+    },
+    {
+      "operation_id": "restoreGcpVmInstance",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-gcp-vm-instance",
+      "tag": "snapshots",
+      "summary": "Restore GCP VM Instance",
+      "request_model": "RestoreGcpVmInstanceRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ]
+    },
+    {
+      "operation_id": "restoreDatabase",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/snapshots/{snapshotId}/restore-rds-instance",
+      "tag": "snapshots",
+      "summary": "Restore RDS Instance",
+      "request_model": "RestoreDbToRdsInstanceRequest",
+      "response_model": "MPAInterceptedResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "snapshotId"
+      ],
+      "classification": "resource",
+      "reason": "One-shot restore trigger; restores are modeled by the existing eon_restore_job resource — extend it with this restore type rather than adding new surface.",
+      "terraform_name": "eon_restore_job",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ]
+    },
+    {
+      "operation_id": "takeSnapshot",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/resources/{id}/take-snapshot",
+      "tag": "backups",
+      "summary": "Take Snapshot",
+      "request_model": "TakeSnapshotRequest",
+      "response_model": "TakeSnapshotResponse",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "skip",
+      "reason": "Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "excludeVolumeFromBackup",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/resources/{id}/volumes/{volumeId}/exclude",
+      "tag": "resources",
+      "summary": "Exclude Volume from Backup",
+      "response_model": "ExcludeFromBackupResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "volumeId"
+      ],
+      "classification": "resource",
+      "reason": "Exclude/include pair describes a durable per-object setting; model like the existing eon_volume_backup_exclusion (create = exclude, delete = include).",
+      "terraform_name": "eon_volume_backup_exclusion",
+      "status": "covered",
+      "covered_by": [
+        "eon_volume_backup_exclusion"
+      ]
+    },
+    {
+      "operation_id": "cancelVolumeBackupExclusion",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/resources/{id}/volumes/{volumeId}/include",
+      "tag": "resources",
+      "summary": "Cancel Volume Backup Exclusion",
+      "response_model": "CancelExclusionFromBackupResponse",
+      "path_params": [
+        "projectId",
+        "id",
+        "volumeId"
+      ],
+      "classification": "resource",
+      "reason": "Exclude/include pair describes a durable per-object setting; model like the existing eon_volume_backup_exclusion (create = exclude, delete = include).",
+      "terraform_name": "eon_volume_backup_exclusion",
+      "status": "covered",
+      "covered_by": [
+        "eon_volume_backup_exclusion"
+      ]
+    },
+    {
+      "operation_id": "connectRestoreAccount",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/restore-accounts",
+      "tag": "accounts",
+      "summary": "Connect Restore Account",
+      "request_model": "ConnectRestoreAccountRequest",
+      "response_model": "ConnectRestoreAccountResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "resource",
+      "reason": "Create with matching item read: a durable object with stable identity and a real lifecycle.",
+      "terraform_name": "eon_restore_account",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_account"
+      ]
+    },
+    {
+      "operation_id": "listRestoreAccounts",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/restore-accounts/list",
+      "tag": "accounts",
+      "summary": "List Restore Accounts",
+      "request_model": "ListRestoreAccountsRequest",
+      "response_model": "ListRestoreAccountsResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "data_source",
+      "reason": "Read-only lookup whose output is useful as input to other resources.",
+      "terraform_name": "eon_restore_accounts",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_account",
+        "eon_restore_accounts"
+      ]
+    },
+    {
+      "operation_id": "DeleteRestoreAccountV1",
+      "method": "DELETE",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}",
+      "tag": "accounts",
+      "summary": "Delete Restore Account",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_restore_account",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_account"
+      ]
+    },
+    {
+      "operation_id": "getRestoreAccount",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}",
+      "tag": "accounts",
+      "summary": "Get Restore Account",
+      "response_model": "GetRestoreAccountResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_restore_account",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_account"
+      ]
+    },
+    {
+      "operation_id": "updateRestoreAccount",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}",
+      "tag": "accounts",
+      "summary": "Update Restore Account",
+      "request_model": "UpdateRestoreAccountRequest",
+      "response_model": "UpdateRestoreAccountResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_restore_account",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_account"
+      ]
+    },
+    {
+      "operation_id": "deleteRestoreAccountConnectivityConfig",
+      "method": "DELETE",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}/connectivity-config",
+      "tag": "accounts",
+      "summary": "Delete Restore Account Connectivity Configuration",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_restore_account_connectivity_config",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_account_connectivity_config"
+      ]
+    },
+    {
+      "operation_id": "getRestoreAccountConnectivityConfig",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}/connectivity-config",
+      "tag": "accounts",
+      "summary": "Get Restore Account Connectivity Configuration",
+      "response_model": "GetRestoreAccountConnectivityConfigResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_restore_account_connectivity_config",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_account_connectivity_config"
+      ]
+    },
+    {
+      "operation_id": "updateRestoreAccountConnectivityConfig",
+      "method": "PUT",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}/connectivity-config",
+      "tag": "accounts",
+      "summary": "Update Restore Account Connectivity Configuration",
+      "request_model": "UpdateRestoreAccountConnectivityConfigRequest",
+      "response_model": "UpdateRestoreAccountConnectivityConfigResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_restore_account_connectivity_config",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_account_connectivity_config"
+      ]
+    },
+    {
+      "operation_id": "DisconnectRestoreAccount",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}/disconnect",
+      "tag": "accounts",
+      "summary": "Disconnect Restore Account",
+      "response_model": "DisconnectRestoreAccountResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "skip",
+      "reason": "Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_account"
+      ]
+    },
+    {
+      "operation_id": "disableRestoreAccountMetricsConfig",
+      "method": "DELETE",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}/metrics-config",
+      "tag": "accounts",
+      "summary": "Disable Restore Account Metrics",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_restore_account_metrics_config",
+      "status": "gap"
+    },
+    {
+      "operation_id": "getRestoreAccountMetricsConfig",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}/metrics-config",
+      "tag": "accounts",
+      "summary": "Get Restore Account Metrics Configuration",
+      "response_model": "GetRestoreAccountMetricsConfigResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_restore_account_metrics_config",
+      "status": "gap"
+    },
+    {
+      "operation_id": "enableRestoreAccountMetricsConfig",
+      "method": "PUT",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}/metrics-config",
+      "tag": "accounts",
+      "summary": "Configure Restore Account Metrics",
+      "request_model": "EnableRestoreAccountMetricsConfigRequest",
+      "response_model": "EnableRestoreAccountMetricsConfigResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_restore_account_metrics_config",
+      "status": "gap"
+    },
+    {
+      "operation_id": "ReconnectRestoreAccount",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/restore-accounts/{accountId}/reconnect",
+      "tag": "accounts",
+      "summary": "Reconnect Restore Account",
+      "response_model": "ReconnectRestoreAccountResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "skip",
+      "reason": "Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_account"
+      ]
+    },
+    {
+      "operation_id": "connectRestoreAwsOrganizationalUnit",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/restore-aws-organizational-units",
+      "tag": "accounts",
+      "summary": "Connect Restore AWS Organizational Unit",
+      "request_model": "ConnectRestoreAwsOrganizationalUnitRequest",
+      "response_model": "ConnectRestoreAwsOrganizationalUnitResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "skip",
+      "reason": "NEEDS REVIEW: no triage rule matched; classify manually.",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_aws_organizational_unit"
+      ]
+    },
+    {
+      "operation_id": "listRestoreAwsOrganizationalUnits",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/restore-aws-organizational-units/list",
+      "tag": "accounts",
+      "summary": "List Restore AWS Organizational Units",
+      "response_model": "ListRestoreAwsOrganizationalUnitsResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "data_source",
+      "reason": "Read-only lookup whose output is useful as input to other resources.",
+      "terraform_name": "eon_restore_aws_organizational_units",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_aws_organizational_unit",
+        "eon_restore_aws_organizational_units"
+      ]
+    },
+    {
+      "operation_id": "disconnectRestoreAwsOrganizationalUnit",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/restore-aws-organizational-units/{organizationalUnitId}/disconnect",
+      "tag": "accounts",
+      "summary": "Disconnect Restore AWS Organizational Unit",
+      "response_model": "DisconnectRestoreAwsOrganizationalUnitResponse",
+      "path_params": [
+        "projectId",
+        "organizationalUnitId"
+      ],
+      "classification": "skip",
+      "reason": "Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_aws_organizational_unit"
+      ]
+    },
+    {
+      "operation_id": "reconnectRestoreAwsOrganizationalUnit",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/restore-aws-organizational-units/{organizationalUnitId}/reconnect",
+      "tag": "accounts",
+      "summary": "Reconnect Restore AWS Organizational Unit",
+      "response_model": "ReconnectRestoreAwsOrganizationalUnitResponse",
+      "path_params": [
+        "projectId",
+        "organizationalUnitId"
+      ],
+      "classification": "skip",
+      "reason": "Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "listRestoreJobs",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/restore-jobs",
+      "tag": "jobs",
+      "summary": "List Restore Jobs",
+      "request_model": "ListRestoreJobsRequest",
+      "response_model": "ListRestoreJobsResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "skip",
+      "reason": "Job listing/status polling is imperative monitoring of runtime activity; there is no desired state to reconcile.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "getRestoreJob",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/restore-jobs/{jobId}",
+      "tag": "jobs",
+      "summary": "Get Restore Job",
+      "response_model": "GetRestoreJobResponse",
+      "path_params": [
+        "projectId",
+        "jobId"
+      ],
+      "classification": "skip",
+      "reason": "Job status polling — no desired state to reconcile; consumed internally by eon_restore_job to wait for restore completion.",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job"
+      ]
+    },
+    {
+      "operation_id": "getSnapshot",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/snapshots/{id}",
+      "tag": "snapshots",
+      "summary": "Get Snapshot",
+      "response_model": "GetSnapshotResponse",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "data_source",
+      "reason": "Read-only lookup whose output is useful as input to other resources.",
+      "terraform_name": "eon_snapshots",
+      "status": "covered",
+      "covered_by": [
+        "eon_restore_job",
+        "eon_snapshot"
+      ]
+    },
+    {
+      "operation_id": "holdSnapshot",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/snapshots/{id}/hold",
+      "tag": "snapshots",
+      "summary": "Hold Snapshot",
+      "request_model": "HoldSnapshotRequest",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "resource",
+      "reason": "Hold/remove-hold pair describes a durable per-snapshot setting; model as a toggle resource (create = hold, delete = remove hold).",
+      "terraform_name": "eon_snapshot_hold",
+      "status": "gap"
+    },
+    {
+      "operation_id": "removeSnapshotHold",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/snapshots/{id}/remove-hold",
+      "tag": "snapshots",
+      "summary": "Remove Snapshot Hold",
+      "path_params": [
+        "projectId",
+        "id"
+      ],
+      "classification": "resource",
+      "reason": "Hold/remove-hold pair describes a durable per-snapshot setting; model as a toggle resource (create = hold, delete = remove hold).",
+      "terraform_name": "eon_snapshot_hold",
+      "status": "gap"
+    },
+    {
+      "operation_id": "runQuery",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/snapshots/{snapshotId}/databases/query",
+      "tag": "databaseSnapshots",
+      "summary": "Run Query",
+      "request_model": "QueryDBRequest",
+      "response_model": "QueryDBResponse",
+      "path_params": [
+        "projectId",
+        "snapshotId"
+      ],
+      "classification": "skip",
+      "reason": "Ad-hoc query execution against snapshots (run/poll/fetch results) is an imperative job with no durable state.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "connectSourceAccount",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/source-accounts",
+      "tag": "accounts",
+      "summary": "Connect Source Account",
+      "request_model": "ConnectSourceAccountRequest",
+      "response_model": "ConnectSourceAccountResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "resource",
+      "reason": "Create with matching item read: a durable object with stable identity and a real lifecycle.",
+      "terraform_name": "eon_source_account",
+      "status": "covered",
+      "covered_by": [
+        "eon_source_account"
+      ]
+    },
+    {
+      "operation_id": "listSourceAccounts",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/source-accounts/list",
+      "tag": "accounts",
+      "summary": "List Source Accounts",
+      "request_model": "ListSourceAccountsRequest",
+      "response_model": "ListSourceAccountsResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "data_source",
+      "reason": "Read-only lookup whose output is useful as input to other resources.",
+      "terraform_name": "eon_source_accounts",
+      "status": "covered",
+      "covered_by": [
+        "eon_source_account",
+        "eon_source_accounts"
+      ]
+    },
+    {
+      "operation_id": "deleteSourceAccount",
+      "method": "DELETE",
+      "path": "/v1/projects/{projectId}/source-accounts/{accountId}",
+      "tag": "accounts",
+      "summary": "Delete Source Account",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_source_account",
+      "status": "covered",
+      "covered_by": [
+        "eon_source_account"
+      ]
+    },
+    {
+      "operation_id": "getSourceAccount",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/source-accounts/{accountId}",
+      "tag": "accounts",
+      "summary": "Get Source Account",
+      "response_model": "GetSourceAccountResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_source_account",
+      "status": "covered",
+      "covered_by": [
+        "eon_source_account"
+      ]
+    },
+    {
+      "operation_id": "updateSourceAccount",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/source-accounts/{accountId}",
+      "tag": "accounts",
+      "summary": "Update Source Account",
+      "request_model": "UpdateSourceAccountRequest",
+      "response_model": "UpdateSourceAccountResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_source_account",
+      "status": "covered",
+      "covered_by": [
+        "eon_source_account"
+      ]
+    },
+    {
+      "operation_id": "DisconnectSourceAccount",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/source-accounts/{accountId}/disconnect",
+      "tag": "accounts",
+      "summary": "Disconnect Source Account",
+      "response_model": "DisconnectSourceAccountResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "skip",
+      "reason": "Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.",
+      "status": "covered",
+      "covered_by": [
+        "eon_source_account"
+      ]
+    },
+    {
+      "operation_id": "disableSourceAccountMetricsConfig",
+      "method": "DELETE",
+      "path": "/v1/projects/{projectId}/source-accounts/{accountId}/metrics-config",
+      "tag": "accounts",
+      "summary": "Disable Source Account Metrics",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_source_account_metrics_config",
+      "status": "gap"
+    },
+    {
+      "operation_id": "getSourceAccountMetricsConfig",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/source-accounts/{accountId}/metrics-config",
+      "tag": "accounts",
+      "summary": "Get Source Account Metrics Configuration",
+      "response_model": "GetSourceAccountMetricsConfigResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_source_account_metrics_config",
+      "status": "gap"
+    },
+    {
+      "operation_id": "enableSourceAccountMetricsConfig",
+      "method": "PUT",
+      "path": "/v1/projects/{projectId}/source-accounts/{accountId}/metrics-config",
+      "tag": "accounts",
+      "summary": "Configure Source Account Metrics",
+      "request_model": "EnableSourceAccountMetricsConfigRequest",
+      "response_model": "EnableSourceAccountMetricsConfigResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_source_account_metrics_config",
+      "status": "gap"
+    },
+    {
+      "operation_id": "ReconnectSourceAccount",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/source-accounts/{accountId}/reconnect",
+      "tag": "accounts",
+      "summary": "Reconnect Source Account",
+      "response_model": "ReconnectSourceAccountResponse",
+      "path_params": [
+        "projectId",
+        "accountId"
+      ],
+      "classification": "skip",
+      "reason": "Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.",
+      "status": "covered",
+      "covered_by": [
+        "eon_source_account"
+      ]
+    },
+    {
+      "operation_id": "connectSourceAwsOrganizationalUnit",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/source-aws-organizational-units",
+      "tag": "accounts",
+      "summary": "Connect Source AWS Organizational Unit",
+      "request_model": "ConnectSourceAwsOrganizationalUnitRequest",
+      "response_model": "ConnectSourceAwsOrganizationalUnitResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "skip",
+      "reason": "NEEDS REVIEW: no triage rule matched; classify manually.",
+      "status": "covered",
+      "covered_by": [
+        "eon_source_aws_organizational_unit"
+      ]
+    },
+    {
+      "operation_id": "listSourceAwsOrganizationalUnits",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/source-aws-organizational-units/list",
+      "tag": "accounts",
+      "summary": "List Source AWS Organizational Units",
+      "response_model": "ListSourceAwsOrganizationalUnitsResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "data_source",
+      "reason": "Read-only lookup whose output is useful as input to other resources.",
+      "terraform_name": "eon_source_aws_organizational_units",
+      "status": "covered",
+      "covered_by": [
+        "eon_source_aws_organizational_unit",
+        "eon_source_aws_organizational_units"
+      ]
+    },
+    {
+      "operation_id": "disconnectSourceAwsOrganizationalUnit",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/source-aws-organizational-units/{organizationalUnitId}/disconnect",
+      "tag": "accounts",
+      "summary": "Disconnect Source AWS Organizational Unit",
+      "response_model": "DisconnectSourceAwsOrganizationalUnitResponse",
+      "path_params": [
+        "projectId",
+        "organizationalUnitId"
+      ],
+      "classification": "skip",
+      "reason": "Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.",
+      "status": "covered",
+      "covered_by": [
+        "eon_source_aws_organizational_unit"
+      ]
+    },
+    {
+      "operation_id": "reconnectSourceAwsOrganizationalUnit",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/source-aws-organizational-units/{organizationalUnitId}/reconnect",
+      "tag": "accounts",
+      "summary": "Reconnect Source AWS Organizational Unit",
+      "response_model": "ReconnectSourceAwsOrganizationalUnitResponse",
+      "path_params": [
+        "projectId",
+        "organizationalUnitId"
+      ],
+      "classification": "skip",
+      "reason": "Imperative one-shot action with no reconcilable state; lifecycle transitions belong inside the owning resource, not as standalone surface.",
+      "status": "skipped"
+    },
+    {
+      "operation_id": "createVault",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/vaults",
+      "tag": "vaults",
+      "summary": "Create Vault",
+      "request_model": "CreateVaultRequest",
+      "response_model": "CreateVaultResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "resource",
+      "reason": "Create with matching item read: a durable object with stable identity and a real lifecycle.",
+      "terraform_name": "eon_vault",
+      "status": "covered",
+      "covered_by": [
+        "eon_vault"
+      ]
+    },
+    {
+      "operation_id": "listVaults",
+      "method": "POST",
+      "path": "/v1/projects/{projectId}/vaults/list",
+      "tag": "vaults",
+      "summary": "List Vaults",
+      "response_model": "ListBackupVaultResponse",
+      "path_params": [
+        "projectId"
+      ],
+      "classification": "data_source",
+      "reason": "Read-only lookup whose output is useful as input to other resources.",
+      "terraform_name": "eon_vaults",
+      "status": "covered",
+      "covered_by": [
+        "eon_vault",
+        "eon_vaults"
+      ]
+    },
+    {
+      "operation_id": "getVault",
+      "method": "GET",
+      "path": "/v1/projects/{projectId}/vaults/{vaultId}",
+      "tag": "vaults",
+      "summary": "Get Vault",
+      "response_model": "GetVaultResponse",
+      "path_params": [
+        "projectId",
+        "vaultId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_vault",
+      "status": "covered",
+      "covered_by": [
+        "eon_vault"
+      ]
+    },
+    {
+      "operation_id": "updateVault",
+      "method": "PATCH",
+      "path": "/v1/projects/{projectId}/vaults/{vaultId}",
+      "tag": "vaults",
+      "summary": "Update Vault",
+      "request_model": "UpdateVaultRequest",
+      "response_model": "UpdateVaultResponse",
+      "path_params": [
+        "projectId",
+        "vaultId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_vault",
+      "status": "covered",
+      "covered_by": [
+        "eon_vault"
+      ]
+    },
+    {
+      "operation_id": "createRole",
+      "method": "POST",
+      "path": "/v1/roles",
+      "tag": "iam",
+      "summary": "Create Role",
+      "request_model": "CreateRoleRequest",
+      "response_model": "CreateRoleResponse",
+      "classification": "resource",
+      "reason": "Create with matching item read: a durable object with stable identity and a real lifecycle.",
+      "terraform_name": "eon_role",
+      "status": "covered",
+      "covered_by": [
+        "eon_role"
+      ]
+    },
+    {
+      "operation_id": "listRoles",
+      "method": "POST",
+      "path": "/v1/roles/list",
+      "tag": "iam",
+      "summary": "List Roles",
+      "response_model": "ListRolesResponse",
+      "classification": "data_source",
+      "reason": "Read-only lookup whose output is useful as input to other resources.",
+      "terraform_name": "eon_roles",
+      "status": "covered",
+      "covered_by": [
+        "eon_roles"
+      ]
+    },
+    {
+      "operation_id": "deleteRole",
+      "method": "DELETE",
+      "path": "/v1/roles/{roleId}",
+      "tag": "iam",
+      "summary": "Delete Role",
+      "path_params": [
+        "roleId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_role",
+      "status": "covered",
+      "covered_by": [
+        "eon_role"
+      ]
+    },
+    {
+      "operation_id": "getRole",
+      "method": "GET",
+      "path": "/v1/roles/{roleId}",
+      "tag": "iam",
+      "summary": "Get Role",
+      "response_model": "GetRoleResponse",
+      "path_params": [
+        "roleId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_role",
+      "status": "covered",
+      "covered_by": [
+        "eon_role"
+      ]
+    },
+    {
+      "operation_id": "updateRole",
+      "method": "PUT",
+      "path": "/v1/roles/{roleId}",
+      "tag": "iam",
+      "summary": "Update Role",
+      "request_model": "UpdateRoleRequest",
+      "response_model": "UpdateRoleResponse",
+      "path_params": [
+        "roleId"
+      ],
+      "classification": "resource",
+      "reason": "Read+write (+delete) on a stable path: a durable configuration object Terraform can reconcile and drift-detect.",
+      "terraform_name": "eon_role",
+      "status": "covered",
+      "covered_by": [
+        "eon_role"
+      ]
+    },
+    {
+      "operation_id": "getAccessToken",
+      "method": "POST",
+      "path": "/v1/token",
+      "tag": "auth",
+      "summary": "Get Access Token",
+      "request_model": "ApiCredentials",
+      "response_model": "TokenResponse",
+      "classification": "skip",
+      "reason": "Authentication, token issuance, and credential rotation are session/security actions, not declarative infrastructure.",
+      "status": "covered_internal",
+      "covered_by": [
+        "internal:client/token_refresher.go"
+      ]
+    }
+  ],
+  "gaps": [
+    {
+      "terraform_name": "eon_backup_posture_control",
+      "classification": "resource",
+      "operation_ids": [
+        "createBackupPostureControl",
+        "deleteBackupPostureControl",
+        "getBackupPostureControl",
+        "updateBackupPostureControl"
+      ]
+    },
+    {
+      "terraform_name": "eon_backup_posture_controls",
+      "classification": "data_source",
+      "operation_ids": [
+        "listBackupPostureControls"
+      ]
+    },
+    {
+      "terraform_name": "eon_idps",
+      "classification": "data_source",
+      "operation_ids": [
+        "listIdps"
+      ]
+    },
+    {
+      "terraform_name": "eon_permissions",
+      "classification": "data_source",
+      "operation_ids": [
+        "listPermissions"
+      ]
+    },
+    {
+      "terraform_name": "eon_resource_backup_exclusion",
+      "classification": "resource",
+      "operation_ids": [
+        "cancelResourceBackupExclusion",
+        "excludeResourceFromBackup"
+      ]
+    },
+    {
+      "terraform_name": "eon_resource_data_classes_override",
+      "classification": "resource",
+      "operation_ids": [
+        "overrideDataClasses",
+        "removeDataClassesOverride"
+      ]
+    },
+    {
+      "terraform_name": "eon_resource_environment_override",
+      "classification": "resource",
+      "operation_ids": [
+        "overrideEnvironment",
+        "removeEnvironmentOverride"
+      ]
+    },
+    {
+      "terraform_name": "eon_resource_snapshots",
+      "classification": "data_source",
+      "operation_ids": [
+        "listResourceSnapshots"
+      ]
+    },
+    {
+      "terraform_name": "eon_restore_account_metrics_config",
+      "classification": "resource",
+      "operation_ids": [
+        "disableRestoreAccountMetricsConfig",
+        "enableRestoreAccountMetricsConfig",
+        "getRestoreAccountMetricsConfig"
+      ]
+    },
+    {
+      "terraform_name": "eon_restore_job",
+      "classification": "resource",
+      "operation_ids": [
+        "restoreAzureDisk",
+        "restoreAzureSqlDatabase",
+        "restoreAzureVmInstance",
+        "restoreDynamoDBTable",
+        "restoreToEbsSnapshot"
+      ]
+    },
+    {
+      "terraform_name": "eon_snapshot_hold",
+      "classification": "resource",
+      "operation_ids": [
+        "holdSnapshot",
+        "removeSnapshotHold"
+      ]
+    },
+    {
+      "terraform_name": "eon_source_account_metrics_config",
+      "classification": "resource",
+      "operation_ids": [
+        "disableSourceAccountMetricsConfig",
+        "enableSourceAccountMetricsConfig",
+        "getSourceAccountMetricsConfig"
+      ]
+    }
+  ]
+}

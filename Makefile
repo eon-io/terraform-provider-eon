@@ -74,6 +74,15 @@ clean: ## Clean build artifacts
 docs: ## Generate documentation
 	go generate ./...
 
+# Regenerate the SDK capability manifest and gap report
+.PHONY: gap-report
+gap-report: ## Analyze SDK capability coverage (see capabilities/README.md)
+	go run ./tools/capsync -update-manifest
+
+.PHONY: gap-check
+gap-check: ## Fail if SDK operations are unclassified or awaiting review
+	go run ./tools/capsync -check
+
 # Development setup
 .PHONY: dev-setup
 dev-setup: ## Set up development environment
