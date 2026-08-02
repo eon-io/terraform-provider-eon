@@ -23,6 +23,12 @@ install: build ## Install the provider locally
 test: ## Run unit tests
 	go test -v ./...
 
+# Run acceptance tests (real terraform CLI against the in-test fake Eon API;
+# no credentials required)
+.PHONY: testacc
+testacc: ## Run acceptance tests
+	TF_ACC=1 go test -v ./internal/provider/ -run 'TestAcc' -timeout 15m
+
 # Run tests with coverage
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage report

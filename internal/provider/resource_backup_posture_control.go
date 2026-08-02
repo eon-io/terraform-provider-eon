@@ -8,6 +8,8 @@ import (
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 	"github.com/eon-io/terraform-provider-eon/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -226,6 +228,18 @@ func (r *BackupPostureControlResource) Read(ctx context.Context, req resource.Re
 	data.Name = types.StringValue(control.Name)
 	data.Severity = types.StringValue(string(control.Severity))
 
+	rulesObj, diags := flattenPostureControlRules(control)
+	resp.Diagnostics.Append(diags...)
+	data.Rules = rulesObj
+
+	selectorObj, diags := flattenPostureControlSelector(data.ResourceSelector, control)
+	resp.Diagnostics.Append(diags...)
+	data.ResourceSelector = selectorObj
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -443,4 +457,117 @@ func createPostureControlRules(ctx context.Context, data *BackupPostureControlRe
 	}
 
 	return rules, nil
+}
+
+func minimumRetentionRuleAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"frequency":              types.StringType,
+		"minimum_retention_days": types.Int64Type,
+	}
+}
+
+func postureControlRulesAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"minimum_retention":      types.ListType{ElemType: types.ObjectType{AttrTypes: minimumRetentionRuleAttrTypes()}},
+		"maximum_retention_days": types.Int64Type,
+		"min_copies":             types.Int64Type,
+		"cross_region":           types.BoolType,
+		"cross_account":          types.BoolType,
+		"cross_cloud_provider":   types.BoolType,
+	}
+}
+
+// flattenPostureControlRules maps the API rules back into state so drift in
+// any rule is detected on refresh and import round-trips completely.
+func flattenPostureControlRules(control *externalEonSdkAPI.BackupPostureControl) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	rules := control.Rules.Get()
+	if rules == nil {
+		return types.ObjectNull(postureControlRulesAttrTypes()), diags
+	}
+
+	minRetElemType := types.ObjectType{AttrTypes: minimumRetentionRuleAttrTypes()}
+	minRetention := types.ListNull(minRetElemType)
+	if rules.MinimumRetention != nil {
+		elems := make([]attr.Value, 0, len(rules.MinimumRetention))
+		for _, rule := range rules.MinimumRetention {
+			obj, d := types.ObjectValue(minimumRetentionRuleAttrTypes(), map[string]attr.Value{
+				"frequency":              types.StringValue(rule.Frequency),
+				"minimum_retention_days": types.Int64Value(int64(rule.MinimumRetention)),
+			})
+			diags.Append(d...)
+			elems = append(elems, obj)
+		}
+		list, d := types.ListValue(minRetElemType, elems)
+		diags.Append(d...)
+		minRetention = list
+	}
+
+	maxRetentionDays := types.Int64Null()
+	if maxRet := rules.MaximumRetention.Get(); maxRet != nil {
+		maxRetentionDays = types.Int64Value(int64(maxRet.MaximumRetention))
+	}
+
+	minCopies := types.Int64Null()
+	if copies := rules.NumberOfCopies.Get(); copies != nil {
+		minCopies = types.Int64Value(int64(copies.MinCopies))
+	}
+
+	boolOrNull := func(v *bool) types.Bool {
+		if v == nil {
+			return types.BoolNull()
+		}
+		return types.BoolValue(*v)
+	}
+
+	obj, d := types.ObjectValue(postureControlRulesAttrTypes(), map[string]attr.Value{
+		"minimum_retention":      minRetention,
+		"maximum_retention_days": maxRetentionDays,
+		"min_copies":             minCopies,
+		"cross_region":           boolOrNull(rules.CrossRegion),
+		"cross_account":          boolOrNull(rules.CrossAccount),
+		"cross_cloud_provider":   boolOrNull(rules.CrossCloudProvider),
+	})
+	diags.Append(d...)
+	return obj, diags
+}
+
+// flattenPostureControlSelector refreshes resource_selection_mode from the
+// API while preserving the expression object from prior state: the deeply
+// nested conditional expression is not reverse-mapped from the API, so after
+// import a CONDITIONAL control shows the expression on the first plan.
+func flattenPostureControlSelector(prior types.Object, control *externalEonSdkAPI.BackupPostureControl) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	exprType, ok := conditionalExpressionSchema().GetType().(basetypes.ObjectType)
+	if !ok {
+		diags.AddError("Provider Error", "conditional expression schema is not an object type; please report this issue to the provider developers")
+		return types.ObjectNull(nil), diags
+	}
+	selectorAttrTypes := map[string]attr.Type{
+		"resource_selection_mode": types.StringType,
+		"expression":              exprType,
+	}
+
+	expression := types.ObjectNull(exprType.AttributeTypes())
+	if !prior.IsNull() && !prior.IsUnknown() {
+		if priorExpr, exists := prior.Attributes()["expression"]; exists {
+			if priorExprObj, isObj := priorExpr.(types.Object); isObj {
+				expression = priorExprObj
+			}
+		}
+	}
+
+	mode := types.StringNull()
+	if selector := control.ResourceSelector.Get(); selector != nil {
+		mode = types.StringValue(string(selector.ResourceSelectionMode))
+	}
+
+	obj, d := types.ObjectValue(selectorAttrTypes, map[string]attr.Value{
+		"resource_selection_mode": mode,
+		"expression":              expression,
+	})
+	diags.Append(d...)
+	return obj, diags
 }

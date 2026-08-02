@@ -45,6 +45,30 @@ jobs:
       - name: Run tests
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
+  # Acceptance tests drive the real terraform CLI against the provider served
+  # in-process, backed by the in-test fake Eon API — no credentials needed.
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Run acceptance tests
+        run: TF_ACC=1 go test -v ./internal/provider/ -run 'TestAcc' -timeout 15m
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15

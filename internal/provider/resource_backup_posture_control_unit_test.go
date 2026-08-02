@@ -147,20 +147,6 @@ func TestPolicyExpressionToPostureExpression(t *testing.T) {
 	assert.Nil(t, policyExpressionToPostureExpression(nil), "Nil input should convert to nil")
 }
 
-func postureControlRulesAttrTypes() map[string]attr.Type {
-	return map[string]attr.Type{
-		"minimum_retention": types.ListType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{
-			"frequency":              types.StringType,
-			"minimum_retention_days": types.Int64Type,
-		}}},
-		"maximum_retention_days": types.Int64Type,
-		"min_copies":             types.Int64Type,
-		"cross_region":           types.BoolType,
-		"cross_account":          types.BoolType,
-		"cross_cloud_provider":   types.BoolType,
-	}
-}
-
 func TestCreatePostureControlRules(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
