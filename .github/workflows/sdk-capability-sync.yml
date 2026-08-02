@@ -91,6 +91,62 @@ jobs:
           go mod tidy
           go run ./tools/capsync -update-manifest | tee /tmp/capsync-summary.txt
 
+      # LLM triage: with the repository variable CAPSYNC_LLM_TRIAGE=true (and
+      # the ANTHROPIC_API_KEY secret), Claude reviews every operation the
+      # heuristics just seeded or flagged, decides the final classification
+      # against the triage policy, and records its rationale in the manifest
+      # (notes prefixed "llm-triage(<version>):"). Cleared operations become
+      # auto-implementable in this same run. The sync PR diff remains the
+      # human audit point: every LLM decision is visible there and overridable
+      # by editing the manifest before (or after) merge.
+      - name: LLM triage of new operations
+        if: steps.gate.outputs.skip == 'false' && vars.CAPSYNC_LLM_TRIAGE == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            You are the triage reviewer for this Terraform provider's SDK capability
+            pipeline. The SDK was just bumped to ${{ steps.versions.outputs.target }} and
+            tools/capsync seeded proposals for newly discovered operations in
+            capabilities/manifest.yaml.
+
+            Task: for every operation whose needs_review is true OR whose first_seen is
+            ${{ steps.versions.outputs.target }}, decide the FINAL classification and edit
+            its manifest entry in place.
+
+            Policy (the deciding heuristic: if a practitioner cannot express it as desired
+            state Terraform can reconcile and drift-detect, it does not belong):
+            - resource: durable, declaratively-managed object with stable identity and a
+              real lifecycle (policies, connected accounts, vaults, roles, config
+              singletons, override/exclusion toggles).
+            - data_source: read-only lookup whose output is useful as input to other
+              resources.
+            - skip: imperative one-shot actions (trigger/cancel/retry/rotate/reconnect),
+              job status polling, reporting/analytics/billing/metrics/dashboard, pure
+              inventory plumbing, auth/session/credential endpoints, and the ENTIRE
+              agentic surface (agents/chat/assistants/MCP and similar) regardless of
+              shape. Also skip any gap that would require a breaking change to an
+              existing provider schema, and say so in notes.
+
+            Editing rules:
+            1. Only touch the human-owned fields: classification, reason, terraform_name,
+               notes, needs_review. Never touch status, covered_by, method, path,
+               first_seen, or entries that already have needs_review absent/false from
+               earlier SDK versions (those are settled human decisions).
+            2. Write a specific, defensible reason for each decision — name the shape
+               (CRUD set, toggle pair, lookup, one-shot action) and, for resources and
+               data sources, set terraform_name following the repo's eon_* conventions
+               (study capabilities/gap-report.md and internal/provider for precedent).
+            3. Set needs_review: false when confident. If a call is genuinely undecidable,
+               leave needs_review: true and explain what a human must weigh.
+            4. Append to notes: "llm-triage(${{ steps.versions.outputs.target }}): <one-line rationale>".
+            5. When done, run: go run ./tools/capsync -update-manifest
+               to regenerate the gap reports from your decisions.
+            6. Do NOT commit, push, or open pull requests — the workflow handles that.
+          claude_args: |
+            --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
+
       - name: Build and test
         if: steps.gate.outputs.skip == 'false'
         run: |
@@ -114,6 +170,7 @@ jobs:
 
           NEW_OPS=$(jq -r '[.operations[] | select(.new == true) | "- `\(.operation_id)` (`\(.method) \(.path)`) — proposed: \(.classification)"] | join("\n")' capabilities/gap-report.json)
           GAPS=$(jq -r '[.gaps[] | "- `\(.terraform_name)` (\(.classification)): \(.operation_ids | join(", "))"] | join("\n")' capabilities/gap-report.json)
+          LLM_TRIAGED=$(jq -r --arg v "$TARGET" '[.operations[] | select((.notes // "") | contains("llm-triage(" + $v + ")")) | "- `\(.operation_id)` → **\(.classification)** — \(.notes)"] | join("\n")' capabilities/gap-report.json)
           {
             echo "Automated SDK dependency bump to \`$TARGET\` with a refreshed capability gap report."
             echo
@@ -121,6 +178,11 @@ jobs:
             cat /tmp/capsync-summary.txt
             echo "\`\`\`"
             echo
+            if [ -n "$LLM_TRIAGED" ]; then
+              echo "### LLM triage decisions — merging this PR accepts them; override by editing capabilities/manifest.yaml"
+              echo "$LLM_TRIAGED"
+              echo
+            fi
             if [ -n "$NEW_OPS" ]; then
               echo "### New SDK operations (triage seeded in capabilities/manifest.yaml — review the proposed classifications)"
               echo "$NEW_OPS"

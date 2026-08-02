@@ -65,6 +65,17 @@ opens as a draft for human review):
   automatically on the PRs this workflow opens; with the default
   `GITHUB_TOKEN`, GitHub suppresses those runs.
 
+  **LLM triage** (repository variable `CAPSYNC_LLM_TRIAGE=true` + the
+  `ANTHROPIC_API_KEY` secret): instead of waiting for a human to confirm the
+  heuristically seeded classification of newly discovered operations, Claude
+  reviews each one against the triage policy during the sync run, writes the
+  final classification and a one-line rationale into the manifest (`notes:
+  llm-triage(<version>): ...`), and clears `needs_review` when confident —
+  leaving it set, with an explanation, only for genuinely ambiguous calls.
+  Cleared operations become auto-implementable in the same run. The sync PR
+  body lists every LLM decision; merging the PR accepts them, and editing the
+  manifest overrides them — the diff is the audit trail.
+
 - **Implement Capability** (`.github/workflows/capability-implement.yml`) —
   dispatched with a capability name from the gap report (e.g.
   `eon_backup_posture_control`). Claude Code implements it end to end
