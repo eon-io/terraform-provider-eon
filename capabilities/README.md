@@ -66,11 +66,20 @@ opens as a draft for human review):
   `GITHUB_TOKEN`, GitHub suppresses those runs.
 
 - **Implement Capability** (`.github/workflows/capability-implement.yml`) —
-  manual dispatch with a capability name from the gap report (e.g.
+  dispatched with a capability name from the gap report (e.g.
   `eon_backup_posture_control`). Claude Code implements it end to end
   following the repo's existing patterns and opens a draft, labeled PR — one
   capability per PR, based on `main` or chained off an open sdk-sync branch.
   Requires the `ANTHROPIC_API_KEY` secret.
+
+  Two dispatch modes:
+  - **Manual** (default): a human picks the capability and runs the workflow.
+  - **Automatic**: set the repository variable `CAPSYNC_AUTO_IMPLEMENT=true`
+    and the sync workflow auto-dispatches implementation jobs (max 3 per run)
+    for every gap whose triage is already settled — i.e. classified in the
+    manifest on a previous run and not flagged `needs_review`. Operations the
+    SDK release just introduced are never auto-implemented; they wait for a
+    human to confirm the seeded classification in the sync PR first.
 
 The manifest keeps both honest: implemented operations flip to `covered` on
 the next run, operations you mark `skip` are never proposed again, and brand
