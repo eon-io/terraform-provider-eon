@@ -3,10 +3,11 @@
 update_linear_on_merge.py
 Update Linear ticket to Deployed state when a PR is merged.
 
-Extracts the EON-XXXX ticket ID from the PR title, branch name, or body,
-looks it up in Linear, and moves it to the Deployed state.
+Extracts the EON-XXXX ticket ID from the PR title or branch name, looks it up
+in Linear, and moves it to the Deployed state.
 """
 
+import os
 import re
 import sys
 from typing import Optional
@@ -19,9 +20,9 @@ DEPLOYED_STATE_ID = "0e6659ab-646c-43e4-81b1-d858126bc390"
 LINEAR_TICKET_PATTERN = re.compile(r"EON-(\d+)", re.IGNORECASE)
 
 
-def extract_ticket_id(pr_title: str, pr_branch: str, pr_body: str) -> Optional[str]:
-    """Extract EON-XXXX ticket ID from PR title, branch, or body."""
-    for source in [pr_title, pr_branch, pr_body]:
+def extract_ticket_id(pr_title: str, pr_branch: str) -> Optional[str]:
+    """Extract EON-XXXX ticket ID from PR title or branch."""
+    for source in [pr_title, pr_branch]:
         match = LINEAR_TICKET_PATTERN.search(source)
         if match:
             return match.group(0).upper()
@@ -112,20 +113,25 @@ def main():
     parser = argparse.ArgumentParser(description="Update Linear ticket to Deployed on PR merge")
     parser.add_argument("--pr-title", required=True, help="Pull request title")
     parser.add_argument("--pr-branch", required=True, help="Pull request head branch name")
-    parser.add_argument("--pr-body", default="", help="Pull request body")
-    parser.add_argument("--linear-api-key", required=True, help="Linear API key")
     args = parser.parse_args()
 
+    # The key comes from the environment, not argv: anything else on the runner can read another
+    # process's command line out of /proc.
+    linear_api_key = os.environ.get("LINEAR_API_KEY", "")
+    if not linear_api_key:
+        print("LINEAR_API_KEY is not set.", file=sys.stderr)
+        sys.exit(1)
+
     # Extract ticket ID
-    ticket_id = extract_ticket_id(args.pr_title, args.pr_branch, args.pr_body)
+    ticket_id = extract_ticket_id(args.pr_title, args.pr_branch)
     if not ticket_id:
-        print("No Linear ticket ID found in PR title, branch, or body. Skipping.")
+        print("No Linear ticket ID found in PR title or branch. Skipping.")
         return
 
     print(f"Found Linear ticket: {ticket_id}")
 
     # Look up the issue
-    issue = lookup_linear_issue(args.linear_api_key, ticket_id)
+    issue = lookup_linear_issue(linear_api_key, ticket_id)
     if not issue:
         return
 
@@ -137,7 +143,7 @@ def main():
 
     # Update to Deployed
     print(f"Updating {ticket_id} from {state_name} to Deployed...")
-    update_linear_issue(args.linear_api_key, issue["id"], ticket_id)
+    update_linear_issue(linear_api_key, issue["id"], ticket_id)
 
 
 if __name__ == "__main__":
