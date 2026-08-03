@@ -180,12 +180,12 @@ func (p *EonProvider) Resources(ctx context.Context) []func() resource.Resource 
 		NewRestoreAccountConnectivityConfigResource,
 		NewRestoreJobResource,
 		NewBackupPolicyResource,
+		NewBackupPostureControlResource,
 		NewVaultResource,
 		NewIdpGroupResource,
 		NewRoleResource,
 		NewVolumeBackupExclusionResource,
 		NewGcsBucketConfigurationResource,
-		NewBackupPostureControlResource,
 	}
 }
 
@@ -197,8 +197,10 @@ func (p *EonProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		NewRestoreAwsOrganizationalUnitsDataSource,
 		NewSnapshotDataSource,
 		NewBackupPoliciesDataSource,
+		NewBackupPostureControlsDataSource,
 		NewVaultsDataSource,
 		NewIdpGroupsDataSource,
+		NewIdpsDataSource,
 		NewRolesDataSource,
 		NewBuiltinRolesDataSource,
 	}

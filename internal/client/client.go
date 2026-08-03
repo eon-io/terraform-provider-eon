@@ -1418,6 +1418,58 @@ func (c *EonClient) DeleteBackupPostureControl(ctx context.Context, controlId st
 	return nil
 }
 
+// ListBackupPostureControls retrieves all backup posture controls for the project.
+func (c *EonClient) ListBackupPostureControls(ctx context.Context) ([]externalEonSdkAPI.BackupPostureControl, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	var all []externalEonSdkAPI.BackupPostureControl
+	var pageToken string
+
+	for {
+		req := c.client.BackupPostureControlsAPI.ListBackupPostureControls(ctx, c.projectID).
+			ListBackupPostureControlsRequest(*externalEonSdkAPI.NewListBackupPostureControlsRequest()).
+			PageSize(100)
+		if pageToken != "" {
+			req = req.PageToken(pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list backup posture controls"); apiErr != nil {
+			if httpResp != nil {
+				_ = httpResp.Body.Close()
+			}
+			return nil, apiErr
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			_ = httpResp.Body.Close()
+			return nil, &APIError{
+				StatusCode: httpResp.StatusCode,
+				Message:    string(body),
+			}
+		}
+
+		if resp.GetBackupPostureControls() != nil {
+			all = append(all, resp.GetBackupPostureControls()...)
+		}
+
+		hasMore := resp.HasNextPageToken() && resp.GetNextPageToken() != ""
+		_ = httpResp.Body.Close()
+		if !hasMore {
+			break
+		}
+		pageToken = resp.GetNextPageToken()
+	}
+
+	if all == nil {
+		return []externalEonSdkAPI.BackupPostureControl{}, nil
+	}
+	return all, nil
+}
+
 // CreateVault creates a new backup vault
 func (c *EonClient) CreateVault(ctx context.Context, req externalEonSdkAPI.CreateVaultRequest) (*externalEonSdkAPI.BackupVault, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
@@ -1624,6 +1676,57 @@ func (c *EonClient) ListIdpGroups(ctx context.Context) ([]externalEonSdkAPI.IdpG
 		return []externalEonSdkAPI.IdpGroup{}, nil
 	}
 	return allGroups, nil
+}
+
+// ListIdps retrieves all identity providers for the account.
+func (c *EonClient) ListIdps(ctx context.Context) ([]externalEonSdkAPI.Idp, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	var all []externalEonSdkAPI.Idp
+	var pageToken *string
+
+	for {
+		req := c.client.IamAPI.ListIdps(ctx).PageSize(100)
+		if pageToken != nil {
+			req = req.PageToken(*pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list identity providers"); apiErr != nil {
+			if httpResp != nil {
+				_ = httpResp.Body.Close()
+			}
+			return nil, apiErr
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			_ = httpResp.Body.Close()
+			return nil, &APIError{
+				StatusCode: httpResp.StatusCode,
+				Message:    string(body),
+			}
+		}
+
+		if resp.GetIdps() != nil {
+			all = append(all, resp.GetIdps()...)
+		}
+
+		hasMore := resp.HasNextToken() && resp.GetNextToken() != ""
+		_ = httpResp.Body.Close()
+		if !hasMore {
+			break
+		}
+		token := resp.GetNextToken()
+		pageToken = &token
+	}
+
+	if all == nil {
+		return []externalEonSdkAPI.Idp{}, nil
+	}
+	return all, nil
 }
 
 // UpdateIdpGroup updates the role assignments for an IDP group.
