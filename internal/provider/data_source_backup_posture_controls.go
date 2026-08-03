@@ -88,6 +88,8 @@ func (d *BackupPostureControlsDataSource) Read(ctx context.Context, req datasour
 		return
 	}
 
+	// Always set a non-null list so empty results read as [] rather than null.
+	data.Controls = make([]BackupPostureControlListItemModel, 0, len(controls))
 	for _, control := range controls {
 		data.Controls = append(data.Controls, BackupPostureControlListItemModel{
 			Id:       types.StringValue(control.GetId()),

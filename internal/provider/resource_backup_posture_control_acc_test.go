@@ -133,3 +133,37 @@ data "eon_idps" "all" {}
 		},
 	})
 }
+
+// Empty results must read as an empty list, not null, so expressions like
+// length(data.eon_idps.all.idps) work against accounts with no IdPs.
+func TestAccDataSourcesEmpty(t *testing.T) {
+	testAccPreCheck(t)
+
+	server := newFakeEonServer(t)
+	t.Setenv("EON_USE_EXACT_ENDPOINT", "true")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: server.providerConfig() + `
+data "eon_idps" "all" {}
+
+data "eon_backup_posture_controls" "all" {}
+
+output "idps_count" {
+  value = length(data.eon_idps.all.idps)
+}
+
+output "controls_count" {
+  value = length(data.eon_backup_posture_controls.all.controls)
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.eon_idps.all", "idps.#", "0"),
+					resource.TestCheckResourceAttr("data.eon_backup_posture_controls.all", "controls.#", "0"),
+				),
+			},
+		},
+	})
+}

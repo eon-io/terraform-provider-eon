@@ -83,6 +83,8 @@ func (d *IdpsDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
+	// Always set a non-null list so empty results read as [] rather than null.
+	data.Idps = make([]IdpModel, 0, len(idps))
 	for _, idp := range idps {
 		data.Idps = append(data.Idps, IdpModel{
 			Id:           types.StringValue(idp.GetId()),
