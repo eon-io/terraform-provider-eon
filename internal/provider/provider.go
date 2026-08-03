@@ -185,6 +185,7 @@ func (p *EonProvider) Resources(ctx context.Context) []func() resource.Resource 
 		NewRoleResource,
 		NewVolumeBackupExclusionResource,
 		NewGcsBucketConfigurationResource,
+		NewBackupPostureControlResource,
 	}
 }
 
