@@ -24,4 +24,3 @@ jobs:
           linear_api_key: ${{ secrets.LINEAR_API_KEY }}
           pr_title: ${{ github.event.pull_request.title }}
           pr_branch: ${{ github.event.pull_request.head.ref }}
-          pr_body: ${{ github.event.pull_request.body }}

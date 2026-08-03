@@ -36,6 +36,10 @@ crash.log
 *.swo
 *~
 
+# Python bytecode from the CI action scripts
+__pycache__/
+*.pyc
+
 # OS files
 .DS_Store
 Thumbs.db
