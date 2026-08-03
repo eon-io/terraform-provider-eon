@@ -1106,6 +1106,132 @@ func (c *EonClient) StartBigQueryDatasetRestore(ctx context.Context, resourceId,
 	return restoreResp.JobId, nil
 }
 
+// ListPermissions retrieves all available permissions for composing custom roles.
+func (c *EonClient) ListPermissions(ctx context.Context) ([]externalEonSdkAPI.Permission, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.IamAPI.ListPermissions(ctx).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list permissions"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	permissions := resp.GetPermissions()
+	if permissions == nil {
+		return []externalEonSdkAPI.Permission{}, nil
+	}
+	return permissions, nil
+}
+
+// ExcludeResourceFromBackup excludes an entire inventory resource from future backups.
+func (c *EonClient) ExcludeResourceFromBackup(ctx context.Context, resourceId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	_, httpResp, err := c.client.ResourcesAPI.ExcludeResourceFromBackup(ctx, c.projectID, resourceId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to exclude resource from backup"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}
+
+// CancelResourceBackupExclusion cancels a resource backup exclusion, including it in future backups.
+func (c *EonClient) CancelResourceBackupExclusion(ctx context.Context, resourceId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	_, httpResp, err := c.client.ResourcesAPI.CancelResourceBackupExclusion(ctx, c.projectID, resourceId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to cancel resource backup exclusion"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}
+
+// OverrideDataClasses manually sets a resource's data classes, overriding auto-classification.
+func (c *EonClient) OverrideDataClasses(ctx context.Context, resourceId string, dataClasses []string) ([]string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	req := *externalEonSdkAPI.NewOverrideDataClassificationsRequest()
+	req.SetDataClasses(dataClasses)
+
+	resp, httpResp, err := c.client.ResourcesAPI.OverrideDataClasses(ctx, c.projectID, resourceId).OverrideDataClassificationsRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to override data classes"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	overridden := resp.GetDataClasses()
+	if overridden == nil {
+		return []string{}, nil
+	}
+	return overridden, nil
+}
+
+// RemoveDataClassesOverride removes a resource's data classes override, re-enabling auto-classification.
+func (c *EonClient) RemoveDataClassesOverride(ctx context.Context, resourceId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.ResourcesAPI.RemoveDataClassesOverride(ctx, c.projectID, resourceId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to remove data classes override"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}
+
 // ExcludeVolumeFromBackup excludes an EBS volume from future EC2 instance backups
 func (c *EonClient) ExcludeVolumeFromBackup(ctx context.Context, resourceId, volumeId string) error {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {

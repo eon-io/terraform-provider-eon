@@ -43,18 +43,22 @@ type fakeEonServer struct {
 	mu        sync.Mutex
 	projectID string
 
-	controls map[string]*externalEonSdkAPI.BackupPostureControl
-	idps     map[string]*externalEonSdkAPI.Idp
-	nextID   int
+	controls    map[string]*externalEonSdkAPI.BackupPostureControl
+	idps        map[string]*externalEonSdkAPI.Idp
+	permissions []externalEonSdkAPI.Permission
+	resources   map[string]*externalEonSdkAPI.InventoryResource
+	nextID      int
 }
 
 func newFakeEonServer(t *testing.T) *fakeEonServer {
 	t.Helper()
 	f := &fakeEonServer{
-		projectID: testAccProjectID,
-		controls:  make(map[string]*externalEonSdkAPI.BackupPostureControl),
-		idps:      make(map[string]*externalEonSdkAPI.Idp),
-		nextID:    1,
+		projectID:   testAccProjectID,
+		controls:    make(map[string]*externalEonSdkAPI.BackupPostureControl),
+		idps:        make(map[string]*externalEonSdkAPI.Idp),
+		permissions: []externalEonSdkAPI.Permission{},
+		resources:   make(map[string]*externalEonSdkAPI.InventoryResource),
+		nextID:      1,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", f.handle)
@@ -88,6 +92,37 @@ func (f *fakeEonServer) AddIdp(idp *externalEonSdkAPI.Idp) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.idps[idp.Id] = idp
+}
+
+func (f *fakeEonServer) AddPermission(permission *externalEonSdkAPI.Permission) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.permissions = append(f.permissions, *permission)
+}
+
+func (f *fakeEonServer) AddResource(resource *externalEonSdkAPI.InventoryResource) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.resources[resource.Id] = resource
+}
+
+func (f *fakeEonServer) CancelResourceExclusion(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if res, ok := f.resources[id]; ok {
+		res.BackupStatus = externalEonSdkAPI.PROTECTED
+	}
+}
+
+func (f *fakeEonServer) RemoveDataClassesOverride(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if res, ok := f.resources[id]; ok && res.Classifications != nil {
+		details := externalEonSdkAPI.NewDataClassesDetails()
+		details.SetIsOverridden(false)
+		details.SetDataClasses([]string{})
+		res.Classifications.SetDataClassesDetails(*details)
+	}
 }
 
 func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
@@ -137,6 +172,37 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && path == "/v1/idps/list":
 		f.handleListIdps(w, r)
 		return
+	case r.Method == http.MethodGet && path == "/v1/permissions":
+		f.handleListPermissions(w, r)
+		return
+	}
+
+	resourcesPrefix := fmt.Sprintf("/v1/projects/%s/resources/", f.projectID)
+	if strings.HasPrefix(path, resourcesPrefix) {
+		rest := strings.TrimPrefix(path, resourcesPrefix)
+		parts := strings.Split(rest, "/")
+		if len(parts) == 1 && r.Method == http.MethodGet {
+			f.handleGetResource(w, parts[0])
+			return
+		}
+		if len(parts) == 2 && parts[1] == "exclude" && r.Method == http.MethodPatch {
+			f.handleExcludeResource(w, parts[0])
+			return
+		}
+		if len(parts) == 2 && parts[1] == "include" && r.Method == http.MethodPatch {
+			f.handleIncludeResource(w, parts[0])
+			return
+		}
+		if len(parts) == 2 && parts[1] == "data-classifications" {
+			switch r.Method {
+			case http.MethodPatch:
+				f.handleOverrideDataClasses(w, r, parts[0])
+				return
+			case http.MethodDelete:
+				f.handleRemoveDataClassesOverride(w, parts[0])
+				return
+			}
+		}
 	}
 
 	http.NotFound(w, r)
@@ -238,6 +304,113 @@ func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func (f *fakeEonServer) handleListPermissions(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	items := make([]externalEonSdkAPI.Permission, len(f.permissions))
+	copy(items, f.permissions)
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewListPermissionsResponse(items))
+}
+
+func (f *fakeEonServer) handleGetResource(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	res, ok := f.resources[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewGetResourceResponse(*res))
+}
+
+func (f *fakeEonServer) handleExcludeResource(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	res, ok := f.resources[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	res.BackupStatus = externalEonSdkAPI.EXCLUDED_FROM_BACKUP
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewExcludeFromBackupResponse(true))
+}
+
+func (f *fakeEonServer) handleIncludeResource(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	res, ok := f.resources[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	res.BackupStatus = externalEonSdkAPI.PROTECTED
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewCancelExclusionFromBackupResponse(true))
+}
+
+func (f *fakeEonServer) handleOverrideDataClasses(w http.ResponseWriter, r *http.Request, id string) {
+	var req externalEonSdkAPI.OverrideDataClassificationsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	res, ok := f.resources[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	dataClasses := req.GetDataClasses()
+	if dataClasses == nil {
+		dataClasses = []string{}
+	}
+	details := externalEonSdkAPI.NewDataClassesDetails()
+	details.SetDataClasses(dataClasses)
+	details.SetIsOverridden(true)
+	if res.Classifications == nil {
+		res.Classifications = externalEonSdkAPI.NewClassifications()
+	}
+	res.Classifications.SetDataClassesDetails(*details)
+	resp := externalEonSdkAPI.NewOverrideDataClassificationsResponse()
+	resp.SetDataClasses(dataClasses)
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (f *fakeEonServer) handleRemoveDataClassesOverride(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	res, ok := f.resources[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	details := externalEonSdkAPI.NewDataClassesDetails()
+	details.SetIsOverridden(false)
+	details.SetDataClasses([]string{})
+	if res.Classifications == nil {
+		res.Classifications = externalEonSdkAPI.NewClassifications()
+	}
+	res.Classifications.SetDataClassesDetails(*details)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func newTestInventoryResource(id string) *externalEonSdkAPI.InventoryResource {
+	return externalEonSdkAPI.NewInventoryResource(
+		id,
+		externalEonSdkAPI.PROTECTED,
+		"i-1234567890abcdef0",
+		"demo-resource",
+		"123456789012",
+		*externalEonSdkAPI.NewSnapshotStorage(),
+		*externalEonSdkAPI.NewSourceStorage(),
+		map[string]string{},
+		externalEonSdkAPI.AWS,
+		externalEonSdkAPI.AWS_EC2,
+		"us-east-1",
+	)
 }
 
 func newTestIdp(id, name string) *externalEonSdkAPI.Idp {
