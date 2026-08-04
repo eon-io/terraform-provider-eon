@@ -1,8 +1,11 @@
 name: "Update Linear on Merge"
 description: "Update Linear ticket to Deployed state when a PR is merged"
 inputs:
-  linear_api_key:
-    description: "Linear API key"
+  oauth_client_id:
+    description: "Linear OAuth client ID for client_credentials flow"
+    required: true
+  oauth_client_secret:
+    description: "Linear OAuth client secret for client_credentials flow"
     required: true
   pr_title:
     description: "Pull request title"
@@ -20,7 +23,8 @@ runs:
     - name: Update Linear ticket
       shell: bash
       env:
-        LINEAR_API_KEY: ${{ inputs.linear_api_key }}
+        OAUTH_CLIENT_ID: ${{ inputs.oauth_client_id }}
+        OAUTH_CLIENT_SECRET: ${{ inputs.oauth_client_secret }}
         # A PR title is author-controlled text. Interpolating it into the script body would let
         # backticks in a title run as shell commands; an env var is expanded after bash parses.
         PR_TITLE: ${{ inputs.pr_title }}
