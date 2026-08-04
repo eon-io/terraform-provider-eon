@@ -20,6 +20,10 @@ type MockEonClient struct {
 	IdpGroups             map[string]*externalEonSdkAPI.IdpGroup
 	Idps                  map[string]*externalEonSdkAPI.Idp
 	Roles                 map[string]*externalEonSdkAPI.Role
+	Permissions           []externalEonSdkAPI.Permission
+	ResourceExclusions    map[string]bool
+	DataClassesOverrides  map[string][]string
+	InventoryResources    map[string]*externalEonSdkAPI.InventoryResource
 
 	// Behavior controls
 	ShouldFailCreate bool
@@ -41,6 +45,13 @@ type MockEonClient struct {
 	ShouldFailBackupPostureControlList   bool
 	// IdP list behavior
 	ShouldFailIdpList bool
+	// Permissions / resource override behavior
+	ShouldFailPermissionsList           bool
+	ShouldFailExcludeResource           bool
+	ShouldFailCancelResourceExclusion   bool
+	ShouldFailOverrideDataClasses       bool
+	ShouldFailRemoveDataClassesOverride bool
+	ShouldFailGetResource               bool
 
 	// Call tracking
 	CreateCalls                     int
@@ -59,6 +70,12 @@ type MockEonClient struct {
 	BackupPostureControlDeleteCalls int
 	BackupPostureControlListCalls   int
 	IdpListCalls                    int
+	PermissionsListCalls            int
+	ExcludeResourceCalls            int
+	CancelResourceExclusionCalls    int
+	OverrideDataClassesCalls        int
+	RemoveDataClassesOverrideCalls  int
+	GetResourceCalls                int
 
 	// Mock configuration
 	ProjectID string
@@ -72,6 +89,10 @@ func NewMockEonClient() *MockEonClient {
 		IdpGroups:             make(map[string]*externalEonSdkAPI.IdpGroup),
 		Idps:                  make(map[string]*externalEonSdkAPI.Idp),
 		Roles:                 make(map[string]*externalEonSdkAPI.Role),
+		Permissions:           []externalEonSdkAPI.Permission{},
+		ResourceExclusions:    make(map[string]bool),
+		DataClassesOverrides:  make(map[string][]string),
+		InventoryResources:    make(map[string]*externalEonSdkAPI.InventoryResource),
 		ProjectID:             "mock-project-id",
 	}
 }
@@ -209,6 +230,10 @@ func (m *MockEonClient) Reset() {
 	m.IdpGroups = make(map[string]*externalEonSdkAPI.IdpGroup)
 	m.Idps = make(map[string]*externalEonSdkAPI.Idp)
 	m.Roles = make(map[string]*externalEonSdkAPI.Role)
+	m.Permissions = []externalEonSdkAPI.Permission{}
+	m.ResourceExclusions = make(map[string]bool)
+	m.DataClassesOverrides = make(map[string][]string)
+	m.InventoryResources = make(map[string]*externalEonSdkAPI.InventoryResource)
 	m.CreateCalls = 0
 	m.ReadCalls = 0
 	m.UpdateCalls = 0
@@ -225,6 +250,12 @@ func (m *MockEonClient) Reset() {
 	m.BackupPostureControlDeleteCalls = 0
 	m.BackupPostureControlListCalls = 0
 	m.IdpListCalls = 0
+	m.PermissionsListCalls = 0
+	m.ExcludeResourceCalls = 0
+	m.CancelResourceExclusionCalls = 0
+	m.OverrideDataClassesCalls = 0
+	m.RemoveDataClassesOverrideCalls = 0
+	m.GetResourceCalls = 0
 	m.ShouldFailCreate = false
 	m.ShouldFailRead = false
 	m.ShouldFailUpdate = false
@@ -241,6 +272,12 @@ func (m *MockEonClient) Reset() {
 	m.ShouldFailBackupPostureControlDelete = false
 	m.ShouldFailBackupPostureControlList = false
 	m.ShouldFailIdpList = false
+	m.ShouldFailPermissionsList = false
+	m.ShouldFailExcludeResource = false
+	m.ShouldFailCancelResourceExclusion = false
+	m.ShouldFailOverrideDataClasses = false
+	m.ShouldFailRemoveDataClassesOverride = false
+	m.ShouldFailGetResource = false
 }
 
 // AddMockPolicy adds a pre-defined mock policy for testing
@@ -589,4 +626,122 @@ func (m *MockEonClient) AddMockIdp(idp *externalEonSdkAPI.Idp) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.Idps[idp.Id] = idp
+}
+
+// ListPermissions mocks listing permissions.
+func (m *MockEonClient) ListPermissions(ctx context.Context) ([]externalEonSdkAPI.Permission, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.PermissionsListCalls++
+	if m.ShouldFailPermissionsList {
+		return nil, fmt.Errorf("mock list permissions error")
+	}
+	out := make([]externalEonSdkAPI.Permission, len(m.Permissions))
+	copy(out, m.Permissions)
+	return out, nil
+}
+
+// AddMockPermission adds a pre-defined mock permission.
+func (m *MockEonClient) AddMockPermission(permission *externalEonSdkAPI.Permission) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Permissions = append(m.Permissions, *permission)
+}
+
+// ExcludeResourceFromBackup mocks excluding a resource from backup.
+func (m *MockEonClient) ExcludeResourceFromBackup(ctx context.Context, resourceId string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ExcludeResourceCalls++
+	if m.ShouldFailExcludeResource {
+		return fmt.Errorf("mock exclude resource error")
+	}
+	m.ResourceExclusions[resourceId] = true
+	if res, ok := m.InventoryResources[resourceId]; ok {
+		res.BackupStatus = externalEonSdkAPI.EXCLUDED_FROM_BACKUP
+	}
+	return nil
+}
+
+// CancelResourceBackupExclusion mocks cancelling a resource backup exclusion.
+func (m *MockEonClient) CancelResourceBackupExclusion(ctx context.Context, resourceId string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.CancelResourceExclusionCalls++
+	if m.ShouldFailCancelResourceExclusion {
+		return fmt.Errorf("mock cancel resource exclusion error")
+	}
+	delete(m.ResourceExclusions, resourceId)
+	if res, ok := m.InventoryResources[resourceId]; ok {
+		res.BackupStatus = externalEonSdkAPI.PROTECTED
+	}
+	return nil
+}
+
+// OverrideDataClasses mocks overriding data classes.
+func (m *MockEonClient) OverrideDataClasses(ctx context.Context, resourceId string, dataClasses []string) ([]string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.OverrideDataClassesCalls++
+	if m.ShouldFailOverrideDataClasses {
+		return nil, fmt.Errorf("mock override data classes error")
+	}
+	copied := append([]string{}, dataClasses...)
+	m.DataClassesOverrides[resourceId] = copied
+	if res, ok := m.InventoryResources[resourceId]; ok {
+		details := externalEonSdkAPI.NewDataClassesDetails()
+		details.SetDataClasses(copied)
+		details.SetIsOverridden(true)
+		if res.Classifications == nil {
+			res.Classifications = externalEonSdkAPI.NewClassifications()
+		}
+		res.Classifications.SetDataClassesDetails(*details)
+	}
+	return copied, nil
+}
+
+// RemoveDataClassesOverride mocks removing a data classes override.
+func (m *MockEonClient) RemoveDataClassesOverride(ctx context.Context, resourceId string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.RemoveDataClassesOverrideCalls++
+	if m.ShouldFailRemoveDataClassesOverride {
+		return fmt.Errorf("mock remove data classes override error")
+	}
+	delete(m.DataClassesOverrides, resourceId)
+	if res, ok := m.InventoryResources[resourceId]; ok && res.Classifications != nil {
+		details := externalEonSdkAPI.NewDataClassesDetails()
+		details.SetIsOverridden(false)
+		res.Classifications.SetDataClassesDetails(*details)
+	}
+	return nil
+}
+
+// GetResourceById mocks getting an inventory resource by ID.
+func (m *MockEonClient) GetResourceById(ctx context.Context, resourceId string) (*externalEonSdkAPI.InventoryResource, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.GetResourceCalls++
+	if m.ShouldFailGetResource {
+		return nil, fmt.Errorf("mock get resource error")
+	}
+	res, ok := m.InventoryResources[resourceId]
+	if !ok {
+		return nil, &APIError{StatusCode: 404, Message: "resource not found"}
+	}
+	copied := *res
+	return &copied, nil
+}
+
+// AddMockInventoryResource adds a pre-defined mock inventory resource.
+func (m *MockEonClient) AddMockInventoryResource(resource *externalEonSdkAPI.InventoryResource) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.InventoryResources[resource.Id] = resource
 }
