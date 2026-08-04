@@ -1124,13 +1124,28 @@ func (r *BackupPolicyResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	data.Id = types.StringValue(policy.Id)
-	data.Name = types.StringValue(policy.Name)
-	data.Enabled = types.BoolValue(policy.Enabled)
-	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
-	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	schemaType, ok := r.schemaObjectType(ctx)
+	if !ok {
+		resp.Diagnostics.AddError("Backup Policy Refresh Failed", "The backup policy schema is not an object type")
+		return
+	}
+
+	resp.Diagnostics.Append(flattenBackupPolicy(ctx, policy, schemaType, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// schemaObjectType exposes the resource schema as an object type so the refresh path can read the
+// shape of each nested attribute from the schema rather than restating it.
+func (r *BackupPolicyResource) schemaObjectType(ctx context.Context) (types.ObjectType, bool) {
+	var schemaResp resource.SchemaResponse
+	r.Schema(ctx, resource.SchemaRequest{}, &schemaResp)
+
+	objectType, ok := schemaResp.Schema.Type().(types.ObjectType)
+	return objectType, ok
 }
 
 func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -1587,10 +1602,10 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 		if monthlyConfigObj, exists := scheduleConfigAttrs["monthly_config"]; exists && !monthlyConfigObj.IsNull() {
 			monthlyConfigAttrs := monthlyConfigObj.(types.Object).Attributes()
 
-			// dayOfMonth, err := SafeInt32Conversion(monthlyConfigAttrs["day_of_month"].(types.Int64).ValueInt64())
-			// if err != nil {
-			//	return nil, fmt.Errorf("invalid day of month: %s", err)
-			// }
+			dayOfMonth, err := SafeInt32Conversion(monthlyConfigAttrs["day_of_month"].(types.Int64).ValueInt64())
+			if err != nil {
+				return nil, fmt.Errorf("invalid day of month: %s", err)
+			}
 
 			timeOfDayHour, err := SafeInt32Conversion(monthlyConfigAttrs["time_of_day_hour"].(types.Int64).ValueInt64())
 			if err != nil {
@@ -1608,7 +1623,7 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 
 			monthlyConfig := externalEonSdkAPI.NewMonthlyConfig()
 			monthlyConfig.SetTimeOfDay(*timeOfDay)
-			// Note: DayOfMonth might need to be set differently based on SDK implementation
+			monthlyConfig.SetDaysOfMonth([]int32{dayOfMonth})
 
 			if startWindowObj, exists := monthlyConfigAttrs["start_window_minutes"]; exists && !startWindowObj.IsNull() {
 				startWindow, err := SafeInt32Conversion(startWindowObj.(types.Int64).ValueInt64())
@@ -1629,10 +1644,15 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 		if annuallyConfigObj, exists := scheduleConfigAttrs["annually_config"]; exists && !annuallyConfigObj.IsNull() {
 			annuallyConfigAttrs := annuallyConfigObj.(types.Object).Attributes()
 
-			// dayOfMonth, err := SafeInt32Conversion(annuallyConfigAttrs["day_of_month"].(types.Int64).ValueInt64())
-			// if err != nil {
-			//	return nil, fmt.Errorf("invalid day of month: %s", err)
-			// }
+			dayOfMonth, err := SafeInt32Conversion(annuallyConfigAttrs["day_of_month"].(types.Int64).ValueInt64())
+			if err != nil {
+				return nil, fmt.Errorf("invalid day of month: %s", err)
+			}
+
+			month, err := monthNumber(annuallyConfigAttrs["month"].(types.String).ValueString())
+			if err != nil {
+				return nil, fmt.Errorf("invalid month: %s", err)
+			}
 
 			timeOfDayHour, err := SafeInt32Conversion(annuallyConfigAttrs["time_of_day_hour"].(types.Int64).ValueInt64())
 			if err != nil {
@@ -1650,7 +1670,7 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 
 			annuallyConfig := externalEonSdkAPI.NewAnnuallyConfig()
 			annuallyConfig.SetTimeOfDay(*timeOfDay)
-			// Note: Month and DayOfMonth might need to be set differently based on SDK implementation
+			annuallyConfig.SetTimeOfYear(*externalEonSdkAPI.NewTimeOfYear(month, dayOfMonth))
 
 			if startWindowObj, exists := annuallyConfigAttrs["start_window_minutes"]; exists && !startWindowObj.IsNull() {
 				startWindow, err := SafeInt32Conversion(startWindowObj.(types.Int64).ValueInt64())
