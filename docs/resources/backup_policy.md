@@ -553,9 +553,9 @@ output "backup_policies_summary" {
 
 ### Read-Only
 
-- `created_at` (String) Creation timestamp
+- `created_at` (String) Time at which Terraform created this policy. Eon does not report policy timestamps, so this records the local apply time and is not refreshed afterwards
 - `id` (String) Backup policy identifier
-- `updated_at` (String) Last update timestamp
+- `updated_at` (String) Time at which Terraform last applied a change to this policy. Eon does not report policy timestamps, so this records the local apply time and is not refreshed afterwards
 
 <a id="nestedatt--backup_plan"></a>
 ### Nested Schema for `backup_plan`

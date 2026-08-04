@@ -803,11 +803,11 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 				},
 			},
 			"created_at": schema.StringAttribute{
-				MarkdownDescription: "Creation timestamp",
+				MarkdownDescription: "Time at which Terraform created this policy. Eon does not report policy timestamps, so this records the local apply time and is not refreshed afterwards",
 				Computed:            true,
 			},
 			"updated_at": schema.StringAttribute{
-				MarkdownDescription: "Last update timestamp",
+				MarkdownDescription: "Time at which Terraform last applied a change to this policy. Eon does not report policy timestamps, so this records the local apply time and is not refreshed afterwards",
 				Computed:            true,
 			},
 		},
@@ -836,8 +836,17 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	resourceSelectorAttrs := data.ResourceSelector.Attributes()
-	resourceSelectionMode := resourceSelectorAttrs["resource_selection_mode"].(types.String)
+	resourceSelectorAttrs, err := objectAttributes(data.ResourceSelector, "resource_selector")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Resource Selector", err.Error())
+		return
+	}
+
+	resourceSelectionMode, err := stringAttr(resourceSelectorAttrs, "resource_selector", "resource_selection_mode")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Resource Selector", err.Error())
+		return
+	}
 
 	resourceSelector := externalEonSdkAPI.NewBackupPolicyResourceSelector(
 		externalEonSdkAPI.ResourceSelectorMode(resourceSelectionMode.ValueString()),
@@ -878,8 +887,17 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		resourceSelector.SetResourceExclusionOverride(exclusionOverride)
 	}
 
-	backupPlanAttrs := data.BackupPlan.Attributes()
-	backupPolicyType := backupPlanAttrs["backup_policy_type"].(types.String)
+	backupPlanAttrs, err := objectAttributes(data.BackupPlan, "backup_plan")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Backup Plan", err.Error())
+		return
+	}
+
+	backupPolicyType, err := stringAttr(backupPlanAttrs, "backup_plan", "backup_policy_type")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Backup Plan", err.Error())
+		return
+	}
 
 	backupPlan := externalEonSdkAPI.NewBackupPolicyPlan(
 		externalEonSdkAPI.BackupPolicyType(backupPolicyType.ValueString()),
@@ -888,7 +906,11 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 	var diags diag.Diagnostics
 	switch backupPolicyType.ValueString() {
 	case "STANDARD", "PITR":
-		standardPlanObj := backupPlanAttrs["standard_plan"].(types.Object)
+		standardPlanObj, err := requiredPlanObject(backupPlanAttrs, "standard_plan", backupPolicyType.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Missing Standard Plan", err.Error())
+			return
+		}
 		var standardPlanModel StandardPlanModel
 		diags = standardPlanObj.As(ctx, &standardPlanModel, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
@@ -936,7 +958,11 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
-		highFrequencyPlanObj := backupPlanAttrs["high_frequency_plan"].(types.Object)
+		highFrequencyPlanObj, err := requiredPlanObject(backupPlanAttrs, "high_frequency_plan", backupPolicyType.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Missing High Frequency Plan", err.Error())
+			return
+		}
 		var highFrequencyPlanModel HighFrequencyPlanModel
 		diags = highFrequencyPlanObj.As(ctx, &highFrequencyPlanModel, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
@@ -1121,8 +1147,17 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	resourceSelectorAttrs := plan.ResourceSelector.Attributes()
-	resourceSelectionMode := resourceSelectorAttrs["resource_selection_mode"].(types.String)
+	resourceSelectorAttrs, err := objectAttributes(plan.ResourceSelector, "resource_selector")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Resource Selector", err.Error())
+		return
+	}
+
+	resourceSelectionMode, err := stringAttr(resourceSelectorAttrs, "resource_selector", "resource_selection_mode")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Resource Selector", err.Error())
+		return
+	}
 
 	resourceSelector := externalEonSdkAPI.NewBackupPolicyResourceSelector(
 		externalEonSdkAPI.ResourceSelectorMode(resourceSelectionMode.ValueString()),
@@ -1163,8 +1198,17 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		resourceSelector.SetResourceExclusionOverride(exclusionOverride)
 	}
 
-	backupPlanAttrs := plan.BackupPlan.Attributes()
-	backupPolicyType := backupPlanAttrs["backup_policy_type"].(types.String)
+	backupPlanAttrs, err := objectAttributes(plan.BackupPlan, "backup_plan")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Backup Plan", err.Error())
+		return
+	}
+
+	backupPolicyType, err := stringAttr(backupPlanAttrs, "backup_plan", "backup_policy_type")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Backup Plan", err.Error())
+		return
+	}
 
 	backupPlan := externalEonSdkAPI.NewBackupPolicyPlan(
 		externalEonSdkAPI.BackupPolicyType(backupPolicyType.ValueString()),
@@ -1172,7 +1216,11 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 
 	switch backupPolicyType.ValueString() {
 	case "STANDARD", "PITR":
-		standardPlanObj := backupPlanAttrs["standard_plan"].(types.Object)
+		standardPlanObj, err := requiredPlanObject(backupPlanAttrs, "standard_plan", backupPolicyType.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Missing Standard Plan", err.Error())
+			return
+		}
 		var standardPlanModel StandardPlanModel
 		diags := standardPlanObj.As(ctx, &standardPlanModel, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
@@ -1220,7 +1268,11 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
-		highFrequencyPlanObj := backupPlanAttrs["high_frequency_plan"].(types.Object)
+		highFrequencyPlanObj, err := requiredPlanObject(backupPlanAttrs, "high_frequency_plan", backupPolicyType.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Missing High Frequency Plan", err.Error())
+			return
+		}
 		var highFrequencyPlanModel HighFrequencyPlanModel
 		diags := highFrequencyPlanObj.As(ctx, &highFrequencyPlanModel, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
@@ -1352,7 +1404,10 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 	plan.Id = types.StringValue(updatedPolicy.Id)
 	plan.Name = types.StringValue(updatedPolicy.Name)
 	plan.Enabled = types.BoolValue(updatedPolicy.Enabled)
-	plan.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	plan.CreatedAt = state.CreatedAt
+	if plan.CreatedAt.IsNull() || plan.CreatedAt.IsUnknown() {
+		plan.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	}
 	plan.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
