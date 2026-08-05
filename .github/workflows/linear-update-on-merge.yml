@@ -21,6 +21,7 @@ jobs:
       - name: Update Linear ticket to Deployed
         uses: ./.github/actions/update-linear-on-merge
         with:
-          linear_api_key: ${{ secrets.LINEAR_API_KEY }}
+          oauth_client_id: ${{ secrets.LINEAR_OAUTH_CLIENT_ID }}
+          oauth_client_secret: ${{ secrets.LINEAR_OAUTH_CLIENT_SECRET }}
           pr_title: ${{ github.event.pull_request.title }}
           pr_branch: ${{ github.event.pull_request.head.ref }}

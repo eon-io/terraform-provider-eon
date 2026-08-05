@@ -803,11 +803,11 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 				},
 			},
 			"created_at": schema.StringAttribute{
-				MarkdownDescription: "Creation timestamp",
+				MarkdownDescription: "Time at which Terraform created this policy. Eon does not report policy timestamps, so this records the local apply time and is not refreshed afterwards",
 				Computed:            true,
 			},
 			"updated_at": schema.StringAttribute{
-				MarkdownDescription: "Last update timestamp",
+				MarkdownDescription: "Time at which Terraform last applied a change to this policy. Eon does not report policy timestamps, so this records the local apply time and is not refreshed afterwards",
 				Computed:            true,
 			},
 		},
@@ -836,8 +836,17 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	resourceSelectorAttrs := data.ResourceSelector.Attributes()
-	resourceSelectionMode := resourceSelectorAttrs["resource_selection_mode"].(types.String)
+	resourceSelectorAttrs, err := objectAttributes(data.ResourceSelector, "resource_selector")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Resource Selector", err.Error())
+		return
+	}
+
+	resourceSelectionMode, err := stringAttr(resourceSelectorAttrs, "resource_selector", "resource_selection_mode")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Resource Selector", err.Error())
+		return
+	}
 
 	resourceSelector := externalEonSdkAPI.NewBackupPolicyResourceSelector(
 		externalEonSdkAPI.ResourceSelectorMode(resourceSelectionMode.ValueString()),
@@ -878,8 +887,17 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		resourceSelector.SetResourceExclusionOverride(exclusionOverride)
 	}
 
-	backupPlanAttrs := data.BackupPlan.Attributes()
-	backupPolicyType := backupPlanAttrs["backup_policy_type"].(types.String)
+	backupPlanAttrs, err := objectAttributes(data.BackupPlan, "backup_plan")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Backup Plan", err.Error())
+		return
+	}
+
+	backupPolicyType, err := stringAttr(backupPlanAttrs, "backup_plan", "backup_policy_type")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Backup Plan", err.Error())
+		return
+	}
 
 	backupPlan := externalEonSdkAPI.NewBackupPolicyPlan(
 		externalEonSdkAPI.BackupPolicyType(backupPolicyType.ValueString()),
@@ -888,7 +906,11 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 	var diags diag.Diagnostics
 	switch backupPolicyType.ValueString() {
 	case "STANDARD", "PITR":
-		standardPlanObj := backupPlanAttrs["standard_plan"].(types.Object)
+		standardPlanObj, err := requiredPlanObject(backupPlanAttrs, "standard_plan", backupPolicyType.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Missing Standard Plan", err.Error())
+			return
+		}
 		var standardPlanModel StandardPlanModel
 		diags = standardPlanObj.As(ctx, &standardPlanModel, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
@@ -936,7 +958,11 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
-		highFrequencyPlanObj := backupPlanAttrs["high_frequency_plan"].(types.Object)
+		highFrequencyPlanObj, err := requiredPlanObject(backupPlanAttrs, "high_frequency_plan", backupPolicyType.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Missing High Frequency Plan", err.Error())
+			return
+		}
 		var highFrequencyPlanModel HighFrequencyPlanModel
 		diags = highFrequencyPlanObj.As(ctx, &highFrequencyPlanModel, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
@@ -1098,13 +1124,28 @@ func (r *BackupPolicyResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	data.Id = types.StringValue(policy.Id)
-	data.Name = types.StringValue(policy.Name)
-	data.Enabled = types.BoolValue(policy.Enabled)
-	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
-	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	schemaType, ok := r.schemaObjectType(ctx)
+	if !ok {
+		resp.Diagnostics.AddError("Backup Policy Refresh Failed", "The backup policy schema is not an object type")
+		return
+	}
+
+	resp.Diagnostics.Append(flattenBackupPolicy(ctx, policy, schemaType, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// schemaObjectType exposes the resource schema as an object type so the refresh path can read the
+// shape of each nested attribute from the schema rather than restating it.
+func (r *BackupPolicyResource) schemaObjectType(ctx context.Context) (types.ObjectType, bool) {
+	var schemaResp resource.SchemaResponse
+	r.Schema(ctx, resource.SchemaRequest{}, &schemaResp)
+
+	objectType, ok := schemaResp.Schema.Type().(types.ObjectType)
+	return objectType, ok
 }
 
 func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -1121,8 +1162,17 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	resourceSelectorAttrs := plan.ResourceSelector.Attributes()
-	resourceSelectionMode := resourceSelectorAttrs["resource_selection_mode"].(types.String)
+	resourceSelectorAttrs, err := objectAttributes(plan.ResourceSelector, "resource_selector")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Resource Selector", err.Error())
+		return
+	}
+
+	resourceSelectionMode, err := stringAttr(resourceSelectorAttrs, "resource_selector", "resource_selection_mode")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Resource Selector", err.Error())
+		return
+	}
 
 	resourceSelector := externalEonSdkAPI.NewBackupPolicyResourceSelector(
 		externalEonSdkAPI.ResourceSelectorMode(resourceSelectionMode.ValueString()),
@@ -1163,8 +1213,17 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		resourceSelector.SetResourceExclusionOverride(exclusionOverride)
 	}
 
-	backupPlanAttrs := plan.BackupPlan.Attributes()
-	backupPolicyType := backupPlanAttrs["backup_policy_type"].(types.String)
+	backupPlanAttrs, err := objectAttributes(plan.BackupPlan, "backup_plan")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Backup Plan", err.Error())
+		return
+	}
+
+	backupPolicyType, err := stringAttr(backupPlanAttrs, "backup_plan", "backup_policy_type")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Backup Plan", err.Error())
+		return
+	}
 
 	backupPlan := externalEonSdkAPI.NewBackupPolicyPlan(
 		externalEonSdkAPI.BackupPolicyType(backupPolicyType.ValueString()),
@@ -1172,7 +1231,11 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 
 	switch backupPolicyType.ValueString() {
 	case "STANDARD", "PITR":
-		standardPlanObj := backupPlanAttrs["standard_plan"].(types.Object)
+		standardPlanObj, err := requiredPlanObject(backupPlanAttrs, "standard_plan", backupPolicyType.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Missing Standard Plan", err.Error())
+			return
+		}
 		var standardPlanModel StandardPlanModel
 		diags := standardPlanObj.As(ctx, &standardPlanModel, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
@@ -1220,7 +1283,11 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
-		highFrequencyPlanObj := backupPlanAttrs["high_frequency_plan"].(types.Object)
+		highFrequencyPlanObj, err := requiredPlanObject(backupPlanAttrs, "high_frequency_plan", backupPolicyType.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Missing High Frequency Plan", err.Error())
+			return
+		}
 		var highFrequencyPlanModel HighFrequencyPlanModel
 		diags := highFrequencyPlanObj.As(ctx, &highFrequencyPlanModel, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
@@ -1352,7 +1419,10 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 	plan.Id = types.StringValue(updatedPolicy.Id)
 	plan.Name = types.StringValue(updatedPolicy.Name)
 	plan.Enabled = types.BoolValue(updatedPolicy.Enabled)
-	plan.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	plan.CreatedAt = state.CreatedAt
+	if plan.CreatedAt.IsNull() || plan.CreatedAt.IsUnknown() {
+		plan.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	}
 	plan.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -1532,10 +1602,10 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 		if monthlyConfigObj, exists := scheduleConfigAttrs["monthly_config"]; exists && !monthlyConfigObj.IsNull() {
 			monthlyConfigAttrs := monthlyConfigObj.(types.Object).Attributes()
 
-			// dayOfMonth, err := SafeInt32Conversion(monthlyConfigAttrs["day_of_month"].(types.Int64).ValueInt64())
-			// if err != nil {
-			//	return nil, fmt.Errorf("invalid day of month: %s", err)
-			// }
+			dayOfMonth, err := SafeInt32Conversion(monthlyConfigAttrs["day_of_month"].(types.Int64).ValueInt64())
+			if err != nil {
+				return nil, fmt.Errorf("invalid day of month: %s", err)
+			}
 
 			timeOfDayHour, err := SafeInt32Conversion(monthlyConfigAttrs["time_of_day_hour"].(types.Int64).ValueInt64())
 			if err != nil {
@@ -1553,7 +1623,7 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 
 			monthlyConfig := externalEonSdkAPI.NewMonthlyConfig()
 			monthlyConfig.SetTimeOfDay(*timeOfDay)
-			// Note: DayOfMonth might need to be set differently based on SDK implementation
+			monthlyConfig.SetDaysOfMonth([]int32{dayOfMonth})
 
 			if startWindowObj, exists := monthlyConfigAttrs["start_window_minutes"]; exists && !startWindowObj.IsNull() {
 				startWindow, err := SafeInt32Conversion(startWindowObj.(types.Int64).ValueInt64())
@@ -1574,10 +1644,15 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 		if annuallyConfigObj, exists := scheduleConfigAttrs["annually_config"]; exists && !annuallyConfigObj.IsNull() {
 			annuallyConfigAttrs := annuallyConfigObj.(types.Object).Attributes()
 
-			// dayOfMonth, err := SafeInt32Conversion(annuallyConfigAttrs["day_of_month"].(types.Int64).ValueInt64())
-			// if err != nil {
-			//	return nil, fmt.Errorf("invalid day of month: %s", err)
-			// }
+			dayOfMonth, err := SafeInt32Conversion(annuallyConfigAttrs["day_of_month"].(types.Int64).ValueInt64())
+			if err != nil {
+				return nil, fmt.Errorf("invalid day of month: %s", err)
+			}
+
+			month, err := monthNumber(annuallyConfigAttrs["month"].(types.String).ValueString())
+			if err != nil {
+				return nil, fmt.Errorf("invalid month: %s", err)
+			}
 
 			timeOfDayHour, err := SafeInt32Conversion(annuallyConfigAttrs["time_of_day_hour"].(types.Int64).ValueInt64())
 			if err != nil {
@@ -1595,7 +1670,7 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 
 			annuallyConfig := externalEonSdkAPI.NewAnnuallyConfig()
 			annuallyConfig.SetTimeOfDay(*timeOfDay)
-			// Note: Month and DayOfMonth might need to be set differently based on SDK implementation
+			annuallyConfig.SetTimeOfYear(*externalEonSdkAPI.NewTimeOfYear(month, dayOfMonth))
 
 			if startWindowObj, exists := annuallyConfigAttrs["start_window_minutes"]; exists && !startWindowObj.IsNull() {
 				startWindow, err := SafeInt32Conversion(startWindowObj.(types.Int64).ValueInt64())
