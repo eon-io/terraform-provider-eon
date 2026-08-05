@@ -23,7 +23,9 @@ type MockEonClient struct {
 	Permissions           []externalEonSdkAPI.Permission
 	ResourceExclusions    map[string]bool
 	DataClassesOverrides  map[string][]string
+	EnvironmentOverrides  map[string]string
 	InventoryResources    map[string]*externalEonSdkAPI.InventoryResource
+	ResourceSnapshots     map[string][]externalEonSdkAPI.Snapshot
 
 	// Behavior controls
 	ShouldFailCreate bool
@@ -51,6 +53,10 @@ type MockEonClient struct {
 	ShouldFailCancelResourceExclusion   bool
 	ShouldFailOverrideDataClasses       bool
 	ShouldFailRemoveDataClassesOverride bool
+	ShouldFailOverrideEnvironment       bool
+	ShouldFailRemoveEnvironmentOverride bool
+	ShouldFailListResources             bool
+	ShouldFailListResourceSnapshots     bool
 	ShouldFailGetResource               bool
 
 	// Call tracking
@@ -75,6 +81,10 @@ type MockEonClient struct {
 	CancelResourceExclusionCalls    int
 	OverrideDataClassesCalls        int
 	RemoveDataClassesOverrideCalls  int
+	OverrideEnvironmentCalls        int
+	RemoveEnvironmentOverrideCalls  int
+	ListResourcesCalls              int
+	ListResourceSnapshotsCalls      int
 	GetResourceCalls                int
 
 	// Mock configuration
@@ -92,7 +102,9 @@ func NewMockEonClient() *MockEonClient {
 		Permissions:           []externalEonSdkAPI.Permission{},
 		ResourceExclusions:    make(map[string]bool),
 		DataClassesOverrides:  make(map[string][]string),
+		EnvironmentOverrides:  make(map[string]string),
 		InventoryResources:    make(map[string]*externalEonSdkAPI.InventoryResource),
+		ResourceSnapshots:     make(map[string][]externalEonSdkAPI.Snapshot),
 		ProjectID:             "mock-project-id",
 	}
 }
@@ -233,7 +245,9 @@ func (m *MockEonClient) Reset() {
 	m.Permissions = []externalEonSdkAPI.Permission{}
 	m.ResourceExclusions = make(map[string]bool)
 	m.DataClassesOverrides = make(map[string][]string)
+	m.EnvironmentOverrides = make(map[string]string)
 	m.InventoryResources = make(map[string]*externalEonSdkAPI.InventoryResource)
+	m.ResourceSnapshots = make(map[string][]externalEonSdkAPI.Snapshot)
 	m.CreateCalls = 0
 	m.ReadCalls = 0
 	m.UpdateCalls = 0
@@ -255,6 +269,10 @@ func (m *MockEonClient) Reset() {
 	m.CancelResourceExclusionCalls = 0
 	m.OverrideDataClassesCalls = 0
 	m.RemoveDataClassesOverrideCalls = 0
+	m.OverrideEnvironmentCalls = 0
+	m.RemoveEnvironmentOverrideCalls = 0
+	m.ListResourcesCalls = 0
+	m.ListResourceSnapshotsCalls = 0
 	m.GetResourceCalls = 0
 	m.ShouldFailCreate = false
 	m.ShouldFailRead = false
@@ -277,6 +295,10 @@ func (m *MockEonClient) Reset() {
 	m.ShouldFailCancelResourceExclusion = false
 	m.ShouldFailOverrideDataClasses = false
 	m.ShouldFailRemoveDataClassesOverride = false
+	m.ShouldFailOverrideEnvironment = false
+	m.ShouldFailRemoveEnvironmentOverride = false
+	m.ShouldFailListResources = false
+	m.ShouldFailListResourceSnapshots = false
 	m.ShouldFailGetResource = false
 }
 
@@ -744,4 +766,96 @@ func (m *MockEonClient) AddMockInventoryResource(resource *externalEonSdkAPI.Inv
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.InventoryResources[resource.Id] = resource
+}
+
+// OverrideEnvironment mocks overriding a resource environment.
+func (m *MockEonClient) OverrideEnvironment(ctx context.Context, resourceId string, environment string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.OverrideEnvironmentCalls++
+	if m.ShouldFailOverrideEnvironment {
+		return "", fmt.Errorf("mock override environment error")
+	}
+	m.EnvironmentOverrides[resourceId] = environment
+	if res, ok := m.InventoryResources[resourceId]; ok {
+		details := externalEonSdkAPI.NewEnvironmentDetails()
+		details.SetEnvironment(externalEonSdkAPI.Environment(environment))
+		details.SetIsOverridden(true)
+		if res.Classifications == nil {
+			res.Classifications = externalEonSdkAPI.NewClassifications()
+		}
+		res.Classifications.SetEnvironmentDetails(*details)
+	}
+	return environment, nil
+}
+
+// RemoveEnvironmentOverride mocks removing an environment override.
+func (m *MockEonClient) RemoveEnvironmentOverride(ctx context.Context, resourceId string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.RemoveEnvironmentOverrideCalls++
+	if m.ShouldFailRemoveEnvironmentOverride {
+		return fmt.Errorf("mock remove environment override error")
+	}
+	delete(m.EnvironmentOverrides, resourceId)
+	if res, ok := m.InventoryResources[resourceId]; ok && res.Classifications != nil {
+		details := externalEonSdkAPI.NewEnvironmentDetails()
+		details.SetIsOverridden(false)
+		res.Classifications.SetEnvironmentDetails(*details)
+	}
+	return nil
+}
+
+// ListResources mocks listing inventory resources.
+func (m *MockEonClient) ListResources(ctx context.Context, filters *externalEonSdkAPI.InventoryFilterConditions) ([]externalEonSdkAPI.InventoryResource, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListResourcesCalls++
+	if m.ShouldFailListResources {
+		return nil, fmt.Errorf("mock list resources error")
+	}
+
+	out := make([]externalEonSdkAPI.InventoryResource, 0, len(m.InventoryResources))
+	for _, res := range m.InventoryResources {
+		if filters != nil && filters.Id != nil && len(filters.Id.GetIn()) > 0 {
+			matched := false
+			for _, id := range filters.Id.GetIn() {
+				if res.GetId() == id {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		out = append(out, *res)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Id < out[j].Id })
+	return out, nil
+}
+
+// ListResourceSnapshots mocks listing snapshots for a resource.
+func (m *MockEonClient) ListResourceSnapshots(ctx context.Context, resourceId string, filters *externalEonSdkAPI.SnapshotFilterConditions) ([]externalEonSdkAPI.Snapshot, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListResourceSnapshotsCalls++
+	if m.ShouldFailListResourceSnapshots {
+		return nil, fmt.Errorf("mock list resource snapshots error")
+	}
+	snapshots := m.ResourceSnapshots[resourceId]
+	out := make([]externalEonSdkAPI.Snapshot, len(snapshots))
+	copy(out, snapshots)
+	return out, nil
+}
+
+// AddMockResourceSnapshot adds a pre-defined mock snapshot for a resource.
+func (m *MockEonClient) AddMockResourceSnapshot(resourceId string, snapshot *externalEonSdkAPI.Snapshot) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ResourceSnapshots[resourceId] = append(m.ResourceSnapshots[resourceId], *snapshot)
 }

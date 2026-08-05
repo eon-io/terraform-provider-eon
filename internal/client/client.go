@@ -1232,6 +1232,171 @@ func (c *EonClient) RemoveDataClassesOverride(ctx context.Context, resourceId st
 	return nil
 }
 
+// OverrideEnvironment manually sets a resource's environment, overriding auto-classification.
+func (c *EonClient) OverrideEnvironment(ctx context.Context, resourceId string, environment string) (string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return "", fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	req := *externalEonSdkAPI.NewOverrideEnvironmentRequest()
+	req.SetEnvironment(externalEonSdkAPI.Environment(environment))
+
+	resp, httpResp, err := c.client.ResourcesAPI.OverrideEnvironment(ctx, c.projectID, resourceId).OverrideEnvironmentRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to override environment"); apiErr != nil {
+		return "", apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return "", &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return string(resp.GetEnvironment()), nil
+}
+
+// RemoveEnvironmentOverride removes a resource's environment override, re-enabling auto-classification.
+func (c *EonClient) RemoveEnvironmentOverride(ctx context.Context, resourceId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.ResourcesAPI.RemoveEnvironmentOverride(ctx, c.projectID, resourceId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to remove environment override"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}
+
+// ListResources retrieves inventory resources for the project, optionally filtered.
+// It paginates through all pages to return the complete list.
+func (c *EonClient) ListResources(ctx context.Context, filters *externalEonSdkAPI.InventoryFilterConditions) ([]externalEonSdkAPI.InventoryResource, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	listReq := *externalEonSdkAPI.NewListInventoryRequest()
+	if filters != nil {
+		listReq.SetFilters(*filters)
+	}
+
+	var all []externalEonSdkAPI.InventoryResource
+	var pageToken string
+
+	for {
+		req := c.client.ResourcesAPI.ListResources(ctx, c.projectID).
+			PageSize(100).
+			ListInventoryRequest(listReq)
+		if pageToken != "" {
+			req = req.PageToken(pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list resources"); apiErr != nil {
+			if httpResp != nil {
+				_ = httpResp.Body.Close()
+			}
+			return nil, apiErr
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			_ = httpResp.Body.Close()
+			return nil, &APIError{
+				StatusCode: httpResp.StatusCode,
+				Message:    string(body),
+			}
+		}
+
+		if resp.GetResources() != nil {
+			all = append(all, resp.GetResources()...)
+		}
+
+		hasMore := resp.HasNextToken() && resp.GetNextToken() != ""
+		_ = httpResp.Body.Close()
+		if !hasMore {
+			break
+		}
+		pageToken = resp.GetNextToken()
+	}
+
+	if all == nil {
+		return []externalEonSdkAPI.InventoryResource{}, nil
+	}
+	return all, nil
+}
+
+// ListResourceSnapshots retrieves snapshots for an inventory resource, optionally filtered.
+// It paginates through all pages to return the complete list.
+func (c *EonClient) ListResourceSnapshots(ctx context.Context, resourceId string, filters *externalEonSdkAPI.SnapshotFilterConditions) ([]externalEonSdkAPI.Snapshot, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	listReq := *externalEonSdkAPI.NewListInventorySnapshotsRequest()
+	if filters != nil {
+		listReq.SetFilters(*filters)
+	}
+
+	var all []externalEonSdkAPI.Snapshot
+	var pageToken string
+
+	for {
+		req := c.client.SnapshotsAPI.ListResourceSnapshots(ctx, c.projectID, resourceId).
+			PageSize(100).
+			ListInventorySnapshotsRequest(listReq)
+		if pageToken != "" {
+			req = req.PageToken(pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list resource snapshots"); apiErr != nil {
+			if httpResp != nil {
+				_ = httpResp.Body.Close()
+			}
+			return nil, apiErr
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			_ = httpResp.Body.Close()
+			return nil, &APIError{
+				StatusCode: httpResp.StatusCode,
+				Message:    string(body),
+			}
+		}
+
+		if resp.GetSnapshots() != nil {
+			all = append(all, resp.GetSnapshots()...)
+		}
+
+		hasMore := resp.HasNextToken() && resp.GetNextToken() != ""
+		_ = httpResp.Body.Close()
+		if !hasMore {
+			break
+		}
+		pageToken = resp.GetNextToken()
+	}
+
+	if all == nil {
+		return []externalEonSdkAPI.Snapshot{}, nil
+	}
+	return all, nil
+}
+
 // ExcludeVolumeFromBackup excludes an EBS volume from future EC2 instance backups
 func (c *EonClient) ExcludeVolumeFromBackup(ctx context.Context, resourceId, volumeId string) error {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
