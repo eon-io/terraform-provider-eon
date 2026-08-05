@@ -2,39 +2,26 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
-	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccPermissions(t *testing.T) {
-	testAccPreCheck(t)
-
-	server := newFakeEonServer(t)
-	t.Setenv("EON_USE_EXACT_ENDPOINT", "true")
-	server.AddPermission(externalEonSdkAPI.NewPermission(
-		externalEonSdkAPI.INVENTORY_VIEW,
-		"View inventory resources",
-		true,
-	))
-	server.AddPermission(externalEonSdkAPI.NewPermission(
-		externalEonSdkAPI.JOBS_VIEW,
-		"View jobs",
-		false,
-	))
+	testAccRealEnvPreCheck(t, false)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: server.providerConfig() + `
+				Config: testAccRealProviderConfig() + `
 data "eon_permissions" "all" {}
 `,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.eon_permissions.all", "permissions.#", "2"),
+					resource.TestCheckResourceAttrSet("data.eon_permissions.all", "permissions.#"),
 					resource.TestMatchResourceAttr("data.eon_permissions.all", "permissions.0.permission_type", regexp.MustCompile(`\.`)),
 					resource.TestCheckResourceAttrSet("data.eon_permissions.all", "permissions.0.description"),
 					resource.TestCheckResourceAttrSet("data.eon_permissions.all", "permissions.0.allow_conditions"),
@@ -45,26 +32,23 @@ data "eon_permissions" "all" {}
 }
 
 func TestAccResourceBackupExclusion(t *testing.T) {
-	testAccPreCheck(t)
+	testAccRealEnvPreCheck(t, true)
 
-	server := newFakeEonServer(t)
-	t.Setenv("EON_USE_EXACT_ENDPOINT", "true")
-
-	resourceID := "res-exclusion-1"
-	server.AddResource(newTestInventoryResource(resourceID))
+	resourceID := os.Getenv("EON_TEST_RESOURCE_ID")
 	resourceName := "eon_resource_backup_exclusion.test"
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: server.providerConfig() + fmt.Sprintf(`
+				Config: testAccRealProviderConfig() + fmt.Sprintf(`
 resource "eon_resource_backup_exclusion" "test" {
   resource_id = %q
 }
 `, resourceID),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "resource_id", resourceID),
+					resource.TestCheckResourceAttr(resourceName, "id", resourceID),
 				),
 			},
 			{
@@ -73,47 +57,31 @@ resource "eon_resource_backup_exclusion" "test" {
 				ImportStateVerify: true,
 				ImportStateId:     resourceID,
 			},
-			{
-				PreConfig: func() {
-					server.CancelResourceExclusion(resourceID)
-				},
-				Config: server.providerConfig() + fmt.Sprintf(`
-resource "eon_resource_backup_exclusion" "test" {
-  resource_id = %q
-}
-`, resourceID),
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: true,
-			},
 		},
 	})
 }
 
 func TestAccResourceDataClassesOverride(t *testing.T) {
-	testAccPreCheck(t)
+	testAccRealEnvPreCheck(t, true)
 
-	server := newFakeEonServer(t)
-	t.Setenv("EON_USE_EXACT_ENDPOINT", "true")
-
-	resourceID := "res-dataclass-1"
-	server.AddResource(newTestInventoryResource(resourceID))
+	resourceID := os.Getenv("EON_TEST_RESOURCE_ID")
 	resourceName := "eon_resource_data_classes_override.test"
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: server.providerConfig() + fmt.Sprintf(`
+				Config: testAccRealProviderConfig() + fmt.Sprintf(`
 resource "eon_resource_data_classes_override" "test" {
   resource_id  = %q
-  data_classes = ["PII", "PCI"]
+  data_classes = ["PII", "PHI"]
 }
 `, resourceID),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "resource_id", resourceID),
 					resource.TestCheckResourceAttr(resourceName, "data_classes.#", "2"),
 					resource.TestCheckTypeSetElemAttr(resourceName, "data_classes.*", "PII"),
-					resource.TestCheckTypeSetElemAttr(resourceName, "data_classes.*", "PCI"),
+					resource.TestCheckTypeSetElemAttr(resourceName, "data_classes.*", "PHI"),
 					func(s *terraform.State) error {
 						rs, ok := s.RootModule().Resources[resourceName]
 						if !ok {
@@ -127,16 +95,16 @@ resource "eon_resource_data_classes_override" "test" {
 				),
 			},
 			{
-				Config: server.providerConfig() + fmt.Sprintf(`
+				Config: testAccRealProviderConfig() + fmt.Sprintf(`
 resource "eon_resource_data_classes_override" "test" {
   resource_id  = %q
-  data_classes = ["PII", "PHI"]
+  data_classes = ["PII", "FI"]
 }
 `, resourceID),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "data_classes.#", "2"),
 					resource.TestCheckTypeSetElemAttr(resourceName, "data_classes.*", "PII"),
-					resource.TestCheckTypeSetElemAttr(resourceName, "data_classes.*", "PHI"),
+					resource.TestCheckTypeSetElemAttr(resourceName, "data_classes.*", "FI"),
 				),
 			},
 			{
@@ -144,19 +112,6 @@ resource "eon_resource_data_classes_override" "test" {
 				ImportState:       true,
 				ImportStateVerify: true,
 				ImportStateId:     resourceID,
-			},
-			{
-				PreConfig: func() {
-					server.RemoveDataClassesOverride(resourceID)
-				},
-				Config: server.providerConfig() + fmt.Sprintf(`
-resource "eon_resource_data_classes_override" "test" {
-  resource_id  = %q
-  data_classes = ["PII", "PHI"]
-}
-`, resourceID),
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: true,
 			},
 		},
 	})

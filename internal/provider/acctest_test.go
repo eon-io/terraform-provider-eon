@@ -37,6 +37,39 @@ func testAccPreCheck(t *testing.T) {
 	}
 }
 
+// testAccRealEnvPreCheck requires live Eon credentials. Optionally also require
+// EON_TEST_RESOURCE_ID when the test mutates/reads a specific inventory resource.
+func testAccRealEnvPreCheck(t *testing.T, requireResourceID bool) {
+	t.Helper()
+	testAccPreCheck(t)
+
+	required := []string{
+		"EON_ENDPOINT",
+		"EON_CLIENT_ID",
+		"EON_CLIENT_SECRET",
+		"EON_PROJECT_ID",
+	}
+	if requireResourceID {
+		required = append(required, "EON_TEST_RESOURCE_ID")
+	}
+	for _, key := range required {
+		if os.Getenv(key) == "" {
+			t.Skipf("%s must be set for real-environment acceptance tests", key)
+		}
+	}
+}
+
+func testAccRealProviderConfig() string {
+	return fmt.Sprintf(`
+provider "eon" {
+  endpoint      = %q
+  client_id     = %q
+  client_secret = %q
+  project_id    = %q
+}
+`, os.Getenv("EON_ENDPOINT"), os.Getenv("EON_CLIENT_ID"), os.Getenv("EON_CLIENT_SECRET"), os.Getenv("EON_PROJECT_ID"))
+}
+
 // fakeEonServer is an in-memory Eon API used by acceptance tests.
 type fakeEonServer struct {
 	server    *httptest.Server
@@ -47,6 +80,7 @@ type fakeEonServer struct {
 	idps        map[string]*externalEonSdkAPI.Idp
 	permissions []externalEonSdkAPI.Permission
 	resources   map[string]*externalEonSdkAPI.InventoryResource
+	snapshots   map[string][]externalEonSdkAPI.Snapshot
 	nextID      int
 }
 
@@ -58,6 +92,7 @@ func newFakeEonServer(t *testing.T) *fakeEonServer {
 		idps:        make(map[string]*externalEonSdkAPI.Idp),
 		permissions: []externalEonSdkAPI.Permission{},
 		resources:   make(map[string]*externalEonSdkAPI.InventoryResource),
+		snapshots:   make(map[string][]externalEonSdkAPI.Snapshot),
 		nextID:      1,
 	}
 	mux := http.NewServeMux()
@@ -123,6 +158,22 @@ func (f *fakeEonServer) RemoveDataClassesOverride(id string) {
 		details.SetDataClasses([]string{})
 		res.Classifications.SetDataClassesDetails(*details)
 	}
+}
+
+func (f *fakeEonServer) RemoveEnvironmentOverride(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if res, ok := f.resources[id]; ok && res.Classifications != nil {
+		details := externalEonSdkAPI.NewEnvironmentDetails()
+		details.SetIsOverridden(false)
+		res.Classifications.SetEnvironmentDetails(*details)
+	}
+}
+
+func (f *fakeEonServer) AddSnapshot(resourceID string, snapshot *externalEonSdkAPI.Snapshot) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.snapshots[resourceID] = append(f.snapshots[resourceID], *snapshot)
 }
 
 func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
@@ -202,6 +253,20 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 				f.handleRemoveDataClassesOverride(w, parts[0])
 				return
 			}
+		}
+		if len(parts) == 2 && parts[1] == "environments" {
+			switch r.Method {
+			case http.MethodPatch:
+				f.handleOverrideEnvironment(w, r, parts[0])
+				return
+			case http.MethodDelete:
+				f.handleRemoveEnvironmentOverride(w, parts[0])
+				return
+			}
+		}
+		if len(parts) == 2 && parts[1] == "snapshots" && r.Method == http.MethodPost {
+			f.handleListResourceSnapshots(w, r, parts[0])
+			return
 		}
 	}
 
@@ -395,6 +460,63 @@ func (f *fakeEonServer) handleRemoveDataClassesOverride(w http.ResponseWriter, i
 	}
 	res.Classifications.SetDataClassesDetails(*details)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (f *fakeEonServer) handleOverrideEnvironment(w http.ResponseWriter, r *http.Request, id string) {
+	var req externalEonSdkAPI.OverrideEnvironmentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	res, ok := f.resources[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	environment := req.GetEnvironment()
+	details := externalEonSdkAPI.NewEnvironmentDetails()
+	details.SetEnvironment(environment)
+	details.SetIsOverridden(true)
+	if res.Classifications == nil {
+		res.Classifications = externalEonSdkAPI.NewClassifications()
+	}
+	res.Classifications.SetEnvironmentDetails(*details)
+	resp := externalEonSdkAPI.NewOverrideEnvironmentResponse()
+	resp.SetEnvironment(environment)
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (f *fakeEonServer) handleRemoveEnvironmentOverride(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	res, ok := f.resources[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	details := externalEonSdkAPI.NewEnvironmentDetails()
+	details.SetIsOverridden(false)
+	if res.Classifications == nil {
+		res.Classifications = externalEonSdkAPI.NewClassifications()
+	}
+	res.Classifications.SetEnvironmentDetails(*details)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (f *fakeEonServer) handleListResourceSnapshots(w http.ResponseWriter, r *http.Request, id string) {
+	_, _ = io.Copy(io.Discard, r.Body)
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.resources[id]; !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	items := append([]externalEonSdkAPI.Snapshot{}, f.snapshots[id]...)
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewListInventorySnapshotsResponse(items, int32(len(items))))
 }
 
 func newTestInventoryResource(id string) *externalEonSdkAPI.InventoryResource {
