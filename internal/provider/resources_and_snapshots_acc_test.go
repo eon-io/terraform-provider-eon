@@ -9,37 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func testAccRealEnvPreCheck(t *testing.T) {
-	t.Helper()
-	testAccPreCheck(t)
-
-	required := []string{
-		"EON_ENDPOINT",
-		"EON_CLIENT_ID",
-		"EON_CLIENT_SECRET",
-		"EON_PROJECT_ID",
-		"EON_TEST_RESOURCE_ID",
-	}
-	for _, key := range required {
-		if os.Getenv(key) == "" {
-			t.Skipf("%s must be set for real-environment acceptance tests", key)
-		}
-	}
-}
-
-func testAccRealProviderConfig() string {
-	return fmt.Sprintf(`
-provider "eon" {
-  endpoint      = %q
-  client_id     = %q
-  client_secret = %q
-  project_id    = %q
-}
-`, os.Getenv("EON_ENDPOINT"), os.Getenv("EON_CLIENT_ID"), os.Getenv("EON_CLIENT_SECRET"), os.Getenv("EON_PROJECT_ID"))
-}
-
 func TestAccResourceEnvironmentOverride(t *testing.T) {
-	testAccRealEnvPreCheck(t)
+	testAccRealEnvPreCheck(t, true)
 
 	resourceID := os.Getenv("EON_TEST_RESOURCE_ID")
 	resourceName := "eon_resource_environment_override.test"
@@ -92,7 +63,7 @@ resource "eon_resource_environment_override" "test" {
 }
 
 func TestAccResourceSnapshots(t *testing.T) {
-	testAccRealEnvPreCheck(t)
+	testAccRealEnvPreCheck(t, true)
 
 	resourceID := os.Getenv("EON_TEST_RESOURCE_ID")
 

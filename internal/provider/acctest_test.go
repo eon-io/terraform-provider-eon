@@ -37,6 +37,39 @@ func testAccPreCheck(t *testing.T) {
 	}
 }
 
+// testAccRealEnvPreCheck requires live Eon credentials. Optionally also require
+// EON_TEST_RESOURCE_ID when the test mutates/reads a specific inventory resource.
+func testAccRealEnvPreCheck(t *testing.T, requireResourceID bool) {
+	t.Helper()
+	testAccPreCheck(t)
+
+	required := []string{
+		"EON_ENDPOINT",
+		"EON_CLIENT_ID",
+		"EON_CLIENT_SECRET",
+		"EON_PROJECT_ID",
+	}
+	if requireResourceID {
+		required = append(required, "EON_TEST_RESOURCE_ID")
+	}
+	for _, key := range required {
+		if os.Getenv(key) == "" {
+			t.Skipf("%s must be set for real-environment acceptance tests", key)
+		}
+	}
+}
+
+func testAccRealProviderConfig() string {
+	return fmt.Sprintf(`
+provider "eon" {
+  endpoint      = %q
+  client_id     = %q
+  client_secret = %q
+  project_id    = %q
+}
+`, os.Getenv("EON_ENDPOINT"), os.Getenv("EON_CLIENT_ID"), os.Getenv("EON_CLIENT_SECRET"), os.Getenv("EON_PROJECT_ID"))
+}
+
 // fakeEonServer is an in-memory Eon API used by acceptance tests.
 type fakeEonServer struct {
 	server    *httptest.Server
