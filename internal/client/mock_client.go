@@ -55,7 +55,6 @@ type MockEonClient struct {
 	ShouldFailRemoveDataClassesOverride bool
 	ShouldFailOverrideEnvironment       bool
 	ShouldFailRemoveEnvironmentOverride bool
-	ShouldFailListResources             bool
 	ShouldFailListResourceSnapshots     bool
 	ShouldFailGetResource               bool
 
@@ -83,7 +82,6 @@ type MockEonClient struct {
 	RemoveDataClassesOverrideCalls  int
 	OverrideEnvironmentCalls        int
 	RemoveEnvironmentOverrideCalls  int
-	ListResourcesCalls              int
 	ListResourceSnapshotsCalls      int
 	GetResourceCalls                int
 
@@ -271,7 +269,6 @@ func (m *MockEonClient) Reset() {
 	m.RemoveDataClassesOverrideCalls = 0
 	m.OverrideEnvironmentCalls = 0
 	m.RemoveEnvironmentOverrideCalls = 0
-	m.ListResourcesCalls = 0
 	m.ListResourceSnapshotsCalls = 0
 	m.GetResourceCalls = 0
 	m.ShouldFailCreate = false
@@ -297,7 +294,6 @@ func (m *MockEonClient) Reset() {
 	m.ShouldFailRemoveDataClassesOverride = false
 	m.ShouldFailOverrideEnvironment = false
 	m.ShouldFailRemoveEnvironmentOverride = false
-	m.ShouldFailListResources = false
 	m.ShouldFailListResourceSnapshots = false
 	m.ShouldFailGetResource = false
 }
@@ -806,36 +802,6 @@ func (m *MockEonClient) RemoveEnvironmentOverride(ctx context.Context, resourceI
 		res.Classifications.SetEnvironmentDetails(*details)
 	}
 	return nil
-}
-
-// ListResources mocks listing inventory resources.
-func (m *MockEonClient) ListResources(ctx context.Context, filters *externalEonSdkAPI.InventoryFilterConditions) ([]externalEonSdkAPI.InventoryResource, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.ListResourcesCalls++
-	if m.ShouldFailListResources {
-		return nil, fmt.Errorf("mock list resources error")
-	}
-
-	out := make([]externalEonSdkAPI.InventoryResource, 0, len(m.InventoryResources))
-	for _, res := range m.InventoryResources {
-		if filters != nil && filters.Id != nil && len(filters.Id.GetIn()) > 0 {
-			matched := false
-			for _, id := range filters.Id.GetIn() {
-				if res.GetId() == id {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
-		}
-		out = append(out, *res)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Id < out[j].Id })
-	return out, nil
 }
 
 // ListResourceSnapshots mocks listing snapshots for a resource.

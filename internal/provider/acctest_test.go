@@ -195,12 +195,6 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resourcesExact := fmt.Sprintf("/v1/projects/%s/resources", f.projectID)
-	if r.Method == http.MethodPost && path == resourcesExact {
-		f.handleListResources(w, r)
-		return
-	}
-
 	resourcesPrefix := fmt.Sprintf("/v1/projects/%s/resources/", f.projectID)
 	if strings.HasPrefix(path, resourcesPrefix) {
 		rest := strings.TrimPrefix(path, resourcesPrefix)
@@ -477,31 +471,6 @@ func (f *fakeEonServer) handleRemoveEnvironmentOverride(w http.ResponseWriter, i
 	}
 	res.Classifications.SetEnvironmentDetails(*details)
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func (f *fakeEonServer) handleListResources(w http.ResponseWriter, r *http.Request) {
-	var req externalEonSdkAPI.ListInventoryRequest
-	_ = json.NewDecoder(r.Body).Decode(&req)
-
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	items := make([]externalEonSdkAPI.InventoryResource, 0, len(f.resources))
-	for _, res := range f.resources {
-		if req.Filters != nil && req.Filters.Id != nil && len(req.Filters.Id.GetIn()) > 0 {
-			matched := false
-			for _, id := range req.Filters.Id.GetIn() {
-				if res.GetId() == id {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
-		}
-		items = append(items, *res)
-	}
-	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewListResourcesResponse(items, int32(len(items))))
 }
 
 func (f *fakeEonServer) handleListResourceSnapshots(w http.ResponseWriter, r *http.Request, id string) {

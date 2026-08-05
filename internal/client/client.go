@@ -1281,64 +1281,6 @@ func (c *EonClient) RemoveEnvironmentOverride(ctx context.Context, resourceId st
 	return nil
 }
 
-// ListResources retrieves inventory resources for the project, optionally filtered.
-// It paginates through all pages to return the complete list.
-func (c *EonClient) ListResources(ctx context.Context, filters *externalEonSdkAPI.InventoryFilterConditions) ([]externalEonSdkAPI.InventoryResource, error) {
-	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
-		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
-	}
-
-	listReq := *externalEonSdkAPI.NewListInventoryRequest()
-	if filters != nil {
-		listReq.SetFilters(*filters)
-	}
-
-	var all []externalEonSdkAPI.InventoryResource
-	var pageToken string
-
-	for {
-		req := c.client.ResourcesAPI.ListResources(ctx, c.projectID).
-			PageSize(100).
-			ListInventoryRequest(listReq)
-		if pageToken != "" {
-			req = req.PageToken(pageToken)
-		}
-
-		resp, httpResp, err := req.Execute()
-		if apiErr := c.handleAPIError(err, httpResp, "failed to list resources"); apiErr != nil {
-			if httpResp != nil {
-				_ = httpResp.Body.Close()
-			}
-			return nil, apiErr
-		}
-
-		if httpResp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(httpResp.Body)
-			_ = httpResp.Body.Close()
-			return nil, &APIError{
-				StatusCode: httpResp.StatusCode,
-				Message:    string(body),
-			}
-		}
-
-		if resp.GetResources() != nil {
-			all = append(all, resp.GetResources()...)
-		}
-
-		hasMore := resp.HasNextToken() && resp.GetNextToken() != ""
-		_ = httpResp.Body.Close()
-		if !hasMore {
-			break
-		}
-		pageToken = resp.GetNextToken()
-	}
-
-	if all == nil {
-		return []externalEonSdkAPI.InventoryResource{}, nil
-	}
-	return all, nil
-}
-
 // ListResourceSnapshots retrieves snapshots for an inventory resource, optionally filtered.
 // It paginates through all pages to return the complete list.
 func (c *EonClient) ListResourceSnapshots(ctx context.Context, resourceId string, filters *externalEonSdkAPI.SnapshotFilterConditions) ([]externalEonSdkAPI.Snapshot, error) {
