@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 	"github.com/eon-io/terraform-provider-eon/internal/client"
@@ -76,28 +77,32 @@ type fakeEonServer struct {
 	mu        sync.Mutex
 	projectID string
 
-	controls    map[string]*externalEonSdkAPI.BackupPostureControl
-	idps        map[string]*externalEonSdkAPI.Idp
-	permissions []externalEonSdkAPI.Permission
-	resources   map[string]*externalEonSdkAPI.InventoryResource
-	snapshots   map[string][]externalEonSdkAPI.Snapshot
-	nextID      int
+	controls       map[string]*externalEonSdkAPI.BackupPostureControl
+	idps           map[string]*externalEonSdkAPI.Idp
+	permissions    []externalEonSdkAPI.Permission
+	resources      map[string]*externalEonSdkAPI.InventoryResource
+	snapshots      map[string][]externalEonSdkAPI.Snapshot
+	snapshotsByID  map[string]*externalEonSdkAPI.Snapshot
+	metricsConfigs map[string]*externalEonSdkAPI.RestoreAccountMetricsConfig
+	restoreJobs    map[string]*externalEonSdkAPI.RestoreJob
+	nextID         int
 }
 
 func newFakeEonServer(t *testing.T) *fakeEonServer {
 	t.Helper()
 	f := &fakeEonServer{
-		projectID:   testAccProjectID,
-		controls:    make(map[string]*externalEonSdkAPI.BackupPostureControl),
-		idps:        make(map[string]*externalEonSdkAPI.Idp),
-		permissions: []externalEonSdkAPI.Permission{},
-		resources:   make(map[string]*externalEonSdkAPI.InventoryResource),
-		snapshots:   make(map[string][]externalEonSdkAPI.Snapshot),
-		nextID:      1,
+		projectID:      testAccProjectID,
+		controls:       make(map[string]*externalEonSdkAPI.BackupPostureControl),
+		idps:           make(map[string]*externalEonSdkAPI.Idp),
+		permissions:    []externalEonSdkAPI.Permission{},
+		resources:      make(map[string]*externalEonSdkAPI.InventoryResource),
+		snapshots:      make(map[string][]externalEonSdkAPI.Snapshot),
+		snapshotsByID:  make(map[string]*externalEonSdkAPI.Snapshot),
+		metricsConfigs: make(map[string]*externalEonSdkAPI.RestoreAccountMetricsConfig),
+		restoreJobs:    make(map[string]*externalEonSdkAPI.RestoreJob),
+		nextID:         1,
 	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", f.handle)
-	f.server = httptest.NewServer(mux)
+	f.server = httptest.NewServer(http.HandlerFunc(f.handle))
 	t.Cleanup(f.server.Close)
 	return f
 }
@@ -174,10 +179,33 @@ func (f *fakeEonServer) AddSnapshot(resourceID string, snapshot *externalEonSdkA
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.snapshots[resourceID] = append(f.snapshots[resourceID], *snapshot)
+	f.snapshotsByID[snapshot.Id] = snapshot
+}
+
+func (f *fakeEonServer) DeleteMetricsConfig(accountID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.metricsConfigs, accountID)
+}
+
+func (f *fakeEonServer) RemoveHold(snapshotID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if snap, ok := f.snapshotsByID[snapshotID]; ok {
+		snap.SetOnHold(false)
+		snap.HoldDescription = nil
+	}
+}
+
+func (f *fakeEonServer) DeleteRestoreJob(jobID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.restoreJobs, jobID)
 }
 
 func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
+	path = strings.TrimPrefix(path, "/api")
 
 	switch {
 	case r.Method == http.MethodPost && path == "/v1/token":
@@ -228,6 +256,52 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	restoreAccountsPrefix := fmt.Sprintf("/v1/projects/%s/restore-accounts/", f.projectID)
+	if strings.HasPrefix(path, restoreAccountsPrefix) {
+		rest := strings.TrimPrefix(path, restoreAccountsPrefix)
+		parts := strings.Split(rest, "/")
+		if len(parts) == 2 && parts[1] == "metrics-config" {
+			switch r.Method {
+			case http.MethodGet:
+				f.handleGetMetricsConfig(w, parts[0])
+				return
+			case http.MethodPut:
+				f.handleEnableMetricsConfig(w, r, parts[0])
+				return
+			case http.MethodDelete:
+				f.handleDisableMetricsConfig(w, parts[0])
+				return
+			}
+		}
+	}
+
+	snapshotsPrefix := fmt.Sprintf("/v1/projects/%s/snapshots/", f.projectID)
+	if strings.HasPrefix(path, snapshotsPrefix) {
+		rest := strings.TrimPrefix(path, snapshotsPrefix)
+		parts := strings.Split(rest, "/")
+		if len(parts) == 1 && r.Method == http.MethodGet {
+			f.handleGetSnapshot(w, parts[0])
+			return
+		}
+		if len(parts) == 2 && parts[1] == "hold" && r.Method == http.MethodPatch {
+			f.handleHoldSnapshot(w, r, parts[0])
+			return
+		}
+		if len(parts) == 2 && parts[1] == "remove-hold" && r.Method == http.MethodPatch {
+			f.handleRemoveSnapshotHold(w, parts[0])
+			return
+		}
+	}
+
+	restoreJobsPrefix := fmt.Sprintf("/v1/projects/%s/restore-jobs/", f.projectID)
+	if strings.HasPrefix(path, restoreJobsPrefix) && r.Method == http.MethodGet {
+		jobID := strings.TrimPrefix(path, restoreJobsPrefix)
+		if jobID != "" && !strings.Contains(jobID, "/") {
+			f.handleGetRestoreJob(w, jobID)
+			return
+		}
+	}
+
 	resourcesPrefix := fmt.Sprintf("/v1/projects/%s/resources/", f.projectID)
 	if strings.HasPrefix(path, resourcesPrefix) {
 		rest := strings.TrimPrefix(path, resourcesPrefix)
@@ -266,6 +340,10 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(parts) == 2 && parts[1] == "snapshots" && r.Method == http.MethodPost {
 			f.handleListResourceSnapshots(w, r, parts[0])
+			return
+		}
+		if len(parts) == 4 && parts[1] == "snapshots" && r.Method == http.MethodPost {
+			f.handleStartRestore(w, r, parts[0], parts[2], parts[3])
 			return
 		}
 	}
@@ -517,6 +595,148 @@ func (f *fakeEonServer) handleListResourceSnapshots(w http.ResponseWriter, r *ht
 	}
 	items := append([]externalEonSdkAPI.Snapshot{}, f.snapshots[id]...)
 	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewListInventorySnapshotsResponse(items, int32(len(items))))
+}
+
+func (f *fakeEonServer) handleGetMetricsConfig(w http.ResponseWriter, accountID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	config, ok := f.metricsConfigs[accountID]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewGetRestoreAccountMetricsConfigResponse(*config))
+}
+
+func (f *fakeEonServer) handleEnableMetricsConfig(w http.ResponseWriter, r *http.Request, accountID string) {
+	var req externalEonSdkAPI.EnableRestoreAccountMetricsConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	destination := externalEonSdkAPI.NewAccountMetricsDestination()
+	if req.HasAws() {
+		destination.SetAws(req.GetAws())
+	}
+
+	config := externalEonSdkAPI.NewRestoreAccountMetricsConfig(accountID, true, *destination)
+	f.mu.Lock()
+	f.metricsConfigs[accountID] = config
+	f.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewEnableRestoreAccountMetricsConfigResponse(*config))
+}
+
+func (f *fakeEonServer) handleDisableMetricsConfig(w http.ResponseWriter, accountID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.metricsConfigs[accountID]; !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	delete(f.metricsConfigs, accountID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (f *fakeEonServer) handleGetSnapshot(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	snap, ok := f.snapshotsByID[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewGetSnapshotResponse(*snap))
+}
+
+func (f *fakeEonServer) handleHoldSnapshot(w http.ResponseWriter, r *http.Request, id string) {
+	var req externalEonSdkAPI.HoldSnapshotRequest
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	snap, ok := f.snapshotsByID[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	snap.SetOnHold(true)
+	if req.HasDescription() {
+		snap.SetHoldDescription(req.GetDescription())
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{})
+}
+
+func (f *fakeEonServer) handleRemoveSnapshotHold(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	snap, ok := f.snapshotsByID[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	snap.SetOnHold(false)
+	snap.HoldDescription = nil
+	writeJSON(w, http.StatusOK, map[string]interface{}{})
+}
+
+func (f *fakeEonServer) handleGetRestoreJob(w http.ResponseWriter, jobID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	job, ok := f.restoreJobs[jobID]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewGetRestoreJobResponse(*job))
+}
+
+func (f *fakeEonServer) handleStartRestore(w http.ResponseWriter, r *http.Request, resourceID, snapshotID, action string) {
+	_, _ = io.Copy(io.Discard, r.Body)
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.resources[resourceID]; !ok {
+		http.Error(w, `{"message":"resource not found"}`, http.StatusNotFound)
+		return
+	}
+	if _, ok := f.snapshotsByID[snapshotID]; !ok {
+		http.Error(w, `{"message":"snapshot not found"}`, http.StatusNotFound)
+		return
+	}
+
+	switch action {
+	case "restore-dynamo-db-table",
+		"restore-azure-disk",
+		"restore-azure-vm-instance",
+		"restore-azure-sql-database",
+		"convert-ec2-ebs-snapshot",
+		"restore-ec2-ebs-volume",
+		"restore-ec2-instance",
+		"restore-rds-instance",
+		"restore-bucket",
+		"restore-files",
+		"restore-gcp-vm-instance",
+		"restore-gcp-disk",
+		"restore-gcp-cloudsql",
+		"restore-bigquery-dataset":
+		// accepted restore actions for the fake server
+	default:
+		http.Error(w, fmt.Sprintf(`{"message":"unsupported restore action %s"}`, action), http.StatusNotFound)
+		return
+	}
+
+	jobID := fmt.Sprintf("job-%d", f.nextID)
+	f.nextID++
+	details := externalEonSdkAPI.NewJobExecutionDetails(jobID, externalEonSdkAPI.JOB_COMPLETED, time.Now().UTC())
+	destination := externalEonSdkAPI.NewDestinationDetails("restore-acct-1", "123456789012", externalEonSdkAPI.AWS, "us-east-1")
+	job := externalEonSdkAPI.NewRestoreJob(*details, *destination, externalEonSdkAPI.AWS_DYNAMO_DB_TABLE_RESTORE)
+	f.restoreJobs[jobID] = job
+	writeJSON(w, http.StatusAccepted, map[string]interface{}{
+		"jobId":                 jobID,
+		"actionApprovalRequest": nil,
+	})
 }
 
 func newTestInventoryResource(id string) *externalEonSdkAPI.InventoryResource {

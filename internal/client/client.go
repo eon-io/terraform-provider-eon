@@ -754,6 +754,108 @@ func (c *EonClient) DeleteRestoreAccountConnectivityConfig(ctx context.Context, 
 	return nil
 }
 
+// GetRestoreAccountMetricsConfig retrieves the metrics configuration of a restore account.
+func (c *EonClient) GetRestoreAccountMetricsConfig(ctx context.Context, accountId string) (*externalEonSdkAPI.RestoreAccountMetricsConfig, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.GetRestoreAccountMetricsConfig(ctx, c.projectID, accountId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get restore account metrics config"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	config := resp.GetRestoreAccountConfig()
+	return &config, nil
+}
+
+// EnableRestoreAccountMetricsConfig enables and configures job metrics for a restore account.
+func (c *EonClient) EnableRestoreAccountMetricsConfig(ctx context.Context, accountId string, req externalEonSdkAPI.EnableRestoreAccountMetricsConfigRequest) (*externalEonSdkAPI.RestoreAccountMetricsConfig, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.EnableRestoreAccountMetricsConfig(ctx, c.projectID, accountId).EnableRestoreAccountMetricsConfigRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to enable restore account metrics config"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	config := resp.GetRestoreAccountConfig()
+	return &config, nil
+}
+
+// DisableRestoreAccountMetricsConfig disables job metrics for a restore account.
+func (c *EonClient) DisableRestoreAccountMetricsConfig(ctx context.Context, accountId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.AccountsAPI.DisableRestoreAccountMetricsConfig(ctx, c.projectID, accountId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to disable restore account metrics config"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// HoldSnapshot places a retention hold on a snapshot so it is not deleted by retention policy.
+func (c *EonClient) HoldSnapshot(ctx context.Context, snapshotId string, req externalEonSdkAPI.HoldSnapshotRequest) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	_, httpResp, err := c.client.SnapshotsAPI.HoldSnapshot(ctx, c.projectID, snapshotId).HoldSnapshotRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to hold snapshot"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// RemoveSnapshotHold removes a retention hold from a snapshot.
+func (c *EonClient) RemoveSnapshotHold(ctx context.Context, snapshotId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	_, httpResp, err := c.client.SnapshotsAPI.RemoveSnapshotHold(ctx, c.projectID, snapshotId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to remove snapshot hold"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // GetCloudResourceConfiguration retrieves the configuration of an inventory resource.
 func (c *EonClient) GetCloudResourceConfiguration(ctx context.Context, resourceId string) (*CloudResourceConfiguration, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
@@ -1039,6 +1141,81 @@ func (c *EonClient) StartGcpCloudSqlRestore(ctx context.Context, resourceId, sna
 	defer func() { _ = httpResp.Body.Close() }()
 
 	return restoreJobIDFromResponse(resp, httpResp, "failed to start GCP Cloud SQL restore")
+}
+
+// StartAzureDiskRestore starts an Azure disk restore job.
+func (c *EonClient) StartAzureDiskRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreAzureDiskRequest) (string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return "", fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreAzureDisk(ctx, c.projectID, resourceId, snapshotId).RestoreAzureDiskRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start Azure disk restore"); apiErr != nil {
+		return "", apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start Azure disk restore")
+}
+
+// StartAzureSqlDatabaseRestore starts an Azure SQL database restore job.
+func (c *EonClient) StartAzureSqlDatabaseRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreAzureSqlDatabaseRequest) (string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return "", fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreAzureSqlDatabase(ctx, c.projectID, resourceId, snapshotId).RestoreAzureSqlDatabaseRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start Azure SQL database restore"); apiErr != nil {
+		return "", apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start Azure SQL database restore")
+}
+
+// StartAzureVmInstanceRestore starts an Azure VM instance restore job.
+func (c *EonClient) StartAzureVmInstanceRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreAzureVmInstanceRequest) (string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return "", fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreAzureVmInstance(ctx, c.projectID, resourceId, snapshotId).RestoreAzureVmInstanceRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start Azure VM instance restore"); apiErr != nil {
+		return "", apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start Azure VM instance restore")
+}
+
+// StartDynamoDBTableRestore starts a DynamoDB table restore job.
+func (c *EonClient) StartDynamoDBTableRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreDynamoDBTableRequest) (string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return "", fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreDynamoDBTable(ctx, c.projectID, resourceId, snapshotId).RestoreDynamoDBTableRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start DynamoDB table restore"); apiErr != nil {
+		return "", apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start DynamoDB table restore")
+}
+
+// StartEbsSnapshotRestore starts a restore-to-EBS-snapshot job.
+func (c *EonClient) StartEbsSnapshotRestore(ctx context.Context, resourceId, snapshotId string, req externalEonSdkAPI.RestoreVolumeToEbsSnapshotRequest) (string, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return "", fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.SnapshotsAPI.RestoreToEbsSnapshot(ctx, c.projectID, resourceId, snapshotId).RestoreVolumeToEbsSnapshotRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to start EBS snapshot restore"); apiErr != nil {
+		return "", apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	return restoreJobIDFromResponse(resp, httpResp, "failed to start EBS snapshot restore")
 }
 
 // BigQueryRestoreDestination represents the destination for a BigQuery dataset restore

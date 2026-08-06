@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -56,11 +57,18 @@ type RestoreJobResourceModel struct {
 	RestoreAccountId types.String `tfsdk:"restore_account_id"`
 
 	// Restore type specific configuration blocks — AWS
-	EbsConfig      *EbsRestoreConfig      `tfsdk:"ebs_config"`
-	Ec2Config      *Ec2RestoreConfig      `tfsdk:"ec2_config"`
-	RdsConfig      *RdsRestoreConfig      `tfsdk:"rds_config"`
-	S3BucketConfig *S3BucketRestoreConfig `tfsdk:"s3_bucket_config"`
-	S3FileConfig   *S3FileRestoreConfig   `tfsdk:"s3_file_config"`
+	EbsConfig         *EbsRestoreConfig         `tfsdk:"ebs_config"`
+	EbsSnapshotConfig *EbsSnapshotRestoreConfig `tfsdk:"ebs_snapshot_config"`
+	Ec2Config         *Ec2RestoreConfig         `tfsdk:"ec2_config"`
+	RdsConfig         *RdsRestoreConfig         `tfsdk:"rds_config"`
+	S3BucketConfig    *S3BucketRestoreConfig    `tfsdk:"s3_bucket_config"`
+	S3FileConfig      *S3FileRestoreConfig      `tfsdk:"s3_file_config"`
+	DynamoDBConfig    *DynamoDBRestoreConfig    `tfsdk:"dynamodb_config"`
+
+	// Restore type specific configuration blocks — Azure
+	AzureDiskConfig *AzureDiskRestoreConfig `tfsdk:"azure_disk_config"`
+	AzureVmConfig   *AzureVmRestoreConfig   `tfsdk:"azure_vm_config"`
+	AzureSqlConfig  *AzureSqlRestoreConfig  `tfsdk:"azure_sql_config"`
 
 	// Restore type specific configuration blocks — GCP
 	GcpVmConfig              *GcpVmRestoreConfig              `tfsdk:"gcp_vm_config"`
@@ -95,6 +103,63 @@ type EbsRestoreConfig struct {
 	VolumeEncryptionKeyId      types.String `tfsdk:"volume_encryption_key_id"`
 	EnvironmentEncryptionKeyId types.String `tfsdk:"environment_encryption_key_id"`
 	Tags                       types.Map    `tfsdk:"tags"`
+}
+
+type EbsSnapshotRestoreConfig struct {
+	ProviderVolumeId        types.String `tfsdk:"provider_volume_id"`
+	Region                  types.String `tfsdk:"region"`
+	SnapshotEncryptionKeyId types.String `tfsdk:"snapshot_encryption_key_id"`
+	Description             types.String `tfsdk:"description"`
+	Tags                    types.Map    `tfsdk:"tags"`
+}
+
+type DynamoDBRestoreConfig struct {
+	RestoreRegion      types.String `tfsdk:"restore_region"`
+	RestoredName       types.String `tfsdk:"restored_name"`
+	EncryptionKeyId    types.String `tfsdk:"encryption_key_id"`
+	WriteCapacityUnits types.Int64  `tfsdk:"write_capacity_units"`
+	Tags               types.Map    `tfsdk:"tags"`
+}
+
+type AzureDiskRestoreConfig struct {
+	ProviderDiskId    types.String `tfsdk:"provider_disk_id"`
+	Region            types.String `tfsdk:"region"`
+	ResourceGroupName types.String `tfsdk:"resource_group_name"`
+	Name              types.String `tfsdk:"name"`
+	DiskType          types.String `tfsdk:"disk_type"`
+	Tier              types.String `tfsdk:"tier"`
+	HyperVGeneration  types.String `tfsdk:"hyper_v_generation"`
+	SizeBytes         types.Int64  `tfsdk:"size_bytes"`
+	Tags              types.Map    `tfsdk:"tags"`
+}
+
+type AzureVmRestoreConfig struct {
+	Region                    types.String `tfsdk:"region"`
+	ResourceGroupName         types.String `tfsdk:"resource_group_name"`
+	VmName                    types.String `tfsdk:"vm_name"`
+	VmSize                    types.String `tfsdk:"vm_size"`
+	NetworkInterface          types.String `tfsdk:"network_interface"`
+	StartInstanceAfterRestore types.Bool   `tfsdk:"start_instance_after_restore"`
+	Tags                      types.Map    `tfsdk:"tags"`
+	Disks                     types.List   `tfsdk:"disks"`
+}
+
+type AzureVmDiskRestoreParam struct {
+	ProviderDiskId   types.String `tfsdk:"provider_disk_id"`
+	Name             types.String `tfsdk:"name"`
+	DiskType         types.String `tfsdk:"disk_type"`
+	Tier             types.String `tfsdk:"tier"`
+	HyperVGeneration types.String `tfsdk:"hyper_v_generation"`
+	SizeBytes        types.Int64  `tfsdk:"size_bytes"`
+	Tags             types.Map    `tfsdk:"tags"`
+}
+
+type AzureSqlRestoreConfig struct {
+	Region            types.String `tfsdk:"region"`
+	ResourceGroupName types.String `tfsdk:"resource_group_name"`
+	ServerName        types.String `tfsdk:"server_name"`
+	AdminUserName     types.String `tfsdk:"admin_user_name"`
+	Tags              types.Map    `tfsdk:"tags"`
 }
 
 type Ec2RestoreConfig struct {
@@ -236,7 +301,7 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"restore_type": schema.StringAttribute{
-				MarkdownDescription: "Type of restore job: `full` for full resource restore, `partial` for partial restore.",
+				MarkdownDescription: "Type of restore job: `full` for full resource restore, `partial` for partial restore, `ebs_snapshot` for restore-to-native-EBS-snapshot.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -341,6 +406,198 @@ func (r *RestoreJobResource) Schema(ctx context.Context, req resource.SchemaRequ
 					},
 					"tags": schema.MapAttribute{
 						MarkdownDescription: "Tags to apply to the restored volume as key-value pairs, where key and value are both strings.",
+						ElementType:         types.StringType,
+						Optional:            true,
+					},
+				},
+			},
+			"ebs_snapshot_config": schema.SingleNestedBlock{
+				MarkdownDescription: "EBS snapshot restore configuration. Required when restoring an AWS volume to a native EBS snapshot (`restore_type` = `ebs_snapshot`).",
+				Attributes: map[string]schema.Attribute{
+					"provider_volume_id": schema.StringAttribute{
+						MarkdownDescription: "Cloud-provider-assigned ID of the volume to convert to an EBS snapshot.",
+						Optional:            true,
+					},
+					"region": schema.StringAttribute{
+						MarkdownDescription: "Region to create the EBS snapshot in.",
+						Optional:            true,
+					},
+					"snapshot_encryption_key_id": schema.StringAttribute{
+						MarkdownDescription: "ID of the KMS key used to encrypt the EBS snapshot.",
+						Optional:            true,
+					},
+					"description": schema.StringAttribute{
+						MarkdownDescription: "Description to apply to the EBS snapshot.",
+						Optional:            true,
+					},
+					"tags": schema.MapAttribute{
+						MarkdownDescription: "Tags to apply to the EBS snapshot as key-value pairs.",
+						ElementType:         types.StringType,
+						Optional:            true,
+					},
+				},
+			},
+			"dynamodb_config": schema.SingleNestedBlock{
+				MarkdownDescription: "DynamoDB table restore configuration. Required when restoring an AWS DynamoDB table.",
+				Attributes: map[string]schema.Attribute{
+					"restore_region": schema.StringAttribute{
+						MarkdownDescription: "Region to restore the DynamoDB table to.",
+						Optional:            true,
+					},
+					"restored_name": schema.StringAttribute{
+						MarkdownDescription: "Name to assign to the restored DynamoDB table.",
+						Optional:            true,
+					},
+					"encryption_key_id": schema.StringAttribute{
+						MarkdownDescription: "ID of the KMS key used to encrypt the restored table.",
+						Optional:            true,
+					},
+					"write_capacity_units": schema.Int64Attribute{
+						MarkdownDescription: "Provisioned write capacity units for the restored table.",
+						Optional:            true,
+					},
+					"tags": schema.MapAttribute{
+						MarkdownDescription: "Tags to apply to the restored table as key-value pairs.",
+						ElementType:         types.StringType,
+						Optional:            true,
+					},
+				},
+			},
+			"azure_disk_config": schema.SingleNestedBlock{
+				MarkdownDescription: "Azure disk restore configuration. Required when restoring an Azure disk.",
+				Attributes: map[string]schema.Attribute{
+					"provider_disk_id": schema.StringAttribute{
+						MarkdownDescription: "Cloud-provider-assigned ID of the disk to restore.",
+						Optional:            true,
+					},
+					"region": schema.StringAttribute{
+						MarkdownDescription: "Region to restore the disk to.",
+						Optional:            true,
+					},
+					"resource_group_name": schema.StringAttribute{
+						MarkdownDescription: "Name of the resource group to restore to.",
+						Optional:            true,
+					},
+					"name": schema.StringAttribute{
+						MarkdownDescription: "Name for the restored disk.",
+						Optional:            true,
+					},
+					"disk_type": schema.StringAttribute{
+						MarkdownDescription: "Azure disk type (for example, Premium_LRS).",
+						Optional:            true,
+					},
+					"tier": schema.StringAttribute{
+						MarkdownDescription: "Azure disk tier.",
+						Optional:            true,
+					},
+					"hyper_v_generation": schema.StringAttribute{
+						MarkdownDescription: "Hyper-V generation of the disk (V1 or V2).",
+						Optional:            true,
+					},
+					"size_bytes": schema.Int64Attribute{
+						MarkdownDescription: "Size of the restored disk, in bytes.",
+						Optional:            true,
+					},
+					"tags": schema.MapAttribute{
+						MarkdownDescription: "Tags to apply to the restored disk as key-value pairs.",
+						ElementType:         types.StringType,
+						Optional:            true,
+					},
+				},
+			},
+			"azure_vm_config": schema.SingleNestedBlock{
+				MarkdownDescription: "Azure VM instance restore configuration. Required when restoring an Azure Virtual Machine with `full` restore type.",
+				Attributes: map[string]schema.Attribute{
+					"region": schema.StringAttribute{
+						MarkdownDescription: "Region to restore the VM to.",
+						Optional:            true,
+					},
+					"resource_group_name": schema.StringAttribute{
+						MarkdownDescription: "Name of the resource group to restore to.",
+						Optional:            true,
+					},
+					"vm_name": schema.StringAttribute{
+						MarkdownDescription: "Name for the restored VM.",
+						Optional:            true,
+					},
+					"vm_size": schema.StringAttribute{
+						MarkdownDescription: "Size of the restored VM (for example, Standard_D2s_v3).",
+						Optional:            true,
+					},
+					"network_interface": schema.StringAttribute{
+						MarkdownDescription: "Name of the network interface to use.",
+						Optional:            true,
+					},
+					"start_instance_after_restore": schema.BoolAttribute{
+						MarkdownDescription: "Whether to start the VM after restoring it.",
+						Optional:            true,
+					},
+					"tags": schema.MapAttribute{
+						MarkdownDescription: "Tags to apply to the restored VM as key-value pairs.",
+						ElementType:         types.StringType,
+						Optional:            true,
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"disks": schema.ListNestedBlock{
+						MarkdownDescription: "Disks to restore and attach to the restored VM.",
+						NestedObject: schema.NestedBlockObject{
+							Attributes: map[string]schema.Attribute{
+								"provider_disk_id": schema.StringAttribute{
+									MarkdownDescription: "Cloud-provider-assigned ID of the disk to restore.",
+									Optional:            true,
+								},
+								"name": schema.StringAttribute{
+									MarkdownDescription: "Name for the restored disk.",
+									Optional:            true,
+								},
+								"disk_type": schema.StringAttribute{
+									MarkdownDescription: "Azure disk type.",
+									Optional:            true,
+								},
+								"tier": schema.StringAttribute{
+									MarkdownDescription: "Azure disk tier.",
+									Optional:            true,
+								},
+								"hyper_v_generation": schema.StringAttribute{
+									MarkdownDescription: "Hyper-V generation of the disk (V1 or V2).",
+									Optional:            true,
+								},
+								"size_bytes": schema.Int64Attribute{
+									MarkdownDescription: "Size of the restored disk, in bytes.",
+									Optional:            true,
+								},
+								"tags": schema.MapAttribute{
+									MarkdownDescription: "Tags to apply to the restored disk.",
+									ElementType:         types.StringType,
+									Optional:            true,
+								},
+							},
+						},
+					},
+				},
+			},
+			"azure_sql_config": schema.SingleNestedBlock{
+				MarkdownDescription: "Azure SQL database restore configuration. Required when restoring an Azure SQL database.",
+				Attributes: map[string]schema.Attribute{
+					"region": schema.StringAttribute{
+						MarkdownDescription: "Region to restore the database to.",
+						Optional:            true,
+					},
+					"resource_group_name": schema.StringAttribute{
+						MarkdownDescription: "Name of the resource group to restore to.",
+						Optional:            true,
+					},
+					"server_name": schema.StringAttribute{
+						MarkdownDescription: "Name of the Azure SQL server to restore to.",
+						Optional:            true,
+					},
+					"admin_user_name": schema.StringAttribute{
+						MarkdownDescription: "Administrator username for the restored database server.",
+						Optional:            true,
+					},
+					"tags": schema.MapAttribute{
+						MarkdownDescription: "Tags to apply to the restored database as key-value pairs.",
 						ElementType:         types.StringType,
 						Optional:            true,
 					},
@@ -808,16 +1065,22 @@ func (r *RestoreJobResource) Create(ctx context.Context, req resource.CreateRequ
 		jobId, err = r.createGcpBigQueryDatasetRestore(ctx, data, resourceId)
 	} else {
 		// Validate restore_type for all non-BigQuery resource types
-		if restoreType != "full" && restoreType != "partial" {
-			resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Invalid restore_type: %s. Supported types: full, partial", restoreType))
+		if restoreType != "full" && restoreType != "partial" && restoreType != "ebs_snapshot" {
+			resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Invalid restore_type: %s. Supported types: full, partial, ebs_snapshot", restoreType))
 			return
 		}
 
 		// Route to the correct restore method based on resource type
 		switch inventoryResource.GetResourceType() {
 		// AWS resource types
-		case externalEonSdkAPI.AWS_EC2:
-			if restoreType == "partial" {
+		case externalEonSdkAPI.AWS_EC2, externalEonSdkAPI.AWS_EBS_VOLUME:
+			if restoreType == "ebs_snapshot" || data.EbsSnapshotConfig != nil {
+				if data.EbsSnapshotConfig == nil {
+					resp.Diagnostics.AddError("Configuration Error", "ebs_snapshot_config is required when restore_type is 'ebs_snapshot'")
+					return
+				}
+				jobId, err = r.createEbsSnapshotRestore(ctx, data, resourceId)
+			} else if restoreType == "partial" {
 				if data.EbsConfig == nil {
 					resp.Diagnostics.AddError("Configuration Error", "ebs_config is required when restoring AWS EC2 volumes with restore_type 'partial'")
 					return
@@ -850,6 +1113,38 @@ func (r *RestoreJobResource) Create(ctx context.Context, req resource.CreateRequ
 				}
 				jobId, err = r.createS3FileRestore(ctx, data, resourceId)
 			}
+		case externalEonSdkAPI.AWS_DYNAMO_DB:
+			if data.DynamoDBConfig == nil {
+				resp.Diagnostics.AddError("Configuration Error", "dynamodb_config is required when restoring AWS DynamoDB tables")
+				return
+			}
+			jobId, err = r.createDynamoDBTableRestore(ctx, data, resourceId)
+		case externalEonSdkAPI.AZURE_DISK:
+			if data.AzureDiskConfig == nil {
+				resp.Diagnostics.AddError("Configuration Error", "azure_disk_config is required when restoring Azure disks")
+				return
+			}
+			jobId, err = r.createAzureDiskRestore(ctx, data, resourceId)
+		case externalEonSdkAPI.AZURE_VIRTUAL_MACHINE:
+			if restoreType == "partial" {
+				if data.AzureDiskConfig == nil {
+					resp.Diagnostics.AddError("Configuration Error", "azure_disk_config is required when restoring Azure VM disks with restore_type 'partial'")
+					return
+				}
+				jobId, err = r.createAzureDiskRestore(ctx, data, resourceId)
+			} else {
+				if data.AzureVmConfig == nil {
+					resp.Diagnostics.AddError("Configuration Error", "azure_vm_config is required when restoring Azure VMs with restore_type 'full'")
+					return
+				}
+				jobId, err = r.createAzureVmInstanceRestore(ctx, data, resourceId)
+			}
+		case externalEonSdkAPI.AZURE_SQL_DATABASE:
+			if data.AzureSqlConfig == nil {
+				resp.Diagnostics.AddError("Configuration Error", "azure_sql_config is required when restoring Azure SQL databases")
+				return
+			}
+			jobId, err = r.createAzureSqlDatabaseRestore(ctx, data, resourceId)
 		// GCP resource types
 		case externalEonSdkAPI.GCP_COMPUTE_ENGINE_INSTANCE:
 			if restoreType == "partial" {
@@ -892,7 +1187,7 @@ func (r *RestoreJobResource) Create(ctx context.Context, req resource.CreateRequ
 				jobId, err = r.createGcsFileRestore(ctx, data, resourceId)
 			}
 		default:
-			resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Unsupported resource type: %s. Supported types: AWS_EC2, AWS_RDS, AWS_S3, GCP_COMPUTE_ENGINE_INSTANCE, GCP_DISK, GCP_CLOUD_SQL_INSTANCE, GCP_CLOUD_STORAGE_BUCKET, GCP_BIG_QUERY", inventoryResource.GetResourceType()))
+			resp.Diagnostics.AddError("Configuration Error", fmt.Sprintf("Unsupported resource type: %s. Supported types: AWS_EC2, AWS_EBS_VOLUME, AWS_RDS, AWS_S3, AWS_DYNAMO_DB, AZURE_DISK, AZURE_VIRTUAL_MACHINE, AZURE_SQL_DATABASE, GCP_COMPUTE_ENGINE_INSTANCE, GCP_DISK, GCP_CLOUD_SQL_INSTANCE, GCP_CLOUD_STORAGE_BUCKET, GCP_BIG_QUERY", inventoryResource.GetResourceType()))
 			return
 		}
 	} // end else (non-BigQuery)
@@ -1007,6 +1302,283 @@ func (r *RestoreJobResource) createEbsVolumeRestore(ctx context.Context, data Re
 	}
 
 	return r.client.StartVolumeRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+func (r *RestoreJobResource) createEbsSnapshotRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.EbsSnapshotConfig
+
+	if config.ProviderVolumeId.IsNull() || config.ProviderVolumeId.ValueString() == "" {
+		return "", fmt.Errorf("provider_volume_id is required for EBS snapshot restore")
+	}
+	if config.Region.IsNull() || config.Region.ValueString() == "" {
+		return "", fmt.Errorf("region is required for EBS snapshot restore")
+	}
+	if config.SnapshotEncryptionKeyId.IsNull() || config.SnapshotEncryptionKeyId.ValueString() == "" {
+		return "", fmt.Errorf("snapshot_encryption_key_id is required for EBS snapshot restore")
+	}
+
+	tags, err := parseMapAttribute(ctx, config.Tags)
+	if err != nil {
+		return "", err
+	}
+
+	target := &externalEonSdkAPI.EbsSnapshotTarget{
+		Region:                  config.Region.ValueString(),
+		SnapshotEncryptionKeyId: config.SnapshotEncryptionKeyId.ValueString(),
+	}
+	if !config.Description.IsNull() && config.Description.ValueString() != "" {
+		desc := config.Description.ValueString()
+		target.Description = &desc
+	}
+	if tags != nil {
+		target.Tags = &tags
+	}
+
+	apiReq := externalEonSdkAPI.RestoreVolumeToEbsSnapshotRequest{
+		ProviderVolumeId: config.ProviderVolumeId.ValueString(),
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Destination: externalEonSdkAPI.EbsSnapshotRestoreDestination{
+			AwsEbs: target,
+		},
+	}
+
+	return r.client.StartEbsSnapshotRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+func (r *RestoreJobResource) createDynamoDBTableRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.DynamoDBConfig
+
+	if config.RestoreRegion.IsNull() || config.RestoreRegion.ValueString() == "" {
+		return "", fmt.Errorf("restore_region is required for DynamoDB table restore")
+	}
+	if config.RestoredName.IsNull() || config.RestoredName.ValueString() == "" {
+		return "", fmt.Errorf("restored_name is required for DynamoDB table restore")
+	}
+
+	tags, err := parseMapAttribute(ctx, config.Tags)
+	if err != nil {
+		return "", err
+	}
+
+	dest := &externalEonSdkAPI.AwsDynamoDBDestination{
+		RestoreRegion: config.RestoreRegion.ValueString(),
+		RestoredName:  config.RestoredName.ValueString(),
+	}
+	if !config.EncryptionKeyId.IsNull() && config.EncryptionKeyId.ValueString() != "" {
+		key := config.EncryptionKeyId.ValueString()
+		dest.EncryptionKeyId = &key
+	}
+	if !config.WriteCapacityUnits.IsNull() {
+		wcu, err := SafeInt32Conversion(config.WriteCapacityUnits.ValueInt64())
+		if err != nil {
+			return "", err
+		}
+		dest.WriteCapacityUnits = &wcu
+	}
+	if tags != nil {
+		dest.Tags = &tags
+	}
+
+	apiReq := externalEonSdkAPI.RestoreDynamoDBTableRequest{
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Destination: externalEonSdkAPI.DynamodbTableRestoreDestination{
+			AwsDynamodb: dest,
+		},
+	}
+
+	return r.client.StartDynamoDBTableRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+func azureDiskSettingsFromModel(ctx context.Context, name, diskType, tier, hyperV types.String, sizeBytes types.Int64, tags types.Map) (externalEonSdkAPI.AzureDiskSettings, error) {
+	settings := externalEonSdkAPI.AzureDiskSettings{
+		Name: name.ValueString(),
+		Type: diskType.ValueString(),
+		Tier: tier.ValueString(),
+	}
+	if !hyperV.IsNull() && hyperV.ValueString() != "" {
+		v := hyperV.ValueString()
+		settings.HyperVGeneration = &v
+	}
+	if !sizeBytes.IsNull() && sizeBytes.ValueInt64() != 0 {
+		v := sizeBytes.ValueInt64()
+		settings.SizeBytes = &v
+	}
+	parsedTags, err := parseMapAttribute(ctx, tags)
+	if err != nil {
+		return settings, err
+	}
+	if parsedTags != nil {
+		settings.Tags = &parsedTags
+	}
+	return settings, nil
+}
+
+func (r *RestoreJobResource) createAzureDiskRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.AzureDiskConfig
+
+	if config.ProviderDiskId.IsNull() || config.ProviderDiskId.ValueString() == "" {
+		return "", fmt.Errorf("provider_disk_id is required for Azure disk restore")
+	}
+	if config.Region.IsNull() || config.Region.ValueString() == "" {
+		return "", fmt.Errorf("region is required for Azure disk restore")
+	}
+	if config.ResourceGroupName.IsNull() || config.ResourceGroupName.ValueString() == "" {
+		return "", fmt.Errorf("resource_group_name is required for Azure disk restore")
+	}
+	if config.Name.IsNull() || config.Name.ValueString() == "" {
+		return "", fmt.Errorf("name is required for Azure disk restore")
+	}
+	if config.DiskType.IsNull() || config.DiskType.ValueString() == "" {
+		return "", fmt.Errorf("disk_type is required for Azure disk restore")
+	}
+	if config.Tier.IsNull() || config.Tier.ValueString() == "" {
+		return "", fmt.Errorf("tier is required for Azure disk restore")
+	}
+
+	settings, err := azureDiskSettingsFromModel(ctx, config.Name, config.DiskType, config.Tier, config.HyperVGeneration, config.SizeBytes, config.Tags)
+	if err != nil {
+		return "", err
+	}
+
+	target := &externalEonSdkAPI.AzureDiskTarget{
+		Region:            config.Region.ValueString(),
+		ResourceGroupName: config.ResourceGroupName.ValueString(),
+		Settings:          settings,
+	}
+
+	apiReq := externalEonSdkAPI.RestoreAzureDiskRequest{
+		ProviderDiskId:   config.ProviderDiskId.ValueString(),
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Destination: externalEonSdkAPI.AzureDiskRestoreDestination{
+			AzureDisk: target,
+		},
+	}
+
+	return r.client.StartAzureDiskRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+func (r *RestoreJobResource) createAzureVmInstanceRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.AzureVmConfig
+
+	if config.Region.IsNull() || config.Region.ValueString() == "" {
+		return "", fmt.Errorf("region is required for Azure VM restore")
+	}
+	if config.ResourceGroupName.IsNull() || config.ResourceGroupName.ValueString() == "" {
+		return "", fmt.Errorf("resource_group_name is required for Azure VM restore")
+	}
+	if config.VmName.IsNull() || config.VmName.ValueString() == "" {
+		return "", fmt.Errorf("vm_name is required for Azure VM restore")
+	}
+	if config.VmSize.IsNull() || config.VmSize.ValueString() == "" {
+		return "", fmt.Errorf("vm_size is required for Azure VM restore")
+	}
+	if config.Disks.IsNull() || len(config.Disks.Elements()) == 0 {
+		return "", fmt.Errorf("disks is required for Azure VM restore")
+	}
+
+	tags, err := parseMapAttribute(ctx, config.Tags)
+	if err != nil {
+		return "", err
+	}
+
+	var diskParams []AzureVmDiskRestoreParam
+	diags := config.Disks.ElementsAs(ctx, &diskParams, false)
+	if diags.HasError() {
+		return "", fmt.Errorf("failed to parse Azure VM disks")
+	}
+
+	disks := make([]externalEonSdkAPI.RestoreAzureInstanceDiskInput, 0, len(diskParams))
+	for _, disk := range diskParams {
+		if disk.ProviderDiskId.IsNull() || disk.ProviderDiskId.ValueString() == "" {
+			return "", fmt.Errorf("provider_disk_id is required for each Azure VM disk")
+		}
+		if disk.Name.IsNull() || disk.Name.ValueString() == "" {
+			return "", fmt.Errorf("name is required for each Azure VM disk")
+		}
+		if disk.DiskType.IsNull() || disk.DiskType.ValueString() == "" {
+			return "", fmt.Errorf("disk_type is required for each Azure VM disk")
+		}
+		if disk.Tier.IsNull() || disk.Tier.ValueString() == "" {
+			return "", fmt.Errorf("tier is required for each Azure VM disk")
+		}
+		settings, err := azureDiskSettingsFromModel(ctx, disk.Name, disk.DiskType, disk.Tier, disk.HyperVGeneration, disk.SizeBytes, disk.Tags)
+		if err != nil {
+			return "", err
+		}
+		disks = append(disks, externalEonSdkAPI.RestoreAzureInstanceDiskInput{
+			ProviderDiskId: disk.ProviderDiskId.ValueString(),
+			Settings:       settings,
+		})
+	}
+
+	target := &externalEonSdkAPI.AzureVmInstanceRestoreTarget{
+		Region:            config.Region.ValueString(),
+		ResourceGroupName: config.ResourceGroupName.ValueString(),
+		VmName:            config.VmName.ValueString(),
+		VmSize:            config.VmSize.ValueString(),
+		Disks:             disks,
+	}
+	if !config.NetworkInterface.IsNull() && config.NetworkInterface.ValueString() != "" {
+		ni := config.NetworkInterface.ValueString()
+		target.NetworkInterface = &ni
+	}
+	if !config.StartInstanceAfterRestore.IsNull() {
+		v := config.StartInstanceAfterRestore.ValueBool()
+		target.StartInstanceAfterRestore = &v
+	}
+	if tags != nil {
+		target.Tags = &tags
+	}
+
+	apiReq := externalEonSdkAPI.RestoreAzureVmInstanceRequest{
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Destination: externalEonSdkAPI.AzureVmInstanceRestoreDestination{
+			AzureVm: target,
+		},
+	}
+
+	return r.client.StartAzureVmInstanceRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
+}
+
+func (r *RestoreJobResource) createAzureSqlDatabaseRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
+	config := data.AzureSqlConfig
+
+	if config.Region.IsNull() || config.Region.ValueString() == "" {
+		return "", fmt.Errorf("region is required for Azure SQL database restore")
+	}
+	if config.ResourceGroupName.IsNull() || config.ResourceGroupName.ValueString() == "" {
+		return "", fmt.Errorf("resource_group_name is required for Azure SQL database restore")
+	}
+	if config.ServerName.IsNull() || config.ServerName.ValueString() == "" {
+		return "", fmt.Errorf("server_name is required for Azure SQL database restore")
+	}
+	if config.AdminUserName.IsNull() || config.AdminUserName.ValueString() == "" {
+		return "", fmt.Errorf("admin_user_name is required for Azure SQL database restore")
+	}
+
+	tags, err := parseMapAttribute(ctx, config.Tags)
+	if err != nil {
+		return "", err
+	}
+
+	target := &externalEonSdkAPI.AzureSqlDatabaseRestoreTarget{
+		Region:            config.Region.ValueString(),
+		ResourceGroupName: config.ResourceGroupName.ValueString(),
+		ServerName:        config.ServerName.ValueString(),
+		AdminUserName:     config.AdminUserName.ValueString(),
+	}
+	if tags != nil {
+		target.Tags = &tags
+	}
+
+	apiReq := externalEonSdkAPI.RestoreAzureSqlDatabaseRequest{
+		RestoreAccountId: data.RestoreAccountId.ValueString(),
+		Destination: externalEonSdkAPI.AzureSqlDatabaseRestoreDestination{
+			AzureSqlDatabase: target,
+		},
+	}
+
+	return r.client.StartAzureSqlDatabaseRestore(ctx, resourceId, data.SnapshotId.ValueString(), apiReq)
 }
 
 func (r *RestoreJobResource) createEc2InstanceRestore(ctx context.Context, data RestoreJobResourceModel, resourceId string) (string, error) {
@@ -1640,16 +2212,27 @@ func (r *RestoreJobResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	if data.JobId.IsNull() || data.JobId.ValueString() == "" {
+	jobID := data.JobId.ValueString()
+	if jobID == "" {
+		jobID = data.Id.ValueString()
+	}
+	if jobID == "" {
 		return
 	}
 
-	job, err := r.client.GetRestoreJob(ctx, data.JobId.ValueString())
+	job, err := r.client.GetRestoreJob(ctx, jobID)
 	if err != nil {
+		var apiErr *client.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read restore job: %s", err))
 		return
 	}
 
+	data.JobId = types.StringValue(job.GetJobExecutionDetails().JobId)
+	data.Id = types.StringValue(job.GetJobExecutionDetails().JobId)
 	r.updateJobStatus(ctx, &data, job)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -1673,5 +2256,6 @@ func (r *RestoreJobResource) Delete(ctx context.Context, req resource.DeleteRequ
 }
 
 func (r *RestoreJobResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("job_id"), req.ID)...)
 }
