@@ -385,3 +385,91 @@ output "bigquery_dataset_filtered_restore_info" {
     completed_at = eon_restore_job.bigquery_dataset_filtered.completed_at
   }
 }
+
+# 13. DynamoDB Table Restore
+resource "eon_restore_job" "dynamodb_table" {
+  restore_type        = "full"
+  snapshot_id         = "cd6312c7-0713-4a24-a0b3-b838c1108d2f"
+  restore_account_id  = "e696c7f0-17c6-4d9b-b589-591293c00d36"
+  timeout_minutes     = 120
+  wait_for_completion = true
+
+  dynamodb_config {
+    restore_region = "us-east-1"
+    restored_name  = "eon-restored-table"
+  }
+}
+
+# 14. Restore volume to native EBS snapshot
+resource "eon_restore_job" "ebs_snapshot" {
+  restore_type        = "ebs_snapshot"
+  snapshot_id         = "cd6312c7-0713-4a24-a0b3-b838c1108d2f"
+  restore_account_id  = "e696c7f0-17c6-4d9b-b589-591293c00d36"
+  timeout_minutes     = 60
+  wait_for_completion = true
+
+  ebs_snapshot_config {
+    provider_volume_id         = "vol-0f55f55a02e069c53"
+    region                     = "us-east-1"
+    snapshot_encryption_key_id = "alias/aws/ebs"
+    description                = "Native EBS snapshot from Eon"
+  }
+}
+
+# 15. Azure Disk Restore
+resource "eon_restore_job" "azure_disk" {
+  restore_type        = "partial"
+  snapshot_id         = "cd6312c7-0713-4a24-a0b3-b838c1108d2f"
+  restore_account_id  = "e696c7f0-17c6-4d9b-b589-591293c00d36"
+  timeout_minutes     = 60
+  wait_for_completion = true
+
+  azure_disk_config {
+    provider_disk_id    = "disk-id-1"
+    region              = "eastus"
+    resource_group_name = "rg-restore"
+    name                = "eon-restored-disk"
+    disk_type           = "Premium_LRS"
+    tier                = "P10"
+  }
+}
+
+# 16. Azure VM Instance Restore
+resource "eon_restore_job" "azure_vm" {
+  restore_type        = "full"
+  snapshot_id         = "cd6312c7-0713-4a24-a0b3-b838c1108d2f"
+  restore_account_id  = "e696c7f0-17c6-4d9b-b589-591293c00d36"
+  timeout_minutes     = 120
+  wait_for_completion = true
+
+  azure_vm_config {
+    region              = "eastus"
+    resource_group_name = "rg-restore"
+    vm_name             = "eon-restored-vm"
+    vm_size             = "Standard_D2s_v3"
+    network_interface   = "nic-restore"
+
+    disks {
+      provider_disk_id = "disk-id-1"
+      name             = "osdisk"
+      disk_type        = "Premium_LRS"
+      tier             = "P10"
+    }
+  }
+}
+
+# 17. Azure SQL Database Restore
+resource "eon_restore_job" "azure_sql" {
+  restore_type        = "full"
+  snapshot_id         = "cd6312c7-0713-4a24-a0b3-b838c1108d2f"
+  restore_account_id  = "e696c7f0-17c6-4d9b-b589-591293c00d36"
+  timeout_minutes     = 180
+  wait_for_completion = true
+
+  azure_sql_config {
+    region              = "eastus"
+    resource_group_name = "rg-restore"
+    server_name         = "eon-sql-server"
+    admin_user_name     = "sqladmin"
+  }
+}
