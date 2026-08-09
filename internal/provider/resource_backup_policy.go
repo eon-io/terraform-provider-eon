@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 	"github.com/eon-io/terraform-provider-eon/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -64,8 +67,18 @@ type AwsNativePitrPlanModel struct {
 	ResourceType  types.String `tfsdk:"resource_type"`
 }
 
+type AwsNativeStandardPlanModel struct {
+	BackupSchedules types.List `tfsdk:"backup_schedules"`
+}
+
 type BackupScheduleModel struct {
 	VaultId        types.String `tfsdk:"vault_id"`
+	RetentionDays  types.Int64  `tfsdk:"retention_days"`
+	ScheduleConfig types.Object `tfsdk:"schedule_config"`
+}
+
+type AwsNativeStandardScheduleModel struct {
+	TargetRegion   types.String `tfsdk:"target_region"`
 	RetentionDays  types.Int64  `tfsdk:"retention_days"`
 	ScheduleConfig types.Object `tfsdk:"schedule_config"`
 }
@@ -585,7 +598,7 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 				Required:            true,
 				Attributes: map[string]schema.Attribute{
 					"backup_policy_type": schema.StringAttribute{
-						MarkdownDescription: "Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', 'PITR', or 'AWS_NATIVE_PITR'",
+						MarkdownDescription: "Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', 'PITR', 'AWS_NATIVE_PITR', or 'AWS_NATIVE_STANDARD'",
 						Required:            true,
 					},
 					"standard_plan": schema.SingleNestedAttribute{
@@ -610,122 +623,10 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 											MarkdownDescription: "Retention days",
 											Required:            true,
 										},
-										"schedule_config": schema.SingleNestedAttribute{
-											MarkdownDescription: "Schedule configuration",
-											Required:            true,
-											Attributes: map[string]schema.Attribute{
-												"frequency": schema.StringAttribute{
-													MarkdownDescription: "Frequency: 'DAILY', 'WEEKLY', 'MONTHLY', 'ANNUALLY', 'INTERVAL'",
-													Required:            true,
-												},
-												"daily_config": schema.SingleNestedAttribute{
-													MarkdownDescription: "Daily configuration",
-													Optional:            true,
-													Attributes: map[string]schema.Attribute{
-														"time_of_day_hour": schema.Int64Attribute{
-															MarkdownDescription: "Hour of day (0-23)",
-															Optional:            true,
-														},
-														"time_of_day_minutes": schema.Int64Attribute{
-															MarkdownDescription: "Minutes of hour (0-59)",
-															Optional:            true,
-														},
-														"start_window_minutes": schema.Int64Attribute{
-															MarkdownDescription: "Start window in minutes",
-															Optional:            true,
-														},
-													},
-												},
-												"weekly_config": schema.SingleNestedAttribute{
-													MarkdownDescription: "Weekly configuration",
-													Optional:            true,
-													Attributes: map[string]schema.Attribute{
-														"day_of_week": schema.StringAttribute{
-															MarkdownDescription: "Day of week: 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'",
-															Required:            true,
-														},
-														"time_of_day_hour": schema.Int64Attribute{
-															MarkdownDescription: "Hour of day (0-23)",
-															Optional:            true,
-														},
-														"time_of_day_minutes": schema.Int64Attribute{
-															MarkdownDescription: "Minutes of hour (0-59)",
-															Optional:            true,
-														},
-														"start_window_minutes": schema.Int64Attribute{
-															MarkdownDescription: "Start window in minutes",
-															Optional:            true,
-														},
-													},
-												},
-												"monthly_config": schema.SingleNestedAttribute{
-													MarkdownDescription: "Monthly configuration",
-													Optional:            true,
-													Attributes: map[string]schema.Attribute{
-														"day_of_month": schema.Int64Attribute{
-															MarkdownDescription: "Day of month (1-31)",
-															Required:            true,
-														},
-														"time_of_day_hour": schema.Int64Attribute{
-															MarkdownDescription: "Hour of day (0-23)",
-															Optional:            true,
-														},
-														"time_of_day_minutes": schema.Int64Attribute{
-															MarkdownDescription: "Minutes of hour (0-59)",
-															Optional:            true,
-														},
-														"start_window_minutes": schema.Int64Attribute{
-															MarkdownDescription: "Start window in minutes",
-															Optional:            true,
-														},
-													},
-												},
-												"annually_config": schema.SingleNestedAttribute{
-													MarkdownDescription: "Annually configuration",
-													Optional:            true,
-													Attributes: map[string]schema.Attribute{
-														"month": schema.StringAttribute{
-															MarkdownDescription: "Month: 'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'",
-															Required:            true,
-														},
-														"day_of_month": schema.Int64Attribute{
-															MarkdownDescription: "Day of month (1-31)",
-															Required:            true,
-														},
-														"time_of_day_hour": schema.Int64Attribute{
-															MarkdownDescription: "Hour of day (0-23)",
-															Optional:            true,
-														},
-														"time_of_day_minutes": schema.Int64Attribute{
-															MarkdownDescription: "Minutes of hour (0-59)",
-															Optional:            true,
-														},
-														"start_window_minutes": schema.Int64Attribute{
-															MarkdownDescription: "Start window in minutes",
-															Optional:            true,
-														},
-													},
-												},
-												"interval_config": schema.SingleNestedAttribute{
-													MarkdownDescription: "Interval configuration. Specify either interval_minutes OR interval_hours (not both)",
-													Optional:            true,
-													Attributes: map[string]schema.Attribute{
-														"interval_minutes": schema.Int64Attribute{
-															MarkdownDescription: "Interval in minutes. Either this or interval_hours must be specified (not both). For STANDARD policies, must be divisible by 60",
-															Optional:            true,
-														},
-														"interval_hours": schema.Int64Attribute{
-															MarkdownDescription: "Interval in hours. Either this or interval_minutes must be specified (not both). More convenient for STANDARD policies",
-															Optional:            true,
-														},
-														"start_window_minutes": schema.Int64Attribute{
-															MarkdownDescription: "Start window in minutes",
-															Optional:            true,
-														},
-													},
-												},
-											},
-										},
+										"schedule_config": scheduleConfigAttribute(
+											"Interval in minutes. Either this or interval_hours must be specified (not both). For STANDARD policies, must be divisible by 60",
+											"Interval in hours. Either this or interval_minutes must be specified (not both). More convenient for STANDARD policies",
+										),
 									},
 								},
 							},
@@ -797,6 +698,33 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 							"resource_type": schema.StringAttribute{
 								MarkdownDescription: "Resource type for PITR backup, e.g. 'AWS_RDS'",
 								Required:            true,
+							},
+						},
+					},
+					"aws_native_standard_plan": schema.SingleNestedAttribute{
+						MarkdownDescription: "AWS native standard backup plan, storing snapshots in the AWS source account instead of an Eon vault (mirrors the console's \"Store snapshots in: AWS source account\" destination). Required when backup_policy_type is 'AWS_NATIVE_STANDARD', which is the only way to back up EFS and FSx, whose native backups cannot leave the source account",
+						Optional:            true,
+						Attributes: map[string]schema.Attribute{
+							"backup_schedules": schema.ListNestedAttribute{
+								MarkdownDescription: "List of backup schedules",
+								Required:            true,
+								NestedObject: schema.NestedAttributeObject{
+									Attributes: map[string]schema.Attribute{
+										"target_region": schema.StringAttribute{
+											MarkdownDescription: "AWS region the backups are copied to, e.g. 'us-east-1'. Omit to keep each backup in its resource's own region",
+											Optional:            true,
+										},
+										"retention_days": schema.Int64Attribute{
+											MarkdownDescription: "Retention days. Minimum 1 for DAILY and INTERVAL, 14 for WEEKLY, 60 for MONTHLY, 730 for ANNUALLY; maximum 36500, the AWS Backup ceiling",
+											Required:            true,
+										},
+										"schedule_config": scheduleConfigAttribute(
+											"Interval in minutes. Either this or interval_hours must be specified (not both). Must be divisible by 60",
+											"Interval in hours. Either this or interval_minutes must be specified (not both)",
+										),
+									},
+									Validators: []validator.Object{awsNativeStandardScheduleValidator{}},
+								},
 							},
 						},
 					},
@@ -1057,11 +985,19 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		awsNativePitrPlan := externalEonSdkAPI.NewAwsNativePitrBackupPolicyPlan(retentionDays, *resourceType)
 		backupPlan.SetAwsNativePitrPlan(*awsNativePitrPlan)
 
+	case "AWS_NATIVE_STANDARD":
+		awsNativeStandardPlan, planDiags := buildAwsNativeStandardPlan(ctx, backupPlanAttrs)
+		resp.Diagnostics.Append(planDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		backupPlan.SetAwsNativeStandardPlan(*awsNativeStandardPlan)
+
 	default:
 		resp.Diagnostics.AddError(
 			"Unsupported Backup Policy Type",
-			fmt.Sprintf("Backup policy type '%s' is not supported. Supported types: STANDARD, PITR, HIGH_FREQUENCY, AWS_NATIVE_PITR.",
-				backupPolicyType.ValueString()),
+			fmt.Sprintf("Backup policy type '%s' is not supported. Supported types: %s.",
+				backupPolicyType.ValueString(), supportedBackupPolicyTypes),
 		)
 		return
 	}
@@ -1382,11 +1318,19 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		awsNativePitrPlan := externalEonSdkAPI.NewAwsNativePitrBackupPolicyPlan(retentionDays, *resourceType)
 		backupPlan.SetAwsNativePitrPlan(*awsNativePitrPlan)
 
+	case "AWS_NATIVE_STANDARD":
+		awsNativeStandardPlan, planDiags := buildAwsNativeStandardPlan(ctx, backupPlanAttrs)
+		resp.Diagnostics.Append(planDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		backupPlan.SetAwsNativeStandardPlan(*awsNativeStandardPlan)
+
 	default:
 		resp.Diagnostics.AddError(
 			"Unsupported Backup Policy Type",
-			fmt.Sprintf("Backup policy type '%s' is not supported. Supported types: STANDARD, PITR, HIGH_FREQUENCY, AWS_NATIVE_PITR.",
-				backupPolicyType.ValueString()),
+			fmt.Sprintf("Backup policy type '%s' is not supported. Supported types: %s.",
+				backupPolicyType.ValueString(), supportedBackupPolicyTypes),
 		)
 		return
 	}
@@ -1476,6 +1420,221 @@ func createDailyConfigFromModel(data *DailyConfigModel) (*externalEonSdkAPI.Dail
 	return dailyConfig, nil
 }
 
+// scheduleConfigAttribute builds the frequency configuration shared by the vault-backed standard
+// schedules and the AWS source-account schedules, which differ only in the intervals they accept.
+func scheduleConfigAttribute(intervalMinutesDescription, intervalHoursDescription string) schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		MarkdownDescription: "Schedule configuration",
+		Required:            true,
+		Attributes: map[string]schema.Attribute{
+			"frequency": schema.StringAttribute{
+				MarkdownDescription: "Frequency: 'DAILY', 'WEEKLY', 'MONTHLY', 'ANNUALLY', 'INTERVAL'",
+				Required:            true,
+			},
+			"daily_config": schema.SingleNestedAttribute{
+				MarkdownDescription: "Daily configuration",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"time_of_day_hour": schema.Int64Attribute{
+						MarkdownDescription: "Hour of day (0-23)",
+						Optional:            true,
+					},
+					"time_of_day_minutes": schema.Int64Attribute{
+						MarkdownDescription: "Minutes of hour (0-59)",
+						Optional:            true,
+					},
+					"start_window_minutes": schema.Int64Attribute{
+						MarkdownDescription: "Start window in minutes",
+						Optional:            true,
+					},
+				},
+			},
+			"weekly_config": schema.SingleNestedAttribute{
+				MarkdownDescription: "Weekly configuration",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"day_of_week": schema.StringAttribute{
+						MarkdownDescription: "Day of week: 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'",
+						Required:            true,
+					},
+					"time_of_day_hour": schema.Int64Attribute{
+						MarkdownDescription: "Hour of day (0-23)",
+						Optional:            true,
+					},
+					"time_of_day_minutes": schema.Int64Attribute{
+						MarkdownDescription: "Minutes of hour (0-59)",
+						Optional:            true,
+					},
+					"start_window_minutes": schema.Int64Attribute{
+						MarkdownDescription: "Start window in minutes",
+						Optional:            true,
+					},
+				},
+			},
+			"monthly_config": schema.SingleNestedAttribute{
+				MarkdownDescription: "Monthly configuration",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"day_of_month": schema.Int64Attribute{
+						MarkdownDescription: "Day of month (1-31)",
+						Required:            true,
+					},
+					"time_of_day_hour": schema.Int64Attribute{
+						MarkdownDescription: "Hour of day (0-23)",
+						Optional:            true,
+					},
+					"time_of_day_minutes": schema.Int64Attribute{
+						MarkdownDescription: "Minutes of hour (0-59)",
+						Optional:            true,
+					},
+					"start_window_minutes": schema.Int64Attribute{
+						MarkdownDescription: "Start window in minutes",
+						Optional:            true,
+					},
+				},
+			},
+			"annually_config": schema.SingleNestedAttribute{
+				MarkdownDescription: "Annually configuration",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"month": schema.StringAttribute{
+						MarkdownDescription: "Month: 'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'",
+						Required:            true,
+					},
+					"day_of_month": schema.Int64Attribute{
+						MarkdownDescription: "Day of month (1-31)",
+						Required:            true,
+					},
+					"time_of_day_hour": schema.Int64Attribute{
+						MarkdownDescription: "Hour of day (0-23)",
+						Optional:            true,
+					},
+					"time_of_day_minutes": schema.Int64Attribute{
+						MarkdownDescription: "Minutes of hour (0-59)",
+						Optional:            true,
+					},
+					"start_window_minutes": schema.Int64Attribute{
+						MarkdownDescription: "Start window in minutes",
+						Optional:            true,
+					},
+				},
+			},
+			"interval_config": schema.SingleNestedAttribute{
+				MarkdownDescription: "Interval configuration. Specify either interval_minutes OR interval_hours (not both)",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"interval_minutes": schema.Int64Attribute{
+						MarkdownDescription: intervalMinutesDescription,
+						Optional:            true,
+					},
+					"interval_hours": schema.Int64Attribute{
+						MarkdownDescription: intervalHoursDescription,
+						Optional:            true,
+					},
+					"start_window_minutes": schema.Int64Attribute{
+						MarkdownDescription: "Start window in minutes",
+						Optional:            true,
+					},
+				},
+			},
+		},
+	}
+}
+
+// awsNativeStandardScheduleValidator reports the interval and retention limits AWS Backup enforces
+// while the practitioner is still looking at a plan, instead of letting the apply fail on the API.
+type awsNativeStandardScheduleValidator struct{}
+
+func (awsNativeStandardScheduleValidator) Description(_ context.Context) string {
+	return fmt.Sprintf("interval must be one of %s hours and retention must respect the per-frequency minimum",
+		intervalHoursList(awsNativeStandardIntervalHours))
+}
+
+func (v awsNativeStandardScheduleValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (awsNativeStandardScheduleValidator) ValidateObject(_ context.Context, req validator.ObjectRequest, resp *validator.ObjectResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	scheduleAttrs := req.ConfigValue.Attributes()
+	scheduleConfig, ok := scheduleAttrs["schedule_config"].(types.Object)
+	if !ok || scheduleConfig.IsNull() || scheduleConfig.IsUnknown() {
+		return
+	}
+
+	configAttrs := scheduleConfig.Attributes()
+	frequencyValue, ok := configAttrs["frequency"].(types.String)
+	if !ok || frequencyValue.IsNull() || frequencyValue.IsUnknown() {
+		return
+	}
+	frequency := frequencyValue.ValueString()
+
+	if frequency == "INTERVAL" {
+		validateAwsNativeStandardInterval(req.Path, configAttrs["interval_config"], resp)
+	}
+
+	retention, ok := scheduleAttrs["retention_days"].(types.Int64)
+	if !ok || retention.IsNull() || retention.IsUnknown() {
+		return
+	}
+
+	days := retention.ValueInt64()
+	if minimum, known := awsNativeStandardMinRetentionDays[frequency]; known && days < minimum {
+		resp.Diagnostics.AddAttributeError(req.Path.AtName("retention_days"), "Invalid retention_days",
+			fmt.Sprintf("AWS source-account %s backups require at least %d retention days, got %d", frequency, minimum, days))
+	}
+	if days > awsNativeStandardMaxRetentionDays {
+		resp.Diagnostics.AddAttributeError(req.Path.AtName("retention_days"), "Invalid retention_days",
+			fmt.Sprintf("retention_days must not exceed %d, got %d", awsNativeStandardMaxRetentionDays, days))
+	}
+}
+
+func validateAwsNativeStandardInterval(schedulePath path.Path, intervalValue attr.Value, resp *validator.ObjectResponse) {
+	intervalConfig, ok := intervalValue.(types.Object)
+	if !ok || intervalConfig.IsNull() || intervalConfig.IsUnknown() {
+		return
+	}
+	intervalPath := schedulePath.AtName("schedule_config").AtName("interval_config")
+
+	intervalAttrs := intervalConfig.Attributes()
+	minutes, hasMinutes := knownInt64(intervalAttrs["interval_minutes"])
+	hours, hasHours := knownInt64(intervalAttrs["interval_hours"])
+
+	if hasMinutes && hasHours {
+		resp.Diagnostics.AddAttributeError(intervalPath, "Conflicting interval",
+			"Specify either interval_minutes or interval_hours, not both")
+		return
+	}
+
+	if hasMinutes {
+		if minutes%60 != 0 {
+			resp.Diagnostics.AddAttributeError(intervalPath.AtName("interval_minutes"), "Invalid interval_minutes",
+				fmt.Sprintf("interval_minutes must be divisible by 60, got %d", minutes))
+			return
+		}
+		hours = minutes / 60
+	} else if !hasHours {
+		return
+	}
+
+	if !allowedInterval(hours, awsNativeStandardIntervalHours) {
+		resp.Diagnostics.AddAttributeError(intervalPath, "Invalid interval",
+			fmt.Sprintf("AWS source-account backup interval must be %s hours, got %d hours",
+				intervalHoursList(awsNativeStandardIntervalHours), hours))
+	}
+}
+
+func knownInt64(value attr.Value) (int64, bool) {
+	typed, ok := value.(types.Int64)
+	if !ok || typed.IsNull() || typed.IsUnknown() {
+		return 0, false
+	}
+	return typed.ValueInt64(), true
+}
+
 // scheduleTimezoneValidator rejects values outside the SDK's allowed set at plan time. Without it a
 // typo would silently map to UTC on the server (the enum is x-extensible, so unknown values are not
 // rejected there). Sourced from the SDK enum so it stays correct if the allowed set grows.
@@ -1511,9 +1670,140 @@ func applyScheduleTimezone(plan *externalEonSdkAPI.StandardBackupPolicyPlan, tz 
 	}
 }
 
+const supportedBackupPolicyTypes = "STANDARD, PITR, HIGH_FREQUENCY, AWS_NATIVE_PITR, AWS_NATIVE_STANDARD"
+
+// Vault-backed standard policies only accept the three intervals the console offers, while AWS
+// source-account policies map onto AWS Backup rules and accept the shorter ones too.
+var (
+	standardIntervalHours          = []int32{6, 8, 12}
+	awsNativeStandardIntervalHours = []int32{1, 2, 4, 6, 8, 12}
+)
+
+// AWS Backup enforces a retention floor per frequency, so a rejected plan is worth catching before
+// the apply reaches the API.
+var awsNativeStandardMinRetentionDays = map[string]int64{
+	"DAILY":    1,
+	"INTERVAL": 1,
+	"WEEKLY":   14,
+	"MONTHLY":  60,
+	"ANNUALLY": 730,
+}
+
+const awsNativeStandardMaxRetentionDays = 36500
+
+func allowedInterval(hours int64, allowed []int32) bool {
+	for _, candidate := range allowed {
+		if hours == int64(candidate) {
+			return true
+		}
+	}
+	return false
+}
+
+func intervalHoursList(allowed []int32) string {
+	parts := make([]string, 0, len(allowed))
+	for _, hours := range allowed {
+		parts = append(parts, strconv.FormatInt(int64(hours), 10))
+	}
+	if len(parts) < 2 {
+		return strings.Join(parts, "")
+	}
+	return strings.Join(parts[:len(parts)-1], ", ") + ", or " + parts[len(parts)-1]
+}
+
+// buildAwsNativeStandardPlan converts the aws_native_standard_plan block into the API plan whose
+// schedules stay in the AWS source account, keyed by target region instead of an Eon vault.
+func buildAwsNativeStandardPlan(
+	ctx context.Context,
+	backupPlanAttrs map[string]attr.Value,
+) (*externalEonSdkAPI.AwsNativeStandardBackupPolicyPlan, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	planObj, err := requiredPlanObject(backupPlanAttrs, "aws_native_standard_plan", "AWS_NATIVE_STANDARD")
+	if err != nil {
+		diags.AddError("Missing AWS Native Standard Plan", err.Error())
+		return nil, diags
+	}
+
+	var planModel AwsNativeStandardPlanModel
+	diags.Append(planObj.As(ctx, &planModel, basetypes.ObjectAsOptions{})...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	var schedules []AwsNativeStandardScheduleModel
+	diags.Append(planModel.BackupSchedules.ElementsAs(ctx, &schedules, false)...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	backupSchedules := make([]externalEonSdkAPI.AwsNativeStandardBackupSchedules, 0, len(schedules))
+	for _, schedule := range schedules {
+		scheduleConfig, configErr := createAwsNativeStandardScheduleConfig(&schedule)
+		if configErr != nil {
+			diags.AddError(
+				"Invalid Schedule Configuration",
+				fmt.Sprintf("Failed to create AWS native standard schedule configuration: %s", configErr),
+			)
+			return nil, diags
+		}
+
+		retentionDays, retentionErr := SafeInt32Conversion(schedule.RetentionDays.ValueInt64())
+		if retentionErr != nil {
+			diags.AddError("Invalid Retention Days", fmt.Sprintf("Failed to validate retention days: %s", retentionErr))
+			return nil, diags
+		}
+
+		backupSchedules = append(backupSchedules, *externalEonSdkAPI.NewAwsNativeStandardBackupSchedules(
+			schedule.TargetRegion.ValueString(),
+			*scheduleConfig,
+			retentionDays,
+		))
+	}
+
+	return externalEonSdkAPI.NewAwsNativeStandardBackupPolicyPlan(backupSchedules), nil
+}
+
+// createAwsNativeStandardScheduleConfig reuses the standard frequency configuration and re-keys it
+// onto the AWS native schedule type, which differs only in the intervals it accepts.
+func createAwsNativeStandardScheduleConfig(
+	schedule *AwsNativeStandardScheduleModel,
+) (*externalEonSdkAPI.AwsNativeStandardBackupScheduleConfig, error) {
+	standardConfig, err := buildStandardScheduleConfig(schedule.ScheduleConfig, awsNativeStandardIntervalHours)
+	if err != nil {
+		return nil, err
+	}
+
+	config := externalEonSdkAPI.NewAwsNativeStandardBackupScheduleConfig(standardConfig.Frequency)
+	if interval := standardConfig.IntervalConfig.Get(); interval != nil {
+		config.SetIntervalConfig(*externalEonSdkAPI.NewAwsNativeStandardIntervalConfig(interval.IntervalHours))
+	}
+	if daily := standardConfig.DailyConfig.Get(); daily != nil {
+		config.SetDailyConfig(*daily)
+	}
+	if weekly := standardConfig.WeeklyConfig.Get(); weekly != nil {
+		config.SetWeeklyConfig(*weekly)
+	}
+	if monthly := standardConfig.MonthlyConfig.Get(); monthly != nil {
+		config.SetMonthlyConfig(*monthly)
+	}
+	if annually := standardConfig.AnnuallyConfig.Get(); annually != nil {
+		config.SetAnnuallyConfig(*annually)
+	}
+
+	return config, nil
+}
+
 // createStandardScheduleConfig creates a StandardBackupScheduleConfig based on the policy type and frequency
 func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSdkAPI.StandardBackupScheduleConfig, error) {
-	scheduleConfigAttrs := schedule.ScheduleConfig.Attributes()
+	return buildStandardScheduleConfig(schedule.ScheduleConfig, standardIntervalHours)
+}
+
+func buildStandardScheduleConfig(
+	scheduleConfigObj types.Object,
+	allowedIntervalHours []int32,
+) (*externalEonSdkAPI.StandardBackupScheduleConfig, error) {
+	scheduleConfigAttrs := scheduleConfigObj.Attributes()
 	frequencyObj := scheduleConfigAttrs["frequency"]
 	if frequencyObj == nil {
 		return nil, fmt.Errorf("frequency field is required in schedule config")
@@ -1718,8 +2008,8 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 				}
 				intervalHours = intervalMinutes / 60
 
-				if intervalHours != 6 && intervalHours != 8 && intervalHours != 12 {
-					return nil, fmt.Errorf("standard backup interval must be 6, 8, or 12 hours (360, 480, or 720 minutes), got %d hours (%d minutes)", intervalHours, intervalMinutes)
+				if !allowedInterval(int64(intervalHours), allowedIntervalHours) {
+					return nil, fmt.Errorf("backup interval must be %s hours, got %d hours (%d minutes)", intervalHoursList(allowedIntervalHours), intervalHours, intervalMinutes)
 				}
 			} else {
 				intervalHours, err = SafeInt32Conversion(intervalHoursObj.(types.Int64).ValueInt64())
@@ -1727,8 +2017,8 @@ func createStandardScheduleConfig(schedule *BackupScheduleModel) (*externalEonSd
 					return nil, fmt.Errorf("invalid interval_hours: %s", err)
 				}
 
-				if intervalHours != 6 && intervalHours != 8 && intervalHours != 12 {
-					return nil, fmt.Errorf("standard backup interval must be 6, 8, or 12 hours, got %d hours", intervalHours)
+				if !allowedInterval(int64(intervalHours), allowedIntervalHours) {
+					return nil, fmt.Errorf("backup interval must be %s hours, got %d hours", intervalHoursList(allowedIntervalHours), intervalHours)
 				}
 			}
 

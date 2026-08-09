@@ -229,6 +229,60 @@ resource "eon_backup_policy" "aws_native_pitr_backup" {
   }
 }
 
+# Example: AWS source-account backups, the only destination available for EFS and FSx
+resource "eon_backup_policy" "aws_native_standard_backup" {
+  name    = "EFS Production - Source Account Backups"
+  enabled = true
+  resource_selector = {
+    resource_selection_mode = "CONDITIONAL"
+
+    expression = {
+      group = {
+        operator = "AND"
+        operands = [
+          {
+            resource_type = {
+              operator       = "IN"
+              resource_types = ["AWS_EFS"]
+            }
+          }
+        ]
+      }
+    }
+  }
+
+  backup_plan = {
+    backup_policy_type = "AWS_NATIVE_STANDARD"
+
+    aws_native_standard_plan = {
+      backup_schedules = [
+        {
+          # Omit target_region to keep each backup in its resource's own region.
+          target_region  = "us-east-1"
+          retention_days = 30
+          schedule_config = {
+            frequency = "DAILY"
+            daily_config = {
+              time_of_day_hour     = 2
+              time_of_day_minutes  = 0
+              start_window_minutes = 240
+            }
+          }
+        },
+        {
+          retention_days = 7
+          schedule_config = {
+            frequency = "INTERVAL"
+            interval_config = {
+              interval_hours = 4
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
 # Example: Conditional backup policy using new condition types
 resource "eon_backup_policy" "conditional_backup" {
   name    = "Conditional Production Backup"

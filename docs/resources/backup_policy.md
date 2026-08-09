@@ -244,6 +244,60 @@ resource "eon_backup_policy" "aws_native_pitr_backup" {
   }
 }
 
+# Example: AWS source-account backups, the only destination available for EFS and FSx
+resource "eon_backup_policy" "aws_native_standard_backup" {
+  name    = "EFS Production - Source Account Backups"
+  enabled = true
+  resource_selector = {
+    resource_selection_mode = "CONDITIONAL"
+
+    expression = {
+      group = {
+        operator = "AND"
+        operands = [
+          {
+            resource_type = {
+              operator       = "IN"
+              resource_types = ["AWS_EFS"]
+            }
+          }
+        ]
+      }
+    }
+  }
+
+  backup_plan = {
+    backup_policy_type = "AWS_NATIVE_STANDARD"
+
+    aws_native_standard_plan = {
+      backup_schedules = [
+        {
+          # Omit target_region to keep each backup in its resource's own region.
+          target_region  = "us-east-1"
+          retention_days = 30
+          schedule_config = {
+            frequency = "DAILY"
+            daily_config = {
+              time_of_day_hour     = 2
+              time_of_day_minutes  = 0
+              start_window_minutes = 240
+            }
+          }
+        },
+        {
+          retention_days = 7
+          schedule_config = {
+            frequency = "INTERVAL"
+            interval_config = {
+              interval_hours = 4
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
 # Example: Conditional backup policy using new condition types
 resource "eon_backup_policy" "conditional_backup" {
   name    = "Conditional Production Backup"
@@ -562,11 +616,12 @@ output "backup_policies_summary" {
 
 Required:
 
-- `backup_policy_type` (String) Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', 'PITR', or 'AWS_NATIVE_PITR'
+- `backup_policy_type` (String) Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', 'PITR', 'AWS_NATIVE_PITR', or 'AWS_NATIVE_STANDARD'
 
 Optional:
 
 - `aws_native_pitr_plan` (Attributes) AWS native PITR (Point-in-Time Recovery) backup plan for RDS/Aurora continuous backups (see [below for nested schema](#nestedatt--backup_plan--aws_native_pitr_plan))
+- `aws_native_standard_plan` (Attributes) AWS native standard backup plan, storing snapshots in the AWS source account instead of an Eon vault (mirrors the console's "Store snapshots in: AWS source account" destination). Required when backup_policy_type is 'AWS_NATIVE_STANDARD', which is the only way to back up EFS and FSx, whose native backups cannot leave the source account (see [below for nested schema](#nestedatt--backup_plan--aws_native_standard_plan))
 - `high_frequency_plan` (Attributes) High frequency backup plan configuration (see [below for nested schema](#nestedatt--backup_plan--high_frequency_plan))
 - `standard_plan` (Attributes) Standard backup plan configuration (see [below for nested schema](#nestedatt--backup_plan--standard_plan))
 
@@ -577,6 +632,106 @@ Required:
 
 - `resource_type` (String) Resource type for PITR backup, e.g. 'AWS_RDS'
 - `retention_days` (Number) Number of days to retain continuous backups using AWS Backup. AWS allows 1-35 days for RDS/Aurora continuous backups
+
+
+<a id="nestedatt--backup_plan--aws_native_standard_plan"></a>
+### Nested Schema for `backup_plan.aws_native_standard_plan`
+
+Required:
+
+- `backup_schedules` (Attributes List) List of backup schedules (see [below for nested schema](#nestedatt--backup_plan--aws_native_standard_plan--backup_schedules))
+
+<a id="nestedatt--backup_plan--aws_native_standard_plan--backup_schedules"></a>
+### Nested Schema for `backup_plan.aws_native_standard_plan.backup_schedules`
+
+Required:
+
+- `retention_days` (Number) Retention days. Minimum 1 for DAILY and INTERVAL, 14 for WEEKLY, 60 for MONTHLY, 730 for ANNUALLY; maximum 36500, the AWS Backup ceiling
+- `schedule_config` (Attributes) Schedule configuration (see [below for nested schema](#nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config))
+
+Optional:
+
+- `target_region` (String) AWS region the backups are copied to, e.g. 'us-east-1'. Omit to keep each backup in its resource's own region
+
+<a id="nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config"></a>
+### Nested Schema for `backup_plan.aws_native_standard_plan.backup_schedules.schedule_config`
+
+Required:
+
+- `frequency` (String) Frequency: 'DAILY', 'WEEKLY', 'MONTHLY', 'ANNUALLY', 'INTERVAL'
+
+Optional:
+
+- `annually_config` (Attributes) Annually configuration (see [below for nested schema](#nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config--annually_config))
+- `daily_config` (Attributes) Daily configuration (see [below for nested schema](#nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config--daily_config))
+- `interval_config` (Attributes) Interval configuration. Specify either interval_minutes OR interval_hours (not both) (see [below for nested schema](#nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config--interval_config))
+- `monthly_config` (Attributes) Monthly configuration (see [below for nested schema](#nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config--monthly_config))
+- `weekly_config` (Attributes) Weekly configuration (see [below for nested schema](#nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config--weekly_config))
+
+<a id="nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config--annually_config"></a>
+### Nested Schema for `backup_plan.aws_native_standard_plan.backup_schedules.schedule_config.annually_config`
+
+Required:
+
+- `day_of_month` (Number) Day of month (1-31)
+- `month` (String) Month: 'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
+
+Optional:
+
+- `start_window_minutes` (Number) Start window in minutes
+- `time_of_day_hour` (Number) Hour of day (0-23)
+- `time_of_day_minutes` (Number) Minutes of hour (0-59)
+
+
+<a id="nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config--daily_config"></a>
+### Nested Schema for `backup_plan.aws_native_standard_plan.backup_schedules.schedule_config.daily_config`
+
+Optional:
+
+- `start_window_minutes` (Number) Start window in minutes
+- `time_of_day_hour` (Number) Hour of day (0-23)
+- `time_of_day_minutes` (Number) Minutes of hour (0-59)
+
+
+<a id="nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config--interval_config"></a>
+### Nested Schema for `backup_plan.aws_native_standard_plan.backup_schedules.schedule_config.interval_config`
+
+Optional:
+
+- `interval_hours` (Number) Interval in hours. Either this or interval_minutes must be specified (not both)
+- `interval_minutes` (Number) Interval in minutes. Either this or interval_hours must be specified (not both). Must be divisible by 60
+- `start_window_minutes` (Number) Start window in minutes
+
+
+<a id="nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config--monthly_config"></a>
+### Nested Schema for `backup_plan.aws_native_standard_plan.backup_schedules.schedule_config.monthly_config`
+
+Required:
+
+- `day_of_month` (Number) Day of month (1-31)
+
+Optional:
+
+- `start_window_minutes` (Number) Start window in minutes
+- `time_of_day_hour` (Number) Hour of day (0-23)
+- `time_of_day_minutes` (Number) Minutes of hour (0-59)
+
+
+<a id="nestedatt--backup_plan--aws_native_standard_plan--backup_schedules--schedule_config--weekly_config"></a>
+### Nested Schema for `backup_plan.aws_native_standard_plan.backup_schedules.schedule_config.weekly_config`
+
+Required:
+
+- `day_of_week` (String) Day of week: 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'
+
+Optional:
+
+- `start_window_minutes` (Number) Start window in minutes
+- `time_of_day_hour` (Number) Hour of day (0-23)
+- `time_of_day_minutes` (Number) Minutes of hour (0-59)
+
+
+
 
 
 <a id="nestedatt--backup_plan--high_frequency_plan"></a>
