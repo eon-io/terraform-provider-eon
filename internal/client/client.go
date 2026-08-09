@@ -816,6 +816,68 @@ func (c *EonClient) DisableRestoreAccountMetricsConfig(ctx context.Context, acco
 	return nil
 }
 
+// GetSourceAccountMetricsConfig retrieves the metrics configuration of a source account.
+func (c *EonClient) GetSourceAccountMetricsConfig(ctx context.Context, accountId string) (*externalEonSdkAPI.SourceAccountMetricsConfig, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.GetSourceAccountMetricsConfig(ctx, c.projectID, accountId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get source account metrics config"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	config := resp.GetSourceAccountConfig()
+	return &config, nil
+}
+
+// EnableSourceAccountMetricsConfig enables and configures job metrics for a source account.
+func (c *EonClient) EnableSourceAccountMetricsConfig(ctx context.Context, accountId string, req externalEonSdkAPI.EnableSourceAccountMetricsConfigRequest) (*externalEonSdkAPI.SourceAccountMetricsConfig, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.AccountsAPI.EnableSourceAccountMetricsConfig(ctx, c.projectID, accountId).EnableSourceAccountMetricsConfigRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to enable source account metrics config"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	config := resp.GetSourceAccountConfig()
+	return &config, nil
+}
+
+// DisableSourceAccountMetricsConfig disables job metrics for a source account.
+func (c *EonClient) DisableSourceAccountMetricsConfig(ctx context.Context, accountId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.AccountsAPI.DisableSourceAccountMetricsConfig(ctx, c.projectID, accountId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to disable source account metrics config"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // HoldSnapshot places a retention hold on a snapshot so it is not deleted by retention policy.
 func (c *EonClient) HoldSnapshot(ctx context.Context, snapshotId string, req externalEonSdkAPI.HoldSnapshotRequest) error {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
@@ -2309,4 +2371,135 @@ func (c *EonClient) DeleteRole(ctx context.Context, roleId string) error {
 	}
 
 	return nil
+}
+
+// CreateActionApprovalRule creates a multi-party authorization rule for a project.
+func (c *EonClient) CreateActionApprovalRule(ctx context.Context, req externalEonSdkAPI.CreateActionApprovalRuleRequest) (*externalEonSdkAPI.ActionApprovalRule, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.ActionApprovalsAPI.CreateActionApprovalRule(ctx, c.projectID).CreateActionApprovalRuleRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to create action approval rule"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	rule := resp.GetActionApprovalRule()
+	return &rule, nil
+}
+
+// GetActionApprovalRule retrieves an action approval rule by ID.
+func (c *EonClient) GetActionApprovalRule(ctx context.Context, ruleId string) (*externalEonSdkAPI.ActionApprovalRule, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.ActionApprovalsAPI.GetActionApprovalRule(ctx, c.projectID, ruleId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get action approval rule"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	rule := resp.GetActionApprovalRule()
+	return &rule, nil
+}
+
+// UpdateActionApprovalRule updates an existing action approval rule.
+func (c *EonClient) UpdateActionApprovalRule(ctx context.Context, ruleId string, req externalEonSdkAPI.UpdateActionApprovalRuleRequest) (*externalEonSdkAPI.ActionApprovalRule, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.ActionApprovalsAPI.UpdateActionApprovalRule(ctx, c.projectID, ruleId).UpdateActionApprovalRuleRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to update action approval rule"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	rule := resp.GetActionApprovalRule()
+	return &rule, nil
+}
+
+// DeleteActionApprovalRule deletes an action approval rule.
+func (c *EonClient) DeleteActionApprovalRule(ctx context.Context, ruleId string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.ActionApprovalsAPI.DeleteActionApprovalRule(ctx, c.projectID, ruleId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to delete action approval rule"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// ListActionApprovalRules retrieves all action approval rules for the project.
+func (c *EonClient) ListActionApprovalRules(ctx context.Context) ([]externalEonSdkAPI.ActionApprovalRule, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	var all []externalEonSdkAPI.ActionApprovalRule
+	var pageToken string
+
+	for {
+		req := c.client.ActionApprovalsAPI.ListActionApprovalRules(ctx, c.projectID).PageSize(100)
+		if pageToken != "" {
+			req = req.PageToken(pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list action approval rules"); apiErr != nil {
+			if httpResp != nil {
+				_ = httpResp.Body.Close()
+			}
+			return nil, apiErr
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			_ = httpResp.Body.Close()
+			return nil, &APIError{
+				StatusCode: httpResp.StatusCode,
+				Message:    string(body),
+			}
+		}
+
+		all = append(all, resp.GetActionApprovalRules()...)
+
+		hasMore := resp.HasNextPageToken() && resp.GetNextPageToken() != ""
+		_ = httpResp.Body.Close()
+		if !hasMore {
+			break
+		}
+		pageToken = resp.GetNextPageToken()
+	}
+
+	if all == nil {
+		return []externalEonSdkAPI.ActionApprovalRule{}, nil
+	}
+	return all, nil
 }
