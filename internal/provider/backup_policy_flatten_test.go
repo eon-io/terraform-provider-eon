@@ -145,12 +145,90 @@ func TestFlattenBackupPolicy_RejectsUnsupportedPolicyType(t *testing.T) {
 	t.Parallel()
 
 	policy := standardPolicy(dailyScheduleConfig(1, 0))
-	policy.BackupPlan.BackupPolicyType = externalEonSdkAPI.BACKUP_POLICY_TYPE_AWS_NATIVE_STANDARD
+	policy.BackupPlan.BackupPolicyType = externalEonSdkAPI.BACKUP_POLICY_TYPE_AZURE_FILES
 
 	data := BackupPolicyResourceModel{}
 	diags := flattenBackupPolicy(context.Background(), policy, policySchemaType(t), &data)
-	require.True(t, diags.HasError(), "AWS_NATIVE_STANDARD should be rejected")
-	assert.Contains(t, diags.Errors()[0].Detail(), "AWS_NATIVE_STANDARD")
+	require.True(t, diags.HasError(), "AZURE_FILES_STANDARD should be rejected")
+	assert.Contains(t, diags.Errors()[0].Detail(), "AZURE_FILES_STANDARD")
+}
+
+func awsNativeStandardPolicy(schedules ...externalEonSdkAPI.AwsNativeStandardBackupSchedules) *externalEonSdkAPI.BackupPolicy {
+	selector := externalEonSdkAPI.NewBackupPolicyResourceSelector(externalEonSdkAPI.RESOURCE_SELECTOR_MODE_ALL)
+	nativePlan := externalEonSdkAPI.NewAwsNativeStandardBackupPolicyPlan(schedules)
+	plan := externalEonSdkAPI.NewBackupPolicyPlan(externalEonSdkAPI.BACKUP_POLICY_TYPE_AWS_NATIVE_STANDARD)
+	plan.SetAwsNativeStandardPlan(*nativePlan)
+
+	return externalEonSdkAPI.NewBackupPolicy("policy-native", "efs-nightly", true, *selector, *plan)
+}
+
+func awsNativeDailySchedule(targetRegion string, retentionDays int32) externalEonSdkAPI.AwsNativeStandardBackupSchedules {
+	dailyConfig := externalEonSdkAPI.NewDailyConfig()
+	dailyConfig.SetTimeOfDay(*externalEonSdkAPI.NewTimeOfDay(2, 30))
+
+	scheduleConfig := externalEonSdkAPI.NewAwsNativeStandardBackupScheduleConfig(externalEonSdkAPI.STANDARD_BACKUP_SCHEDULE_DAILY)
+	scheduleConfig.SetDailyConfig(*dailyConfig)
+
+	return *externalEonSdkAPI.NewAwsNativeStandardBackupSchedules(targetRegion, *scheduleConfig, retentionDays)
+}
+
+func TestFlattenBackupPolicy_AwsNativeStandardPlan(t *testing.T) {
+	t.Parallel()
+
+	data := BackupPolicyResourceModel{}
+	diags := flattenBackupPolicy(context.Background(), awsNativeStandardPolicy(awsNativeDailySchedule("us-east-1", 30)),
+		policySchemaType(t), &data)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags.Errors())
+
+	assert.Equal(t, types.StringValue("AWS_NATIVE_STANDARD"), nestedValue(t, data.BackupPlan, "backup_policy_type"))
+	assert.Equal(t, types.StringValue("us-east-1"),
+		nestedValue(t, data.BackupPlan, "aws_native_standard_plan", "backup_schedules", "target_region"))
+	assert.Equal(t, types.Int64Value(30),
+		nestedValue(t, data.BackupPlan, "aws_native_standard_plan", "backup_schedules", "retention_days"))
+	assert.Equal(t, types.Int64Value(2),
+		nestedValue(t, data.BackupPlan, "aws_native_standard_plan", "backup_schedules", "schedule_config", "daily_config", "time_of_day_hour"))
+	assert.True(t, nestedValue(t, data.BackupPlan, "standard_plan").IsNull())
+}
+
+// TestFlattenBackupPolicy_AwsNativeStandardSourceRegion pins the source-region case: the API reports
+// an empty target region, which the configuration expresses by omitting target_region entirely.
+func TestFlattenBackupPolicy_AwsNativeStandardSourceRegion(t *testing.T) {
+	t.Parallel()
+
+	data := BackupPolicyResourceModel{}
+	diags := flattenBackupPolicy(context.Background(), awsNativeStandardPolicy(awsNativeDailySchedule("", 30)),
+		policySchemaType(t), &data)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags.Errors())
+
+	assert.True(t, nestedValue(t, data.BackupPlan, "aws_native_standard_plan", "backup_schedules", "target_region").IsNull())
+}
+
+func TestFlattenBackupPolicy_AwsNativeStandardInterval(t *testing.T) {
+	t.Parallel()
+
+	scheduleConfig := externalEonSdkAPI.NewAwsNativeStandardBackupScheduleConfig(externalEonSdkAPI.STANDARD_BACKUP_SCHEDULE_INTERVAL)
+	scheduleConfig.SetIntervalConfig(*externalEonSdkAPI.NewAwsNativeStandardIntervalConfig(2))
+	schedule := externalEonSdkAPI.NewAwsNativeStandardBackupSchedules("us-west-2", *scheduleConfig, 7)
+
+	data := BackupPolicyResourceModel{}
+	diags := flattenBackupPolicy(context.Background(), awsNativeStandardPolicy(*schedule), policySchemaType(t), &data)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags.Errors())
+
+	assert.Equal(t, types.Int64Value(2),
+		nestedValue(t, data.BackupPlan, "aws_native_standard_plan", "backup_schedules", "schedule_config", "interval_config", "interval_hours"))
+}
+
+func TestFlattenBackupPolicy_AwsNativeStandardWithoutPlan(t *testing.T) {
+	t.Parallel()
+
+	policy := standardPolicy(dailyScheduleConfig(1, 0))
+	policy.BackupPlan.BackupPolicyType = externalEonSdkAPI.BACKUP_POLICY_TYPE_AWS_NATIVE_STANDARD
+	policy.BackupPlan.UnsetStandardPlan()
+
+	data := BackupPolicyResourceModel{}
+	diags := flattenBackupPolicy(context.Background(), policy, policySchemaType(t), &data)
+	require.True(t, diags.HasError(), "a native standard policy without its plan should be reported")
+	assert.Contains(t, diags.Errors()[0].Detail(), "without an AWS native standard plan")
 }
 
 // TestFlattenIntervalConfig_KeepsConfiguredUnit pins the ambiguity that makes a naive refresh diff

@@ -703,11 +703,29 @@ func flattenBackupPlan(
 		diags.Append(awsNativePitrDiags...)
 		present["aws_native_pitr_plan"] = flattened
 
+	case "AWS_NATIVE_STANDARD":
+		awsNativeStandard := plan.AwsNativeStandardPlan.Get()
+		if awsNativeStandard == nil {
+			diags.AddError("Backup Policy Refresh Failed", "Eon reported policy type AWS_NATIVE_STANDARD without an AWS native standard plan")
+			return types.ObjectNull(t.AttrTypes), diags
+		}
+
+		awsNativeStandardType, typeDiags := nestedObjectType(t, "aws_native_standard_plan")
+		diags.Append(typeDiags...)
+		if diags.HasError() {
+			return types.ObjectNull(t.AttrTypes), diags
+		}
+
+		flattened, awsNativeStandardDiags := flattenAwsNativeStandardPlan(
+			awsNativeStandardType, *awsNativeStandard, priorObject(prior, "aws_native_standard_plan"))
+		diags.Append(awsNativeStandardDiags...)
+		present["aws_native_standard_plan"] = flattened
+
 	default:
 		diags.AddError(
 			"Unsupported Backup Policy Type",
 			fmt.Sprintf("Eon reports this policy as type '%s', which this provider version cannot represent. "+
-				"Supported types: STANDARD, PITR, HIGH_FREQUENCY, AWS_NATIVE_PITR.", policyType),
+				"Supported types: %s.", policyType, supportedBackupPolicyTypes),
 		)
 		return types.ObjectNull(t.AttrTypes), diags
 	}
@@ -777,6 +795,95 @@ func flattenStandardPlan(
 	object, objectDiags := objectValue(t, present)
 	diags.Append(objectDiags...)
 	return object, diags
+}
+
+// flattenAwsNativeStandardPlan mirrors flattenStandardPlan for source-account schedules, which are
+// keyed by target region and carry no vault or plan-level timezone.
+func flattenAwsNativeStandardPlan(
+	t types.ObjectType,
+	plan externalEonSdkAPI.AwsNativeStandardBackupPolicyPlan,
+	prior types.Object,
+) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	scheduleType, typeDiags := nestedListElementType(t, "backup_schedules")
+	diags.Append(typeDiags...)
+	if diags.HasError() {
+		return types.ObjectNull(t.AttrTypes), diags
+	}
+
+	configType, typeDiags := nestedObjectType(scheduleType, "schedule_config")
+	diags.Append(typeDiags...)
+	if diags.HasError() {
+		return types.ObjectNull(t.AttrTypes), diags
+	}
+
+	schedules := make([]attr.Value, 0, len(plan.BackupSchedules))
+	for index, schedule := range plan.BackupSchedules {
+		priorSchedule := priorListElement(prior, "backup_schedules", index)
+
+		config, configDiags := flattenStandardScheduleConfig(
+			configType,
+			awsNativeStandardScheduleConfigAsStandard(schedule.ScheduleConfig),
+			priorObject(priorSchedule, "schedule_config"),
+		)
+		diags.Append(configDiags...)
+		if diags.HasError() {
+			return types.ObjectNull(t.AttrTypes), diags
+		}
+
+		// An empty region means "back up in the resource's own region", which the configuration
+		// expresses by omitting target_region, so writing "" back would read as drift.
+		targetRegion := types.StringNull()
+		if schedule.TargetRegion != "" {
+			targetRegion = types.StringValue(schedule.TargetRegion)
+		}
+
+		flattened, scheduleDiags := objectValue(scheduleType, map[string]attr.Value{
+			"target_region":   targetRegion,
+			"retention_days":  types.Int64Value(int64(schedule.BackupRetentionDays)),
+			"schedule_config": config,
+		})
+		diags.Append(scheduleDiags...)
+		if diags.HasError() {
+			return types.ObjectNull(t.AttrTypes), diags
+		}
+		schedules = append(schedules, flattened)
+	}
+
+	scheduleList, listDiags := types.ListValue(scheduleType, schedules)
+	diags.Append(listDiags...)
+	if diags.HasError() {
+		return types.ObjectNull(t.AttrTypes), diags
+	}
+
+	object, objectDiags := objectValue(t, map[string]attr.Value{"backup_schedules": scheduleList})
+	diags.Append(objectDiags...)
+	return object, diags
+}
+
+// awsNativeStandardScheduleConfigAsStandard re-keys the native schedule config onto its standard
+// twin, which shares every frequency config and differs only in the interval type.
+func awsNativeStandardScheduleConfigAsStandard(
+	config externalEonSdkAPI.AwsNativeStandardBackupScheduleConfig,
+) externalEonSdkAPI.StandardBackupScheduleConfig {
+	standard := externalEonSdkAPI.NewStandardBackupScheduleConfig(config.Frequency)
+	if interval := config.IntervalConfig.Get(); interval != nil {
+		standard.SetIntervalConfig(*externalEonSdkAPI.NewStandardIntervalConfig(interval.IntervalHours))
+	}
+	if daily := config.DailyConfig.Get(); daily != nil {
+		standard.SetDailyConfig(*daily)
+	}
+	if weekly := config.WeeklyConfig.Get(); weekly != nil {
+		standard.SetWeeklyConfig(*weekly)
+	}
+	if monthly := config.MonthlyConfig.Get(); monthly != nil {
+		standard.SetMonthlyConfig(*monthly)
+	}
+	if annually := config.AnnuallyConfig.Get(); annually != nil {
+		standard.SetAnnuallyConfig(*annually)
+	}
+	return *standard
 }
 
 // flattenScheduleTimezone keeps schedule_timezone null when the configuration omitted it and Eon
