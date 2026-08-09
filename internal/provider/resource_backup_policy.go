@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -1621,7 +1620,7 @@ func validateAwsNativeStandardInterval(schedulePath path.Path, intervalValue att
 		return
 	}
 
-	if hours > math.MaxInt32 || !allowedInterval(int32(hours), awsNativeStandardIntervalHours) {
+	if !allowedInterval(hours, awsNativeStandardIntervalHours) {
 		resp.Diagnostics.AddAttributeError(intervalPath, "Invalid interval",
 			fmt.Sprintf("AWS source-account backup interval must be %s hours, got %d hours",
 				intervalHoursList(awsNativeStandardIntervalHours), hours))
@@ -1692,9 +1691,9 @@ var awsNativeStandardMinRetentionDays = map[string]int64{
 
 const awsNativeStandardMaxRetentionDays = 36500
 
-func allowedInterval(hours int32, allowed []int32) bool {
+func allowedInterval(hours int64, allowed []int32) bool {
 	for _, candidate := range allowed {
-		if hours == candidate {
+		if hours == int64(candidate) {
 			return true
 		}
 	}
@@ -2009,7 +2008,7 @@ func buildStandardScheduleConfig(
 				}
 				intervalHours = intervalMinutes / 60
 
-				if !allowedInterval(intervalHours, allowedIntervalHours) {
+				if !allowedInterval(int64(intervalHours), allowedIntervalHours) {
 					return nil, fmt.Errorf("backup interval must be %s hours, got %d hours (%d minutes)", intervalHoursList(allowedIntervalHours), intervalHours, intervalMinutes)
 				}
 			} else {
@@ -2018,7 +2017,7 @@ func buildStandardScheduleConfig(
 					return nil, fmt.Errorf("invalid interval_hours: %s", err)
 				}
 
-				if !allowedInterval(intervalHours, allowedIntervalHours) {
+				if !allowedInterval(int64(intervalHours), allowedIntervalHours) {
 					return nil, fmt.Errorf("backup interval must be %s hours, got %d hours", intervalHoursList(allowedIntervalHours), intervalHours)
 				}
 			}
