@@ -7,9 +7,12 @@ import (
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 	"github.com/eon-io/terraform-provider-eon/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBackupPolicyResource_Unit tests the backup policy resource without API calls
@@ -888,6 +891,177 @@ func TestApplyScheduleTimezone(t *testing.T) {
 			assert.Equal(t, tt.want, *got)
 		})
 	}
+}
+
+func awsNativeIntervalSchedule(t *testing.T, retentionDays int64, frequency string, intervalAttrs map[string]attr.Value) types.Object {
+	t.Helper()
+
+	scheduleType, diags := nestedListElementType(awsNativeStandardPlanType(t), "backup_schedules")
+	require.False(t, diags.HasError())
+	configType, diags := nestedObjectType(scheduleType, "schedule_config")
+	require.False(t, diags.HasError())
+	intervalType, diags := nestedObjectType(configType, "interval_config")
+	require.False(t, diags.HasError())
+
+	interval := types.ObjectNull(intervalType.AttrTypes)
+	if intervalAttrs != nil {
+		interval, diags = objectValue(intervalType, intervalAttrs)
+		require.False(t, diags.HasError())
+	}
+
+	config, diags := objectValue(configType, map[string]attr.Value{
+		"frequency":       types.StringValue(frequency),
+		"interval_config": interval,
+	})
+	require.False(t, diags.HasError())
+
+	schedule, diags := objectValue(scheduleType, map[string]attr.Value{
+		"retention_days":  types.Int64Value(retentionDays),
+		"schedule_config": config,
+	})
+	require.False(t, diags.HasError())
+	return schedule
+}
+
+func awsNativeStandardPlanType(t *testing.T) types.ObjectType {
+	t.Helper()
+
+	planType, diags := nestedObjectType(policySchemaType(t), "backup_plan")
+	require.False(t, diags.HasError())
+	nativeType, diags := nestedObjectType(planType, "aws_native_standard_plan")
+	require.False(t, diags.HasError())
+	return nativeType
+}
+
+func TestAwsNativeStandardScheduleValidator(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		schedule      types.Object
+		wantErr       bool
+		errorContains string
+	}{
+		{
+			name:     "hourly interval is allowed",
+			schedule: awsNativeIntervalSchedule(t, 7, "INTERVAL", map[string]attr.Value{"interval_hours": types.Int64Value(1)}),
+		},
+		{
+			name:     "minutes convert to an allowed interval",
+			schedule: awsNativeIntervalSchedule(t, 7, "INTERVAL", map[string]attr.Value{"interval_minutes": types.Int64Value(240)}),
+		},
+		{
+			name:          "three hours is rejected",
+			schedule:      awsNativeIntervalSchedule(t, 7, "INTERVAL", map[string]attr.Value{"interval_hours": types.Int64Value(3)}),
+			wantErr:       true,
+			errorContains: "1, 2, 4, 6, 8, or 12 hours",
+		},
+		{
+			name:          "minutes must be whole hours",
+			schedule:      awsNativeIntervalSchedule(t, 7, "INTERVAL", map[string]attr.Value{"interval_minutes": types.Int64Value(90)}),
+			wantErr:       true,
+			errorContains: "divisible by 60",
+		},
+		{
+			name: "both interval units are rejected",
+			schedule: awsNativeIntervalSchedule(t, 7, "INTERVAL", map[string]attr.Value{
+				"interval_hours":   types.Int64Value(2),
+				"interval_minutes": types.Int64Value(120),
+			}),
+			wantErr:       true,
+			errorContains: "not both",
+		},
+		{
+			name:     "daily accepts a single day",
+			schedule: awsNativeIntervalSchedule(t, 1, "DAILY", nil),
+		},
+		{
+			name:          "weekly below the AWS floor is rejected",
+			schedule:      awsNativeIntervalSchedule(t, 13, "WEEKLY", nil),
+			wantErr:       true,
+			errorContains: "at least 14 retention days",
+		},
+		{
+			name:          "monthly below the AWS floor is rejected",
+			schedule:      awsNativeIntervalSchedule(t, 59, "MONTHLY", nil),
+			wantErr:       true,
+			errorContains: "at least 60 retention days",
+		},
+		{
+			name:          "annual below the AWS floor is rejected",
+			schedule:      awsNativeIntervalSchedule(t, 729, "ANNUALLY", nil),
+			wantErr:       true,
+			errorContains: "at least 730 retention days",
+		},
+		{
+			name:          "retention above the AWS ceiling is rejected",
+			schedule:      awsNativeIntervalSchedule(t, 36501, "DAILY", nil),
+			wantErr:       true,
+			errorContains: "must not exceed 36500",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			resp := &validator.ObjectResponse{}
+			awsNativeStandardScheduleValidator{}.ValidateObject(
+				context.Background(),
+				validator.ObjectRequest{Path: path.Root("backup_plan"), ConfigValue: tt.schedule},
+				resp,
+			)
+			assert.Equal(t, tt.wantErr, resp.Diagnostics.HasError(), "diagnostics: %v", resp.Diagnostics.Errors())
+			if tt.errorContains != "" {
+				require.True(t, resp.Diagnostics.HasError())
+				assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), tt.errorContains)
+			}
+		})
+	}
+}
+
+// TestBuildAwsNativeStandardPlan covers the create and update request the provider sends for a
+// source-account policy: schedules carry a target region instead of a vault, and the interval is
+// expressed in hours whichever unit the configuration used.
+func TestBuildAwsNativeStandardPlan(t *testing.T) {
+	t.Parallel()
+
+	planType := awsNativeStandardPlanType(t)
+	scheduleType, diags := nestedListElementType(planType, "backup_schedules")
+	require.False(t, diags.HasError())
+
+	schedule := awsNativeIntervalSchedule(t, 7, "INTERVAL", map[string]attr.Value{"interval_minutes": types.Int64Value(240)})
+	scheduleAttrs := schedule.Attributes()
+	scheduleAttrs["target_region"] = types.StringValue("us-east-1")
+	schedule, diags = objectValue(scheduleType, scheduleAttrs)
+	require.False(t, diags.HasError())
+
+	scheduleList, diags := types.ListValue(scheduleType, []attr.Value{schedule})
+	require.False(t, diags.HasError())
+
+	planObject, diags := objectValue(planType, map[string]attr.Value{"backup_schedules": scheduleList})
+	require.False(t, diags.HasError())
+
+	plan, planDiags := buildAwsNativeStandardPlan(context.Background(),
+		map[string]attr.Value{"aws_native_standard_plan": planObject})
+	require.False(t, planDiags.HasError(), "unexpected diagnostics: %v", planDiags.Errors())
+
+	require.Len(t, plan.BackupSchedules, 1)
+	built := plan.BackupSchedules[0]
+	assert.Equal(t, "us-east-1", built.TargetRegion)
+	assert.Equal(t, int32(7), built.BackupRetentionDays)
+	assert.Equal(t, externalEonSdkAPI.STANDARD_BACKUP_SCHEDULE_INTERVAL, built.ScheduleConfig.Frequency)
+	require.NotNil(t, built.ScheduleConfig.IntervalConfig.Get())
+	assert.Equal(t, int32(4), built.ScheduleConfig.IntervalConfig.Get().IntervalHours)
+}
+
+func TestBuildAwsNativeStandardPlan_MissingPlan(t *testing.T) {
+	t.Parallel()
+
+	_, diags := buildAwsNativeStandardPlan(context.Background(),
+		map[string]attr.Value{"aws_native_standard_plan": types.ObjectNull(awsNativeStandardPlanType(t).AttrTypes)})
+	require.True(t, diags.HasError())
+	assert.Contains(t, diags.Errors()[0].Detail(), "aws_native_standard_plan is required")
 }
 
 func TestScheduleTimezoneValidator(t *testing.T) {

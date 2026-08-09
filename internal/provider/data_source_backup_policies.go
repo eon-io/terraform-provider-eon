@@ -60,7 +60,7 @@ func (d *BackupPoliciesDataSource) Schema(ctx context.Context, req datasource.Sc
 							Computed:            true,
 						},
 						"backup_policy_type": schema.StringAttribute{
-							MarkdownDescription: "The type of the policy. Possible values: `UNSPECIFIED`, `STANDARD`, `HIGH_FREQUENCY`, `PITR`, `AWS_NATIVE_PITR`.",
+							MarkdownDescription: "The type of the policy. Possible values: `UNSPECIFIED`, `STANDARD`, `HIGH_FREQUENCY`, `PITR`, `AWS_NATIVE_PITR`, `AWS_NATIVE_STANDARD`.",
 							Computed:            true,
 						},
 						"resource_selection_mode": schema.StringAttribute{
