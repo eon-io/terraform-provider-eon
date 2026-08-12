@@ -464,7 +464,7 @@ func flattenOperand(
 		"resource_type": true, "environment": true, "tag_keys": true, "tag_key_values": true,
 		"data_classes": true, "apps": true, "cloud_provider": true, "account_id": true,
 		"source_region": true, "vpc": true, "subnets": true, "resource_group_name": true,
-		"resource_name": true, "resource_id": true,
+		"resource_name": true, "resource_id": true, "group": true,
 	}
 	if unrepresentable := unrepresentableConditions(operand, supported); len(unrepresentable) > 0 {
 		diags.AddError(
@@ -537,6 +537,18 @@ func flattenOperand(
 		flattened, conditionDiags := flattenTagKeyValuesCondition(t, "tag_key_values", *condition)
 		diags.Append(conditionDiags...)
 		present["tag_key_values"] = flattened
+	}
+
+	if condition := operand.Group.Get(); condition != nil {
+		groupType, typeDiags := nestedObjectType(t, "group")
+		diags.Append(typeDiags...)
+		if diags.HasError() {
+			return types.ObjectNull(t.AttrTypes), diags
+		}
+
+		flattened, groupDiags := flattenGroupCondition(ctx, groupType, *condition, types.ObjectNull(groupType.AttrTypes))
+		diags.Append(groupDiags...)
+		present["group"] = flattened
 	}
 
 	if diags.HasError() {
