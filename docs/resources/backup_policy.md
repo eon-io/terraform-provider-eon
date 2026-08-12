@@ -497,6 +497,124 @@ resource "eon_backup_policy" "all_condition_types" {
   }
 }
 
+# Example: Nested groups — exclude specific RDS and DynamoDB names (matches console AND → OR → AND)
+# Logic: account/region/tag/type filters AND (
+#   (type=RDS AND name does not contain exclude) OR
+#   (type=DynamoDB AND name does not contain exclude)
+# )
+resource "eon_backup_policy" "exclude_by_type_and_name" {
+  name    = "Standard Backup Excluding Test Resources"
+  enabled = true
+
+  resource_selector = {
+    resource_selection_mode = "CONDITIONAL"
+
+    expression = {
+      group = {
+        operator = "AND"
+        operands = [
+          {
+            account_id = {
+              operator    = "IN"
+              account_ids = ["123456789012"]
+            }
+          },
+          {
+            source_region = {
+              operator       = "IN"
+              source_regions = ["us-east-1"]
+            }
+          },
+          {
+            tag_key_values = {
+              operator = "CONTAINS_ANY_OF"
+              tag_key_values = [
+                {
+                  key   = "m_tier"
+                  value = "1"
+                }
+              ]
+            }
+          },
+          {
+            resource_type = {
+              operator       = "IN"
+              resource_types = ["AWS_RDS", "AWS_DYNAMO_DB"]
+            }
+          },
+          {
+            # Type-scoped name excludes: nested OR of (type AND name NOT_CONTAINS)
+            group = {
+              operator = "OR"
+              operands = [
+                {
+                  group = {
+                    operator = "AND"
+                    operands = [
+                      {
+                        resource_type = {
+                          operator       = "IN"
+                          resource_types = ["AWS_RDS"]
+                        }
+                      },
+                      {
+                        resource_name = {
+                          operator       = "NOT_CONTAINS"
+                          resource_names = ["db-test-users"]
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  group = {
+                    operator = "AND"
+                    operands = [
+                      {
+                        resource_type = {
+                          operator       = "IN"
+                          resource_types = ["AWS_DYNAMO_DB"]
+                        }
+                      },
+                      {
+                        resource_name = {
+                          operator       = "NOT_CONTAINS"
+                          resource_names = ["lab-test-claims-events"]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      schedule_timezone = "RESOURCE"
+      backup_schedules = [
+        {
+          vault_id       = "e19a6ad1-6a97-49a1-b7c9-9620977ea018"
+          retention_days = 30
+          schedule_config = {
+            frequency = "DAILY"
+            daily_config = {
+              time_of_day_hour     = 2
+              time_of_day_minutes  = 0
+              start_window_minutes = 240
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
 # Output examples
 output "daily_backup_policy_id" {
   description = "ID of the daily backup policy"
@@ -541,6 +659,11 @@ output "conditional_backup_policy_id" {
 output "all_condition_types_policy_id" {
   description = "ID of the policy demonstrating all condition types"
   value       = eon_backup_policy.all_condition_types.id
+}
+
+output "exclude_by_type_and_name_policy_id" {
+  description = "ID of the nested-group exclude-by-type-and-name policy"
+  value       = eon_backup_policy.exclude_by_type_and_name.id
 }
 
 output "backup_policies_summary" {
@@ -590,6 +713,11 @@ output "backup_policies_summary" {
       id      = eon_backup_policy.all_condition_types.id
       name    = eon_backup_policy.all_condition_types.name
       enabled = eon_backup_policy.all_condition_types.enabled
+    }
+    exclude_by_type_and_name = {
+      id      = eon_backup_policy.exclude_by_type_and_name.id
+      name    = eon_backup_policy.exclude_by_type_and_name.name
+      enabled = eon_backup_policy.exclude_by_type_and_name.enabled
     }
   }
 }
@@ -893,7 +1021,7 @@ Optional:
 Optional:
 
 - `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--resource_selector--expression--environment))
-- `group` (Attributes) Group condition with logical operator and operands (see [below for nested schema](#nestedatt--resource_selector--expression--group))
+- `group` (Attributes) Group condition with logical operator and operands. Operands may nest further groups (AND/OR) up to 3 levels deep, matching the console resource selector. (see [below for nested schema](#nestedatt--resource_selector--expression--group))
 - `resource_type` (Attributes) Resource type condition (see [below for nested schema](#nestedatt--resource_selector--expression--resource_type))
 - `tag_key_values` (Attributes) Tag key-value pairs condition (see [below for nested schema](#nestedatt--resource_selector--expression--tag_key_values))
 - `tag_keys` (Attributes) Tag keys condition (see [below for nested schema](#nestedatt--resource_selector--expression--tag_keys))
@@ -912,7 +1040,7 @@ Required:
 
 Required:
 
-- `operands` (Attributes List) List of conditions (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands))
+- `operands` (Attributes List) List of conditions. Each operand may be a leaf condition or a nested group (AND/OR), matching the console resource selector. (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands))
 - `operator` (String) Logical operator: 'AND' or 'OR'
 
 <a id="nestedatt--resource_selector--expression--group--operands"></a>
@@ -925,6 +1053,7 @@ Optional:
 - `cloud_provider` (Attributes) Cloud provider condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--cloud_provider))
 - `data_classes` (Attributes) Data classes condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--data_classes))
 - `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--environment))
+- `group` (Attributes) Nested group condition with logical operator and operands. Groups nest up to 3 levels deep. (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group))
 - `resource_group_name` (Attributes) Resource group name condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--resource_group_name))
 - `resource_id` (Attributes) Resource ID condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--resource_id))
 - `resource_name` (Attributes) Resource name condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--resource_name))
@@ -978,6 +1107,337 @@ Required:
 
 - `environments` (List of String) List of environments
 - `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group`
+
+Required:
+
+- `operands` (Attributes List) List of conditions (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands))
+- `operator` (String) Logical operator: 'AND' or 'OR'
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands`
+
+Optional:
+
+- `account_id` (Attributes) Account ID condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--account_id))
+- `apps` (Attributes) Apps condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--apps))
+- `cloud_provider` (Attributes) Cloud provider condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--cloud_provider))
+- `data_classes` (Attributes) Data classes condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--data_classes))
+- `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--environment))
+- `group` (Attributes) Nested group condition with logical operator and operands. Groups nest up to 3 levels deep. (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group))
+- `resource_group_name` (Attributes) Resource group name condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--resource_group_name))
+- `resource_id` (Attributes) Resource ID condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--resource_id))
+- `resource_name` (Attributes) Resource name condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--resource_name))
+- `resource_type` (Attributes) Resource type condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--resource_type))
+- `source_region` (Attributes) Source region condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--source_region))
+- `subnets` (Attributes) Subnets condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--subnets))
+- `tag_key_values` (Attributes) Tag key-value pairs condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--tag_key_values))
+- `tag_keys` (Attributes) Tag keys condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--tag_keys))
+- `vpc` (Attributes) VPC condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--vpc))
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--account_id"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.account_id`
+
+Required:
+
+- `account_ids` (List of String) List of account IDs
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--apps"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.apps`
+
+Required:
+
+- `apps` (List of String) List of apps
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--cloud_provider"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.cloud_provider`
+
+Required:
+
+- `cloud_providers` (List of String) List of cloud providers
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--data_classes"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.data_classes`
+
+Required:
+
+- `data_classes` (List of String) List of data classes
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--environment"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.environment`
+
+Required:
+
+- `environments` (List of String) List of environments
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group`
+
+Required:
+
+- `operands` (Attributes List) List of conditions (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands))
+- `operator` (String) Logical operator: 'AND' or 'OR'
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands`
+
+Optional:
+
+- `account_id` (Attributes) Account ID condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--account_id))
+- `apps` (Attributes) Apps condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--apps))
+- `cloud_provider` (Attributes) Cloud provider condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--cloud_provider))
+- `data_classes` (Attributes) Data classes condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--data_classes))
+- `environment` (Attributes) Environment condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--environment))
+- `resource_group_name` (Attributes) Resource group name condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--resource_group_name))
+- `resource_id` (Attributes) Resource ID condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--resource_id))
+- `resource_name` (Attributes) Resource name condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--resource_name))
+- `resource_type` (Attributes) Resource type condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--resource_type))
+- `source_region` (Attributes) Source region condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--source_region))
+- `subnets` (Attributes) Subnets condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--subnets))
+- `tag_key_values` (Attributes) Tag key-value pairs condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--tag_key_values))
+- `tag_keys` (Attributes) Tag keys condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--tag_keys))
+- `vpc` (Attributes) VPC condition (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--vpc))
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--account_id"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.account_id`
+
+Required:
+
+- `account_ids` (List of String) List of account IDs
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--apps"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.apps`
+
+Required:
+
+- `apps` (List of String) List of apps
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--cloud_provider"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.cloud_provider`
+
+Required:
+
+- `cloud_providers` (List of String) List of cloud providers
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--data_classes"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.data_classes`
+
+Required:
+
+- `data_classes` (List of String) List of data classes
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--environment"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.environment`
+
+Required:
+
+- `environments` (List of String) List of environments
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--resource_group_name"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.resource_group_name`
+
+Required:
+
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+- `resource_group_names` (List of String) List of resource group names
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--resource_id"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.resource_id`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `resource_ids` (List of String) List of resource IDs
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--resource_name"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.resource_name`
+
+Required:
+
+- `operator` (String) Operator: 'IN', 'NOT_IN', 'CONTAINS', 'NOT_CONTAINS', 'STARTS_WITH', 'NOT_STARTS_WITH', 'ENDS_WITH', or 'NOT_ENDS_WITH'
+- `resource_names` (List of String) List of resource names
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--resource_type"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.resource_type`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `resource_types` (List of String) List of resource types
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--source_region"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.source_region`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `source_regions` (List of String) List of source regions
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--subnets"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.subnets`
+
+Required:
+
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+- `subnets` (List of String) List of subnets
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--tag_key_values"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.tag_key_values`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `tag_key_values` (Attributes List) List of tag key-value pairs to match (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--tag_key_values--tag_key_values))
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--tag_key_values--tag_key_values"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.tag_key_values.tag_key_values`
+
+Required:
+
+- `key` (String) Tag key
+- `value` (String) Tag value
+
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--tag_keys"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.tag_keys`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `tag_keys` (List of String) List of tag keys to match
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--group--operands--vpc"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.group.operands.vpc`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `vpcs` (List of String) List of VPCs
+
+
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--resource_group_name"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.resource_group_name`
+
+Required:
+
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+- `resource_group_names` (List of String) List of resource group names
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--resource_id"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.resource_id`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `resource_ids` (List of String) List of resource IDs
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--resource_name"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.resource_name`
+
+Required:
+
+- `operator` (String) Operator: 'IN', 'NOT_IN', 'CONTAINS', 'NOT_CONTAINS', 'STARTS_WITH', 'NOT_STARTS_WITH', 'ENDS_WITH', or 'NOT_ENDS_WITH'
+- `resource_names` (List of String) List of resource names
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--resource_type"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.resource_type`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `resource_types` (List of String) List of resource types
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--source_region"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.source_region`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `source_regions` (List of String) List of source regions
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--subnets"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.subnets`
+
+Required:
+
+- `operator` (String) Operator: 'CONTAINS' or 'NOT_CONTAINS'
+- `subnets` (List of String) List of subnets
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--tag_key_values"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.tag_key_values`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `tag_key_values` (Attributes List) List of tag key-value pairs to match (see [below for nested schema](#nestedatt--resource_selector--expression--group--operands--group--operands--tag_key_values--tag_key_values))
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--tag_key_values--tag_key_values"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.tag_key_values.tag_key_values`
+
+Required:
+
+- `key` (String) Tag key
+- `value` (String) Tag value
+
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--tag_keys"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.tag_keys`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `tag_keys` (List of String) List of tag keys to match
+
+
+<a id="nestedatt--resource_selector--expression--group--operands--group--operands--vpc"></a>
+### Nested Schema for `resource_selector.expression.group.operands.group.operands.vpc`
+
+Required:
+
+- `operator` (String) Operator: 'IN' or 'NOT_IN'
+- `vpcs` (List of String) List of VPCs
+
+
 
 
 <a id="nestedatt--resource_selector--expression--group--operands--resource_group_name"></a>

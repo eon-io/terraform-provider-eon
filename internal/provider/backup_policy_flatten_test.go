@@ -6,6 +6,8 @@ import (
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -120,6 +122,111 @@ func TestFlattenBackupPolicy_GroupExpression(t *testing.T) {
 	names, ok := nestedValue(t, data.ResourceSelector, "expression", "group", "operands", "resource_name", "resource_names").(types.List)
 	require.True(t, ok)
 	assert.Equal(t, []attr.Value{types.StringValue("prod-")}, names.Elements())
+}
+
+// TestFlattenBackupPolicy_NestedGroupExpression covers the console pattern: top AND → nested OR →
+// nested AND with type+name leaf conditions (type-scoped name excludes).
+func TestFlattenBackupPolicy_NestedGroupExpression(t *testing.T) {
+	t.Parallel()
+
+	rdsType := externalEonSdkAPI.NewBackupPolicyExpression()
+	rdsType.SetResourceType(*externalEonSdkAPI.NewResourceTypeCondition(
+		externalEonSdkAPI.ScalarOperators("IN"),
+		[]externalEonSdkAPI.ResourceType{externalEonSdkAPI.AWS_RDS}))
+
+	rdsName := externalEonSdkAPI.NewBackupPolicyExpression()
+	rdsName.SetResourceName(*externalEonSdkAPI.NewResourceNameCondition(
+		externalEonSdkAPI.StringOperators("NOT_CONTAINS"), []string{"db-test-users"}))
+
+	rdsAnd := externalEonSdkAPI.NewBackupPolicyExpression()
+	rdsAnd.SetGroup(*externalEonSdkAPI.NewBackupPolicyGroupCondition(
+		externalEonSdkAPI.AND_OPERATOR, []externalEonSdkAPI.BackupPolicyExpression{*rdsType, *rdsName}))
+
+	dynamoType := externalEonSdkAPI.NewBackupPolicyExpression()
+	dynamoType.SetResourceType(*externalEonSdkAPI.NewResourceTypeCondition(
+		externalEonSdkAPI.ScalarOperators("IN"),
+		[]externalEonSdkAPI.ResourceType{externalEonSdkAPI.AWS_DYNAMO_DB}))
+
+	dynamoName := externalEonSdkAPI.NewBackupPolicyExpression()
+	dynamoName.SetResourceName(*externalEonSdkAPI.NewResourceNameCondition(
+		externalEonSdkAPI.StringOperators("NOT_CONTAINS"), []string{"lab-test-claims-events"}))
+
+	dynamoAnd := externalEonSdkAPI.NewBackupPolicyExpression()
+	dynamoAnd.SetGroup(*externalEonSdkAPI.NewBackupPolicyGroupCondition(
+		externalEonSdkAPI.AND_OPERATOR, []externalEonSdkAPI.BackupPolicyExpression{*dynamoType, *dynamoName}))
+
+	excludeOr := externalEonSdkAPI.NewBackupPolicyExpression()
+	excludeOr.SetGroup(*externalEonSdkAPI.NewBackupPolicyGroupCondition(
+		externalEonSdkAPI.OR_OPERATOR, []externalEonSdkAPI.BackupPolicyExpression{*rdsAnd, *dynamoAnd}))
+
+	region := externalEonSdkAPI.NewBackupPolicyExpression()
+	region.SetSourceRegion(*externalEonSdkAPI.NewRegionCondition(
+		externalEonSdkAPI.ScalarOperators("IN"), []string{"us-east-1"}))
+
+	topAnd := externalEonSdkAPI.NewBackupPolicyExpression()
+	topAnd.SetGroup(*externalEonSdkAPI.NewBackupPolicyGroupCondition(
+		externalEonSdkAPI.AND_OPERATOR, []externalEonSdkAPI.BackupPolicyExpression{*region, *excludeOr}))
+
+	policy := standardPolicy(dailyScheduleConfig(1, 0))
+	policy.ResourceSelector.ResourceSelectionMode = externalEonSdkAPI.RESOURCE_SELECTOR_MODE_CONDITIONAL
+	policy.ResourceSelector.SetExpression(*topAnd)
+
+	data := BackupPolicyResourceModel{}
+	diags := flattenBackupPolicy(context.Background(), policy, policySchemaType(t), &data)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags.Errors())
+
+	assert.Equal(t, types.StringValue("AND"), nestedValue(t, data.ResourceSelector, "expression", "group", "operator"))
+
+	operands := nestedValue(t, data.ResourceSelector, "expression", "group", "operands").(types.List)
+	require.Len(t, operands.Elements(), 2)
+
+	orOperand := operands.Elements()[1].(types.Object)
+	assert.Equal(t, types.StringValue("OR"), nestedValue(t, orOperand, "group", "operator"))
+
+	orOperands := nestedValue(t, orOperand, "group", "operands").(types.List)
+	require.Len(t, orOperands.Elements(), 2)
+
+	rdsBranch := orOperands.Elements()[0].(types.Object)
+	assert.Equal(t, types.StringValue("AND"), nestedValue(t, rdsBranch, "group", "operator"))
+
+	rdsOperands := nestedValue(t, rdsBranch, "group", "operands").(types.List)
+	require.Len(t, rdsOperands.Elements(), 2)
+	nameOperand := rdsOperands.Elements()[1].(types.Object)
+	assert.Equal(t, types.StringValue("NOT_CONTAINS"),
+		nestedValue(t, nameOperand, "resource_name", "operator"))
+	names, ok := nestedValue(t, nameOperand, "resource_name", "resource_names").(types.List)
+	require.True(t, ok)
+	assert.Equal(t, []attr.Value{types.StringValue("db-test-users")}, names.Elements())
+}
+
+func TestBackupPolicyOperandSchemaAllowsNestedGroup(t *testing.T) {
+	t.Parallel()
+
+	policyResource := &BackupPolicyResource{}
+	var resp resource.SchemaResponse
+	policyResource.Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	require.False(t, resp.Diagnostics.HasError())
+
+	expression := resp.Schema.Attributes["resource_selector"].(schema.SingleNestedAttribute).
+		Attributes["expression"].(schema.SingleNestedAttribute)
+	group := expression.Attributes["group"].(schema.SingleNestedAttribute)
+	operand := group.Attributes["operands"].(schema.ListNestedAttribute).NestedObject.Attributes
+	assert.Contains(t, operand, "group", "operands must accept a nested group")
+
+	nestedOperand := operand["group"].(schema.SingleNestedAttribute).
+		Attributes["operands"].(schema.ListNestedAttribute).NestedObject.Attributes
+	assert.Contains(t, nestedOperand, "group", "second nesting level must still accept a group")
+
+	innermost := nestedOperand["group"].(schema.SingleNestedAttribute).
+		Attributes["operands"].(schema.ListNestedAttribute).NestedObject.Attributes
+	assert.NotContains(t, innermost, "group", "nesting must stop at the configured depth")
+}
+
+func TestNormalizeResourceNameOperator(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "NOT_CONTAINS", normalizeResourceNameOperator("DOES_NOT_CONTAIN"))
+	assert.Equal(t, "NOT_CONTAINS", normalizeResourceNameOperator("NOT_CONTAINS"))
+	assert.Equal(t, "IN", normalizeResourceNameOperator("IN"))
 }
 
 // TestFlattenBackupPolicy_RejectsUnrepresentableCondition guards the other half of drift detection:
