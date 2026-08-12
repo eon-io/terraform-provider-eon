@@ -136,7 +136,7 @@ func TestFlattenBackupPolicy_NestedGroupExpression(t *testing.T) {
 
 	rdsName := externalEonSdkAPI.NewBackupPolicyExpression()
 	rdsName.SetResourceName(*externalEonSdkAPI.NewResourceNameCondition(
-		externalEonSdkAPI.StringOperators("NOT_CONTAINS"), []string{"db-test-users"}))
+		externalEonSdkAPI.StringOperators("NOT_CONTAINS"), []string{"example-rds-instance"}))
 
 	rdsAnd := externalEonSdkAPI.NewBackupPolicyExpression()
 	rdsAnd.SetGroup(*externalEonSdkAPI.NewBackupPolicyGroupCondition(
@@ -149,7 +149,7 @@ func TestFlattenBackupPolicy_NestedGroupExpression(t *testing.T) {
 
 	dynamoName := externalEonSdkAPI.NewBackupPolicyExpression()
 	dynamoName.SetResourceName(*externalEonSdkAPI.NewResourceNameCondition(
-		externalEonSdkAPI.StringOperators("NOT_CONTAINS"), []string{"lab-test-claims-events"}))
+		externalEonSdkAPI.StringOperators("NOT_CONTAINS"), []string{"example-dynamodb-table"}))
 
 	dynamoAnd := externalEonSdkAPI.NewBackupPolicyExpression()
 	dynamoAnd.SetGroup(*externalEonSdkAPI.NewBackupPolicyGroupCondition(
@@ -196,7 +196,7 @@ func TestFlattenBackupPolicy_NestedGroupExpression(t *testing.T) {
 		nestedValue(t, nameOperand, "resource_name", "operator"))
 	names, ok := nestedValue(t, nameOperand, "resource_name", "resource_names").(types.List)
 	require.True(t, ok)
-	assert.Equal(t, []attr.Value{types.StringValue("db-test-users")}, names.Elements())
+	assert.Equal(t, []attr.Value{types.StringValue("example-rds-instance")}, names.Elements())
 }
 
 func TestBackupPolicyOperandSchemaAllowsNestedGroup(t *testing.T) {

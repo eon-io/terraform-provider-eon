@@ -38,9 +38,9 @@ func TestAccBackupPolicyNestedGroups(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "resource_selector.expression.group.operands.2.group.operands.0.group.operator", "AND"),
 					resource.TestCheckResourceAttr(resourceName, "resource_selector.expression.group.operands.2.group.operands.0.group.operands.0.resource_type.resource_types.0", "AWS_RDS"),
 					resource.TestCheckResourceAttr(resourceName, "resource_selector.expression.group.operands.2.group.operands.0.group.operands.1.resource_name.operator", "NOT_CONTAINS"),
-					resource.TestCheckResourceAttr(resourceName, "resource_selector.expression.group.operands.2.group.operands.0.group.operands.1.resource_name.resource_names.0", "db-test-users"),
+					resource.TestCheckResourceAttr(resourceName, "resource_selector.expression.group.operands.2.group.operands.0.group.operands.1.resource_name.resource_names.0", "example-rds-instance"),
 					resource.TestCheckResourceAttr(resourceName, "resource_selector.expression.group.operands.2.group.operands.1.group.operands.0.resource_type.resource_types.0", "AWS_DYNAMO_DB"),
-					resource.TestCheckResourceAttr(resourceName, "resource_selector.expression.group.operands.2.group.operands.1.group.operands.1.resource_name.resource_names.0", "lab-test-claims-events"),
+					resource.TestCheckResourceAttr(resourceName, "resource_selector.expression.group.operands.2.group.operands.1.group.operands.1.resource_name.resource_names.0", "example-dynamodb-table"),
 				),
 			},
 			{
@@ -95,7 +95,7 @@ resource "eon_backup_policy" "test" {
                       {
                         resource_name = {
                           operator       = "NOT_CONTAINS"
-                          resource_names = ["db-test-users"]
+                          resource_names = ["example-rds-instance"]
                         }
                       }
                     ]
@@ -114,7 +114,7 @@ resource "eon_backup_policy" "test" {
                       {
                         resource_name = {
                           operator       = "NOT_CONTAINS"
-                          resource_names = ["lab-test-claims-events"]
+                          resource_names = ["example-dynamodb-table"]
                         }
                       }
                     ]

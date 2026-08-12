@@ -545,7 +545,7 @@ resource "eon_backup_policy" "exclude_by_type_and_name" {
                       {
                         resource_name = {
                           operator       = "NOT_CONTAINS"
-                          resource_names = ["db-test-users"]
+                          resource_names = ["example-rds-instance"]
                         }
                       }
                     ]
@@ -564,7 +564,7 @@ resource "eon_backup_policy" "exclude_by_type_and_name" {
                       {
                         resource_name = {
                           operator       = "NOT_CONTAINS"
-                          resource_names = ["lab-test-claims-events"]
+                          resource_names = ["example-dynamodb-table"]
                         }
                       }
                     ]
