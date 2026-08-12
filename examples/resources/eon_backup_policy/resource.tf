@@ -482,6 +482,124 @@ resource "eon_backup_policy" "all_condition_types" {
   }
 }
 
+# Example: Nested groups — exclude specific RDS and DynamoDB names (matches console AND → OR → AND)
+# Logic: account/region/tag/type filters AND (
+#   (type=RDS AND name does not contain exclude) OR
+#   (type=DynamoDB AND name does not contain exclude)
+# )
+resource "eon_backup_policy" "exclude_by_type_and_name" {
+  name    = "Standard Backup Excluding Test Resources"
+  enabled = true
+
+  resource_selector = {
+    resource_selection_mode = "CONDITIONAL"
+
+    expression = {
+      group = {
+        operator = "AND"
+        operands = [
+          {
+            account_id = {
+              operator    = "IN"
+              account_ids = ["123456789012"]
+            }
+          },
+          {
+            source_region = {
+              operator       = "IN"
+              source_regions = ["us-east-1"]
+            }
+          },
+          {
+            tag_key_values = {
+              operator = "CONTAINS_ANY_OF"
+              tag_key_values = [
+                {
+                  key   = "m_tier"
+                  value = "1"
+                }
+              ]
+            }
+          },
+          {
+            resource_type = {
+              operator       = "IN"
+              resource_types = ["AWS_RDS", "AWS_DYNAMO_DB"]
+            }
+          },
+          {
+            # Type-scoped name excludes: nested OR of (type AND name NOT_CONTAINS)
+            group = {
+              operator = "OR"
+              operands = [
+                {
+                  group = {
+                    operator = "AND"
+                    operands = [
+                      {
+                        resource_type = {
+                          operator       = "IN"
+                          resource_types = ["AWS_RDS"]
+                        }
+                      },
+                      {
+                        resource_name = {
+                          operator       = "NOT_CONTAINS"
+                          resource_names = ["example-rds-instance"]
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  group = {
+                    operator = "AND"
+                    operands = [
+                      {
+                        resource_type = {
+                          operator       = "IN"
+                          resource_types = ["AWS_DYNAMO_DB"]
+                        }
+                      },
+                      {
+                        resource_name = {
+                          operator       = "NOT_CONTAINS"
+                          resource_names = ["example-dynamodb-table"]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+
+  backup_plan = {
+    backup_policy_type = "STANDARD"
+    standard_plan = {
+      schedule_timezone = "RESOURCE"
+      backup_schedules = [
+        {
+          vault_id       = "e19a6ad1-6a97-49a1-b7c9-9620977ea018"
+          retention_days = 30
+          schedule_config = {
+            frequency = "DAILY"
+            daily_config = {
+              time_of_day_hour     = 2
+              time_of_day_minutes  = 0
+              start_window_minutes = 240
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
 # Output examples
 output "daily_backup_policy_id" {
   description = "ID of the daily backup policy"
@@ -526,6 +644,11 @@ output "conditional_backup_policy_id" {
 output "all_condition_types_policy_id" {
   description = "ID of the policy demonstrating all condition types"
   value       = eon_backup_policy.all_condition_types.id
+}
+
+output "exclude_by_type_and_name_policy_id" {
+  description = "ID of the nested-group exclude-by-type-and-name policy"
+  value       = eon_backup_policy.exclude_by_type_and_name.id
 }
 
 output "backup_policies_summary" {
@@ -575,6 +698,11 @@ output "backup_policies_summary" {
       id      = eon_backup_policy.all_condition_types.id
       name    = eon_backup_policy.all_condition_types.name
       enabled = eon_backup_policy.all_condition_types.enabled
+    }
+    exclude_by_type_and_name = {
+      id      = eon_backup_policy.exclude_by_type_and_name.id
+      name    = eon_backup_policy.exclude_by_type_and_name.name
+      enabled = eon_backup_policy.exclude_by_type_and_name.enabled
     }
   }
 }
