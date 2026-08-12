@@ -2032,39 +2032,47 @@ func createBackupPolicyExpression(ctx context.Context, data *ResourceSelectorMod
 }
 
 func createBackupPolicyGroupCondition(ctx context.Context, groupObj types.Object) (*externalEonSdkAPI.BackupPolicyGroupCondition, error) {
-	var groupCondition GroupConditionModel
-	diags := groupObj.As(ctx, &groupCondition, basetypes.ObjectAsOptions{})
-	if diags.HasError() {
-		tflog.Error(ctx, "Failed to parse group condition", map[string]interface{}{
-			"error": diags.Errors(),
-		})
-		return nil, fmt.Errorf("failed to parse group condition")
+	// Walk attributes directly so nested group depths with different operand schemas
+	// (innermost has no `group` attr) still parse — ElementsAs into OperandModel fails there.
+	attrs := groupObj.Attributes()
+
+	opAttr, ok := attrs["operator"]
+	if !ok || opAttr.IsNull() || opAttr.IsUnknown() {
+		return nil, fmt.Errorf("group operator is required")
+	}
+	operator := opAttr.(types.String).ValueString()
+
+	operandsAttr, ok := attrs["operands"]
+	if !ok || operandsAttr.IsNull() || operandsAttr.IsUnknown() {
+		return nil, fmt.Errorf("group operands are required")
+	}
+	operandsList, ok := operandsAttr.(types.List)
+	if !ok {
+		return nil, fmt.Errorf("group operands must be a list")
 	}
 
-	var operands []OperandModel
-	diags = groupCondition.Operands.ElementsAs(ctx, &operands, false)
-	if diags.HasError() {
-		return nil, fmt.Errorf("failed to parse operands")
-	}
-
-	expressions := make([]externalEonSdkAPI.BackupPolicyExpression, 0, len(operands))
-	for _, operand := range operands {
-		operandExpr, err := createBackupPolicyOperandExpression(ctx, operand)
+	expressions := make([]externalEonSdkAPI.BackupPolicyExpression, 0, len(operandsList.Elements()))
+	for i, elem := range operandsList.Elements() {
+		operandObj, ok := elem.(types.Object)
+		if !ok {
+			return nil, fmt.Errorf("operand %d is not an object", i)
+		}
+		operandExpr, err := createBackupPolicyOperandExpression(ctx, operandObj)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("operand %d: %w", i, err)
 		}
 		expressions = append(expressions, *operandExpr)
 	}
 
-	logicalOperator := externalEonSdkAPI.LogicalOperator(groupCondition.Operator.ValueString())
-	return externalEonSdkAPI.NewBackupPolicyGroupCondition(logicalOperator, expressions), nil
+	return externalEonSdkAPI.NewBackupPolicyGroupCondition(externalEonSdkAPI.LogicalOperator(operator), expressions), nil
 }
 
-func createBackupPolicyOperandExpression(ctx context.Context, operand OperandModel) (*externalEonSdkAPI.BackupPolicyExpression, error) {
+func createBackupPolicyOperandExpression(ctx context.Context, operandObj types.Object) (*externalEonSdkAPI.BackupPolicyExpression, error) {
+	attrs := operandObj.Attributes()
 	operandExpr := externalEonSdkAPI.NewBackupPolicyExpression()
 
-	if !operand.Group.IsNull() && !operand.Group.IsUnknown() {
-		groupConditionApi, err := createBackupPolicyGroupCondition(ctx, operand.Group)
+	if groupVal, ok := attrs["group"]; ok && !groupVal.IsNull() && !groupVal.IsUnknown() {
+		groupConditionApi, err := createBackupPolicyGroupCondition(ctx, groupVal.(types.Object))
 		if err != nil {
 			return nil, err
 		}
@@ -2072,9 +2080,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		return operandExpr, nil
 	}
 
-	if !operand.ResourceType.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "resource_type"); ok {
 		var resourceTypeCondition ResourceTypeConditionModel
-		diags := operand.ResourceType.As(ctx, &resourceTypeCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &resourceTypeCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse resource type condition in operand")
 		}
@@ -2095,9 +2103,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetResourceType(*resourceTypeConditionApi)
 	}
 
-	if !operand.Environment.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "environment"); ok {
 		var envCondition EnvironmentConditionModel
-		diags := operand.Environment.As(ctx, &envCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &envCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse environment condition in operand")
 		}
@@ -2118,9 +2126,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetEnvironment(*envConditionApi)
 	}
 
-	if !operand.TagKeys.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "tag_keys"); ok {
 		var tagKeysCondition TagKeysConditionModel
-		diags := operand.TagKeys.As(ctx, &tagKeysCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &tagKeysCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse tag keys condition in operand")
 		}
@@ -2136,9 +2144,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetTagKeys(*tagKeysConditionApi)
 	}
 
-	if !operand.TagKeyValues.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "tag_key_values"); ok {
 		var tagKeyValuesCondition TagKeyValuesConditionModel
-		diags := operand.TagKeyValues.As(ctx, &tagKeyValuesCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &tagKeyValuesCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse tag key-values condition in operand")
 		}
@@ -2161,9 +2169,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetTagKeyValues(*tagKeyValuesConditionApi)
 	}
 
-	if !operand.DataClasses.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "data_classes"); ok {
 		var dataClassesCondition DataClassesConditionModel
-		diags := operand.DataClasses.As(ctx, &dataClassesCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &dataClassesCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse data_classes condition in operand")
 		}
@@ -2179,9 +2187,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetDataClasses(*dataClassesConditionApi)
 	}
 
-	if !operand.Apps.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "apps"); ok {
 		var appsCondition AppsConditionModel
-		diags := operand.Apps.As(ctx, &appsCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &appsCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse apps condition in operand")
 		}
@@ -2197,9 +2205,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetApps(*appsConditionApi)
 	}
 
-	if !operand.CloudProvider.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "cloud_provider"); ok {
 		var cloudProviderCondition CloudProviderConditionModel
-		diags := operand.CloudProvider.As(ctx, &cloudProviderCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &cloudProviderCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse cloud_provider condition in operand")
 		}
@@ -2220,9 +2228,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetCloudProvider(*cloudProviderConditionApi)
 	}
 
-	if !operand.AccountId.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "account_id"); ok {
 		var accountIdCondition AccountIdConditionModel
-		diags := operand.AccountId.As(ctx, &accountIdCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &accountIdCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse account_id condition in operand")
 		}
@@ -2238,9 +2246,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetAccountId(*accountIdConditionApi)
 	}
 
-	if !operand.SourceRegion.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "source_region"); ok {
 		var sourceRegionCondition SourceRegionConditionModel
-		diags := operand.SourceRegion.As(ctx, &sourceRegionCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &sourceRegionCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse source_region condition in operand")
 		}
@@ -2256,9 +2264,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetSourceRegion(*sourceRegionConditionApi)
 	}
 
-	if !operand.Vpc.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "vpc"); ok {
 		var vpcCondition VpcConditionModel
-		diags := operand.Vpc.As(ctx, &vpcCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &vpcCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse vpc condition in operand")
 		}
@@ -2274,9 +2282,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetVpc(*vpcConditionApi)
 	}
 
-	if !operand.Subnets.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "subnets"); ok {
 		var subnetsCondition SubnetsConditionModel
-		diags := operand.Subnets.As(ctx, &subnetsCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &subnetsCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse subnets condition in operand")
 		}
@@ -2292,9 +2300,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetSubnets(*subnetsConditionApi)
 	}
 
-	if !operand.ResourceGroupName.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "resource_group_name"); ok {
 		var resourceGroupNameCondition ResourceGroupNameConditionModel
-		diags := operand.ResourceGroupName.As(ctx, &resourceGroupNameCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &resourceGroupNameCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse resource_group_name condition in operand")
 		}
@@ -2310,9 +2318,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetResourceGroupName(*resourceGroupNameConditionApi)
 	}
 
-	if !operand.ResourceName.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "resource_name"); ok {
 		var resourceNameCondition ResourceNameConditionModel
-		diags := operand.ResourceName.As(ctx, &resourceNameCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &resourceNameCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse resource_name condition in operand")
 		}
@@ -2328,9 +2336,9 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 		operandExpr.SetResourceName(*resourceNameConditionApi)
 	}
 
-	if !operand.ResourceId.IsNull() {
+	if obj, ok := optionalObjectAttr(attrs, "resource_id"); ok {
 		var resourceIdCondition ResourceIdConditionModel
-		diags := operand.ResourceId.As(ctx, &resourceIdCondition, basetypes.ObjectAsOptions{})
+		diags := obj.As(ctx, &resourceIdCondition, basetypes.ObjectAsOptions{})
 		if diags.HasError() {
 			return nil, fmt.Errorf("failed to parse resource_id condition in operand")
 		}
@@ -2347,6 +2355,15 @@ func createBackupPolicyOperandExpression(ctx context.Context, operand OperandMod
 	}
 
 	return operandExpr, nil
+}
+
+func optionalObjectAttr(attrs map[string]attr.Value, name string) (types.Object, bool) {
+	v, ok := attrs[name]
+	if !ok || v.IsNull() || v.IsUnknown() {
+		return types.Object{}, false
+	}
+	obj, ok := v.(types.Object)
+	return obj, ok
 }
 
 // normalizeResourceNameOperator accepts the console-style alias DOES_NOT_CONTAIN.
