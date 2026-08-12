@@ -77,30 +77,34 @@ type fakeEonServer struct {
 	mu        sync.Mutex
 	projectID string
 
-	controls       map[string]*externalEonSdkAPI.BackupPostureControl
-	idps           map[string]*externalEonSdkAPI.Idp
-	permissions    []externalEonSdkAPI.Permission
-	resources      map[string]*externalEonSdkAPI.InventoryResource
-	snapshots      map[string][]externalEonSdkAPI.Snapshot
-	snapshotsByID  map[string]*externalEonSdkAPI.Snapshot
-	metricsConfigs map[string]*externalEonSdkAPI.RestoreAccountMetricsConfig
-	restoreJobs    map[string]*externalEonSdkAPI.RestoreJob
-	nextID         int
+	controls             map[string]*externalEonSdkAPI.BackupPostureControl
+	idps                 map[string]*externalEonSdkAPI.Idp
+	permissions          []externalEonSdkAPI.Permission
+	resources            map[string]*externalEonSdkAPI.InventoryResource
+	snapshots            map[string][]externalEonSdkAPI.Snapshot
+	snapshotsByID        map[string]*externalEonSdkAPI.Snapshot
+	metricsConfigs       map[string]*externalEonSdkAPI.RestoreAccountMetricsConfig
+	sourceMetricsConfigs map[string]*externalEonSdkAPI.SourceAccountMetricsConfig
+	actionApprovalRules  map[string]*externalEonSdkAPI.ActionApprovalRule
+	restoreJobs          map[string]*externalEonSdkAPI.RestoreJob
+	nextID               int
 }
 
 func newFakeEonServer(t *testing.T) *fakeEonServer {
 	t.Helper()
 	f := &fakeEonServer{
-		projectID:      testAccProjectID,
-		controls:       make(map[string]*externalEonSdkAPI.BackupPostureControl),
-		idps:           make(map[string]*externalEonSdkAPI.Idp),
-		permissions:    []externalEonSdkAPI.Permission{},
-		resources:      make(map[string]*externalEonSdkAPI.InventoryResource),
-		snapshots:      make(map[string][]externalEonSdkAPI.Snapshot),
-		snapshotsByID:  make(map[string]*externalEonSdkAPI.Snapshot),
-		metricsConfigs: make(map[string]*externalEonSdkAPI.RestoreAccountMetricsConfig),
-		restoreJobs:    make(map[string]*externalEonSdkAPI.RestoreJob),
-		nextID:         1,
+		projectID:            testAccProjectID,
+		controls:             make(map[string]*externalEonSdkAPI.BackupPostureControl),
+		idps:                 make(map[string]*externalEonSdkAPI.Idp),
+		permissions:          []externalEonSdkAPI.Permission{},
+		resources:            make(map[string]*externalEonSdkAPI.InventoryResource),
+		snapshots:            make(map[string][]externalEonSdkAPI.Snapshot),
+		snapshotsByID:        make(map[string]*externalEonSdkAPI.Snapshot),
+		metricsConfigs:       make(map[string]*externalEonSdkAPI.RestoreAccountMetricsConfig),
+		sourceMetricsConfigs: make(map[string]*externalEonSdkAPI.SourceAccountMetricsConfig),
+		actionApprovalRules:  make(map[string]*externalEonSdkAPI.ActionApprovalRule),
+		restoreJobs:          make(map[string]*externalEonSdkAPI.RestoreJob),
+		nextID:               1,
 	}
 	f.server = httptest.NewServer(http.HandlerFunc(f.handle))
 	t.Cleanup(f.server.Close)
@@ -188,6 +192,18 @@ func (f *fakeEonServer) DeleteMetricsConfig(accountID string) {
 	delete(f.metricsConfigs, accountID)
 }
 
+func (f *fakeEonServer) DeleteSourceMetricsConfig(accountID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.sourceMetricsConfigs, accountID)
+}
+
+func (f *fakeEonServer) DeleteActionApprovalRule(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.actionApprovalRules, id)
+}
+
 func (f *fakeEonServer) RemoveHold(snapshotID string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -273,6 +289,52 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+	}
+
+	sourceAccountsPrefix := fmt.Sprintf("/v1/projects/%s/source-accounts/", f.projectID)
+	if strings.HasPrefix(path, sourceAccountsPrefix) {
+		rest := strings.TrimPrefix(path, sourceAccountsPrefix)
+		parts := strings.Split(rest, "/")
+		if len(parts) == 2 && parts[1] == "metrics-config" {
+			switch r.Method {
+			case http.MethodGet:
+				f.handleGetSourceMetricsConfig(w, parts[0])
+				return
+			case http.MethodPut:
+				f.handleEnableSourceMetricsConfig(w, r, parts[0])
+				return
+			case http.MethodDelete:
+				f.handleDisableSourceMetricsConfig(w, parts[0])
+				return
+			}
+		}
+	}
+
+	actionApprovalRulesPrefix := fmt.Sprintf("/v1/projects/%s/action-approvals/rules", f.projectID)
+	switch {
+	case r.Method == http.MethodGet && path == actionApprovalRulesPrefix:
+		f.handleListActionApprovalRules(w, r)
+		return
+	case r.Method == http.MethodPost && path == actionApprovalRulesPrefix:
+		f.handleCreateActionApprovalRule(w, r)
+		return
+	case strings.HasPrefix(path, actionApprovalRulesPrefix+"/"):
+		id := strings.TrimPrefix(path, actionApprovalRulesPrefix+"/")
+		if id == "" || strings.Contains(id, "/") {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			f.handleGetActionApprovalRule(w, id)
+		case http.MethodPut:
+			f.handleUpdateActionApprovalRule(w, r, id)
+		case http.MethodDelete:
+			f.handleDeleteActionApprovalRule(w, id)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
 	}
 
 	snapshotsPrefix := fmt.Sprintf("/v1/projects/%s/snapshots/", f.projectID)
@@ -637,6 +699,183 @@ func (f *fakeEonServer) handleDisableMetricsConfig(w http.ResponseWriter, accoun
 	}
 	delete(f.metricsConfigs, accountID)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (f *fakeEonServer) handleGetSourceMetricsConfig(w http.ResponseWriter, accountID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	config, ok := f.sourceMetricsConfigs[accountID]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewGetSourceAccountMetricsConfigResponse(*config))
+}
+
+func (f *fakeEonServer) handleEnableSourceMetricsConfig(w http.ResponseWriter, r *http.Request, accountID string) {
+	var req externalEonSdkAPI.EnableSourceAccountMetricsConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	destination := externalEonSdkAPI.NewAccountMetricsDestination()
+	if req.HasAws() {
+		destination.SetAws(req.GetAws())
+	}
+
+	config := externalEonSdkAPI.NewSourceAccountMetricsConfig(accountID, true, *destination)
+	f.mu.Lock()
+	f.sourceMetricsConfigs[accountID] = config
+	f.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewEnableSourceAccountMetricsConfigResponse(*config))
+}
+
+func (f *fakeEonServer) handleDisableSourceMetricsConfig(w http.ResponseWriter, accountID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.sourceMetricsConfigs[accountID]; !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	delete(f.sourceMetricsConfigs, accountID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (f *fakeEonServer) handleCreateActionApprovalRule(w http.ResponseWriter, r *http.Request) {
+	var req externalEonSdkAPI.CreateActionApprovalRuleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	id := fmt.Sprintf("aar-%d", f.nextID)
+	f.nextID++
+
+	required := int32(1)
+	if req.HasRequiredApprovals() {
+		required = req.GetRequiredApprovals()
+	}
+	rule := externalEonSdkAPI.NewActionApprovalRule(
+		id,
+		f.projectID,
+		req.GetOperation(),
+		required,
+		req.GetApprovalWindowHours(),
+		req.GetExecutionWindowHours(),
+	)
+	if req.HasDescription() {
+		rule.SetDescription(req.GetDescription())
+	}
+	if req.HasResourceSelector() {
+		rule.SetResourceSelector(req.GetResourceSelector())
+	}
+	if req.HasApproverIdpId() {
+		rule.SetApproverIdpId(req.GetApproverIdpId())
+	}
+	if req.HasApproverProviderGroupId() {
+		rule.SetApproverProviderGroupId(req.GetApproverProviderGroupId())
+	}
+	if req.HasExemptApiCredentials() {
+		rule.SetExemptApiCredentials(req.GetExemptApiCredentials())
+	} else {
+		rule.SetExemptApiCredentials(false)
+	}
+	f.actionApprovalRules[id] = rule
+	writeJSON(w, http.StatusCreated, externalEonSdkAPI.NewCreateActionApprovalRuleResponse(*externalEonSdkAPI.NewNullableActionApprovalRule(rule)))
+}
+
+func (f *fakeEonServer) handleGetActionApprovalRule(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	rule, ok := f.actionApprovalRules[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewGetActionApprovalRuleResponse(*externalEonSdkAPI.NewNullableActionApprovalRule(rule)))
+}
+
+func (f *fakeEonServer) handleUpdateActionApprovalRule(w http.ResponseWriter, r *http.Request, id string) {
+	var req externalEonSdkAPI.UpdateActionApprovalRuleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	rule, ok := f.actionApprovalRules[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	if req.HasRequiredApprovals() {
+		rule.SetRequiredApprovals(req.GetRequiredApprovals())
+	}
+	if req.HasApprovalWindowHours() {
+		rule.SetApprovalWindowHours(req.GetApprovalWindowHours())
+	}
+	if req.HasExecutionWindowHours() {
+		rule.SetExecutionWindowHours(req.GetExecutionWindowHours())
+	}
+	if req.HasDescription() {
+		rule.SetDescription(req.GetDescription())
+	}
+	if req.HasExemptApiCredentials() {
+		rule.SetExemptApiCredentials(req.GetExemptApiCredentials())
+	}
+	if req.HasResourceSelector() {
+		if sel, ok := req.GetResourceSelectorOk(); ok && sel != nil {
+			rule.SetResourceSelector(*sel)
+		} else {
+			rule.UnsetResourceSelector()
+		}
+	}
+	if req.HasApproverIdpId() {
+		if idp, ok := req.GetApproverIdpIdOk(); ok && idp != nil {
+			rule.SetApproverIdpId(*idp)
+		} else {
+			rule.UnsetApproverIdpId()
+		}
+	}
+	if req.HasApproverProviderGroupId() {
+		if gid, ok := req.GetApproverProviderGroupIdOk(); ok && gid != nil {
+			rule.SetApproverProviderGroupId(*gid)
+		} else {
+			rule.UnsetApproverProviderGroupId()
+		}
+	}
+	f.actionApprovalRules[id] = rule
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewUpdateActionApprovalRuleResponse(*externalEonSdkAPI.NewNullableActionApprovalRule(rule)))
+}
+
+func (f *fakeEonServer) handleDeleteActionApprovalRule(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.actionApprovalRules[id]; !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	delete(f.actionApprovalRules, id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (f *fakeEonServer) handleListActionApprovalRules(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	items := make([]externalEonSdkAPI.ActionApprovalRule, 0, len(f.actionApprovalRules))
+	opFilter := r.URL.Query().Get("operation")
+	for _, rule := range f.actionApprovalRules {
+		if opFilter != "" && string(rule.GetOperation()) != opFilter {
+			continue
+		}
+		items = append(items, *rule)
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewListActionApprovalRulesResponse(items, int32(len(items))))
 }
 
 func (f *fakeEonServer) handleGetSnapshot(w http.ResponseWriter, id string) {
