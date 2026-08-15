@@ -361,3 +361,159 @@ func TestStartEbsSnapshotRestore(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "job-ebs-snap-1", jobID)
 }
+
+const sourceMetricsConfigPath = "/api/v1/projects/project-1/source-accounts/account-1/metrics-config"
+
+const sourceMetricsConfigResponse = `{
+	"sourceAccountConfig": {
+		"sourceAccountId": "account-1",
+		"enabled": true,
+		"destination": {
+			"aws": {"region": "us-east-1"}
+		}
+	}
+}`
+
+func TestGetSourceAccountMetricsConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		wantErr    bool
+		wantRegion string
+	}{
+		{
+			name:       "success",
+			statusCode: http.StatusOK,
+			body:       sourceMetricsConfigResponse,
+			wantRegion: "us-east-1",
+		},
+		{
+			name:       "not found",
+			statusCode: http.StatusNotFound,
+			body:       `{"message":"not found"}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+				assert.Equal(t, http.MethodGet, r.Method)
+				assert.Equal(t, sourceMetricsConfigPath, r.URL.Path)
+				return &http.Response{
+					StatusCode: tt.statusCode,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(tt.body)),
+				}, nil
+			}))
+
+			config, err := c.GetSourceAccountMetricsConfig(context.Background(), "account-1")
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, config)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, "account-1", config.GetSourceAccountId())
+			assert.True(t, config.GetEnabled())
+			dest := config.GetDestination()
+			aws := dest.GetAws()
+			assert.Equal(t, tt.wantRegion, aws.GetRegion())
+		})
+	}
+}
+
+func TestEnableSourceAccountMetricsConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		wantErr    bool
+	}{
+		{
+			name:       "success",
+			statusCode: http.StatusOK,
+			body:       sourceMetricsConfigResponse,
+		},
+		{
+			name:       "bad request",
+			statusCode: http.StatusBadRequest,
+			body:       `{"message":"invalid"}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+				assert.Equal(t, http.MethodPut, r.Method)
+				assert.Equal(t, sourceMetricsConfigPath, r.URL.Path)
+				return &http.Response{
+					StatusCode: tt.statusCode,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(tt.body)),
+				}, nil
+			}))
+
+			aws := externalEonSdkAPI.NewAwsAccountMetricsDestination()
+			aws.SetRegion("us-east-1")
+			req := externalEonSdkAPI.EnableSourceAccountMetricsConfigRequest{}
+			req.SetAws(*aws)
+
+			config, err := c.EnableSourceAccountMetricsConfig(context.Background(), "account-1", req)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, config)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, "account-1", config.GetSourceAccountId())
+		})
+	}
+}
+
+func TestDisableSourceAccountMetricsConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		wantErr    bool
+	}{
+		{name: "success", statusCode: http.StatusNoContent},
+		{name: "success ok", statusCode: http.StatusOK},
+		{name: "not found", statusCode: http.StatusNotFound, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+				assert.Equal(t, http.MethodDelete, r.Method)
+				assert.Equal(t, sourceMetricsConfigPath, r.URL.Path)
+				return &http.Response{
+					StatusCode: tt.statusCode,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
+				}, nil
+			}))
+
+			err := c.DisableSourceAccountMetricsConfig(context.Background(), "account-1")
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
