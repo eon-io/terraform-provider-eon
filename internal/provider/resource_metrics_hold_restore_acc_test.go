@@ -212,3 +212,66 @@ resource "eon_restore_job" "test" {
 		},
 	})
 }
+
+func TestAccSourceAccountMetricsConfig(t *testing.T) {
+	testAccPreCheck(t)
+
+	server := newFakeEonServer(t)
+	resourceName := "eon_source_account_metrics_config.test"
+	accountID := "source-acct-1"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: server.providerConfig() + fmt.Sprintf(`
+resource "eon_source_account_metrics_config" "test" {
+  source_account_id = %q
+  aws {
+    region = "us-east-1"
+  }
+}
+`, accountID),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "source_account_id", accountID),
+					resource.TestCheckResourceAttr(resourceName, "id", accountID),
+					resource.TestCheckResourceAttr(resourceName, "aws.region", "us-east-1"),
+				),
+			},
+			{
+				Config: server.providerConfig() + fmt.Sprintf(`
+resource "eon_source_account_metrics_config" "test" {
+  source_account_id = %q
+  aws {
+    region = "us-west-2"
+  }
+}
+`, accountID),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "aws.region", "us-west-2"),
+				),
+			},
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateId:     accountID,
+			},
+			{
+				PreConfig: func() {
+					server.DeleteSourceMetricsConfig(accountID)
+				},
+				Config: server.providerConfig() + fmt.Sprintf(`
+resource "eon_source_account_metrics_config" "test" {
+  source_account_id = %q
+  aws {
+    region = "us-west-2"
+  }
+}
+`, accountID),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
