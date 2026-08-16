@@ -73,3 +73,46 @@ func TestAzureDiskSettingsFromModel(t *testing.T) {
 	require.NotNil(t, settings.SizeBytes)
 	assert.Equal(t, int64(10737418240), *settings.SizeBytes)
 }
+
+func TestModelToEnableSourceMetricsRequest(t *testing.T) {
+	t.Parallel()
+
+	t.Run("with aws region", func(t *testing.T) {
+		t.Parallel()
+		data := &SourceAccountMetricsConfigResourceModel{
+			SourceAccountId: types.StringValue("acct-1"),
+			Aws: &awsAccountMetricsDestModel{
+				Region: types.StringValue("eu-west-1"),
+			},
+		}
+		req := modelToEnableSourceMetricsRequest(data)
+		require.True(t, req.HasAws())
+		aws := req.GetAws()
+		assert.Equal(t, "eu-west-1", aws.GetRegion())
+	})
+
+	t.Run("without aws block", func(t *testing.T) {
+		t.Parallel()
+		data := &SourceAccountMetricsConfigResourceModel{
+			SourceAccountId: types.StringValue("acct-1"),
+		}
+		req := modelToEnableSourceMetricsRequest(data)
+		assert.False(t, req.HasAws())
+	})
+}
+
+func TestSourceMetricsConfigToModel(t *testing.T) {
+	t.Parallel()
+
+	destination := externalEonSdkAPI.NewAccountMetricsDestination()
+	aws := externalEonSdkAPI.NewAwsAccountMetricsDestination()
+	aws.SetRegion("ap-southeast-1")
+	destination.SetAws(*aws)
+	config := externalEonSdkAPI.NewSourceAccountMetricsConfig("acct-1", true, *destination)
+
+	data := &SourceAccountMetricsConfigResourceModel{}
+	diags := sourceMetricsConfigToModel(config, data)
+	require.False(t, diags.HasError())
+	require.NotNil(t, data.Aws)
+	assert.Equal(t, "ap-southeast-1", data.Aws.Region.ValueString())
+}
