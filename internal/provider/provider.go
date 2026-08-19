@@ -204,6 +204,7 @@ func (p *EonProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		NewRestoreAwsOrganizationalUnitsDataSource,
 		NewSnapshotDataSource,
 		NewResourceSnapshotsDataSource,
+		NewResourcesDataSource,
 		NewBackupPoliciesDataSource,
 		NewBackupPostureControlsDataSource,
 		NewActionApprovalRulesDataSource,

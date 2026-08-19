@@ -56,6 +56,7 @@ type MockEonClient struct {
 	ShouldFailOverrideEnvironment       bool
 	ShouldFailRemoveEnvironmentOverride bool
 	ShouldFailListResourceSnapshots     bool
+	ShouldFailListResources             bool
 	ShouldFailGetResource               bool
 
 	// Call tracking
@@ -83,6 +84,7 @@ type MockEonClient struct {
 	OverrideEnvironmentCalls        int
 	RemoveEnvironmentOverrideCalls  int
 	ListResourceSnapshotsCalls      int
+	ListResourcesCalls              int
 	GetResourceCalls                int
 
 	// Mock configuration
@@ -270,6 +272,7 @@ func (m *MockEonClient) Reset() {
 	m.OverrideEnvironmentCalls = 0
 	m.RemoveEnvironmentOverrideCalls = 0
 	m.ListResourceSnapshotsCalls = 0
+	m.ListResourcesCalls = 0
 	m.GetResourceCalls = 0
 	m.ShouldFailCreate = false
 	m.ShouldFailRead = false
@@ -295,6 +298,7 @@ func (m *MockEonClient) Reset() {
 	m.ShouldFailOverrideEnvironment = false
 	m.ShouldFailRemoveEnvironmentOverride = false
 	m.ShouldFailListResourceSnapshots = false
+	m.ShouldFailListResources = false
 	m.ShouldFailGetResource = false
 }
 
@@ -802,6 +806,26 @@ func (m *MockEonClient) RemoveEnvironmentOverride(ctx context.Context, resourceI
 		res.Classifications.SetEnvironmentDetails(*details)
 	}
 	return nil
+}
+
+// ListResources mocks listing inventory resources.
+func (m *MockEonClient) ListResources(ctx context.Context, filters *externalEonSdkAPI.InventoryFilterConditions) ([]externalEonSdkAPI.InventoryResource, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListResourcesCalls++
+	if m.ShouldFailListResources {
+		return nil, fmt.Errorf("mock list resources error")
+	}
+
+	items := make([]externalEonSdkAPI.InventoryResource, 0, len(m.InventoryResources))
+	for _, res := range m.InventoryResources {
+		items = append(items, *res)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Id < items[j].Id
+	})
+	return items, nil
 }
 
 // ListResourceSnapshots mocks listing snapshots for a resource.

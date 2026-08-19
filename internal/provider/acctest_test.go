@@ -150,6 +150,12 @@ func (f *fakeEonServer) AddResource(resource *externalEonSdkAPI.InventoryResourc
 	f.resources[resource.Id] = resource
 }
 
+func (f *fakeEonServer) DeleteResource(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.resources, id)
+}
+
 func (f *fakeEonServer) CancelResourceExclusion(id string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -364,6 +370,12 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	resourcesListPath := fmt.Sprintf("/v1/projects/%s/resources", f.projectID)
+	if r.Method == http.MethodPost && path == resourcesListPath {
+		f.handleListResources(w, r)
+		return
+	}
+
 	resourcesPrefix := fmt.Sprintf("/v1/projects/%s/resources/", f.projectID)
 	if strings.HasPrefix(path, resourcesPrefix) {
 		rest := strings.TrimPrefix(path, resourcesPrefix)
@@ -528,6 +540,143 @@ func (f *fakeEonServer) handleGetResource(w http.ResponseWriter, id string) {
 		return
 	}
 	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewGetResourceResponse(*res))
+}
+
+func (f *fakeEonServer) handleListResources(w http.ResponseWriter, r *http.Request) {
+	var req externalEonSdkAPI.ListInventoryRequest
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	items := make([]externalEonSdkAPI.InventoryResource, 0, len(f.resources))
+	for _, res := range f.resources {
+		if inventoryResourceMatchesFilters(res, req.GetFilters()) {
+			items = append(items, *res)
+		}
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewListResourcesResponse(items, int32(len(items))))
+}
+
+func inventoryResourceMatchesFilters(resource *externalEonSdkAPI.InventoryResource, filters externalEonSdkAPI.InventoryFilterConditions) bool {
+	if idFilters, ok := filters.GetIdOk(); ok && idFilters != nil {
+		if !stringInList(resource.Id, idFilters.GetIn()) {
+			return false
+		}
+	}
+	if providerFilters, ok := filters.GetProviderResourceIdOk(); ok && providerFilters != nil {
+		if !stringInList(resource.ProviderResourceId, providerFilters.GetIn()) {
+			return false
+		}
+	}
+	if nameFilters, ok := filters.GetResourceNameOk(); ok && nameFilters != nil {
+		if !stringInList(resource.ResourceName, nameFilters.GetIn()) {
+			return false
+		}
+	}
+	if typeFilters, ok := filters.GetResourceTypeOk(); ok && typeFilters != nil {
+		if !resourceTypeInList(resource.ResourceType, typeFilters.GetIn()) {
+			return false
+		}
+	}
+	if cloudFilters, ok := filters.GetCloudProviderOk(); ok && cloudFilters != nil {
+		if !providerInList(resource.CloudProvider, cloudFilters.GetIn()) {
+			return false
+		}
+	}
+	if accountFilters, ok := filters.GetAccountIdOk(); ok && accountFilters != nil {
+		if !stringInList(resource.ProviderAccountId, accountFilters.GetIn()) {
+			return false
+		}
+	}
+	if statusFilters, ok := filters.GetBackupStatusOk(); ok && statusFilters != nil {
+		if !backupStatusInList(resource.BackupStatus, statusFilters.GetIn()) {
+			return false
+		}
+	}
+	if environmentFilters, ok := filters.GetEnvironmentOk(); ok && environmentFilters != nil {
+		env := inventoryResourceEnvironment(resource)
+		if !environmentInList(env, environmentFilters.GetIn()) {
+			return false
+		}
+	}
+	return true
+}
+
+func stringInList(value string, allowed []string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	for _, candidate := range allowed {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
+}
+
+func resourceTypeInList(value externalEonSdkAPI.ResourceType, allowed []externalEonSdkAPI.ResourceType) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	for _, candidate := range allowed {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
+}
+
+func providerInList(value externalEonSdkAPI.Provider, allowed []externalEonSdkAPI.Provider) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	for _, candidate := range allowed {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
+}
+
+func backupStatusInList(value externalEonSdkAPI.BackupStatus, allowed []externalEonSdkAPI.BackupStatus) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	for _, candidate := range allowed {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
+}
+
+func environmentInList(value string, allowed []externalEonSdkAPI.Environment) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	for _, candidate := range allowed {
+		if string(candidate) == value {
+			return true
+		}
+	}
+	return false
+}
+
+func inventoryResourceEnvironment(resource *externalEonSdkAPI.InventoryResource) string {
+	if resource.Classifications == nil {
+		return ""
+	}
+	details, ok := resource.Classifications.GetEnvironmentDetailsOk()
+	if !ok || details == nil {
+		return ""
+	}
+	env, ok := details.GetEnvironmentOk()
+	if !ok || env == nil {
+		return ""
+	}
+	return string(*env)
 }
 
 func (f *fakeEonServer) handleExcludeResource(w http.ResponseWriter, id string) {

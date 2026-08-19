@@ -197,3 +197,86 @@ func TestListResourceSnapshots(t *testing.T) {
 		})
 	}
 }
+
+func TestListResources(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		wantErr    bool
+		wantLen    int
+	}{
+		{
+			name:       "success",
+			statusCode: http.StatusOK,
+			body: `{
+				"resources": [
+					{
+						"id": "res-1",
+						"backupStatus": "PROTECTED",
+						"providerResourceId": "i-1",
+						"resourceName": "demo",
+						"providerAccountId": "123456789012",
+						"snapshotStorage": {},
+						"sourceStorage": {},
+						"tags": {},
+						"cloudProvider": "AWS",
+						"resourceType": "AWS_EC2",
+						"region": "us-east-1"
+					}
+				],
+				"totalCount": 1
+			}`,
+			wantLen: 1,
+		},
+		{
+			name:       "empty list",
+			statusCode: http.StatusOK,
+			body:       `{"resources": [], "totalCount": 0}`,
+			wantLen:    0,
+		},
+		{
+			name:       "not found",
+			statusCode: http.StatusNotFound,
+			body:       `{"message":"not found"}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Equal(t, "/api/v1/projects/project-1/resources", r.URL.Path)
+				assert.Equal(t, "100", r.URL.Query().Get("pageSize"))
+				return &http.Response{
+					StatusCode: tt.statusCode,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(tt.body)),
+				}, nil
+			}))
+
+			filters := externalEonSdkAPI.NewInventoryFilterConditions()
+			providerFilters := externalEonSdkAPI.NewResourceIdFilters()
+			providerFilters.SetIn([]string{"i-1"})
+			filters.SetProviderResourceId(*providerFilters)
+
+			result, err := c.ListResources(context.Background(), filters)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, result, tt.wantLen)
+			if tt.wantLen > 0 {
+				assert.Equal(t, "res-1", result[0].GetId())
+				assert.Equal(t, "i-1", result[0].GetProviderResourceId())
+			}
+		})
+	}
+}
