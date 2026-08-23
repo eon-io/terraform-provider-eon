@@ -5,7 +5,33 @@ terraform {
     }
   }
 }
+# Cost Explore Viewr - FinOps team
+resource "eon_role" "cost_viewer" {
+  name = "Cost Explorer Viewer"
 
+  permission_grants = [
+  {
+  permission = "cost_explorer.view"
+  },
+  {
+  permission = "dashboard.view"
+  }
+  ]
+ }
+# Backup Operator - can view and create backups but not manage policies
+resource "eon_role" "backup_operator" {
+  name = "Backup Operations"
+
+  permission_grants = [
+  {
+  permission = "inventory.view"
+  },
+  {
+  permission = "jobs.view"
+  access_condition_id = "prod-only"
+  }
+  ]
+}
 # Example: Custom role with permissions
 resource "eon_role" "backup_viewer" {
   name = "Backup Viewer (Custom)"
