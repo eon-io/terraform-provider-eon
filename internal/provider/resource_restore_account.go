@@ -88,9 +88,8 @@ func (r *RestoreAccountResource) Schema(ctx context.Context, req resource.Schema
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
-				MarkdownDescription: "Date and time the restore account was last updated.",
+				MarkdownDescription: "Time at which Terraform last applied a change to this restore account. Eon does not report an update timestamp, so this records the local apply time and is not refreshed afterwards.",
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 		Blocks: map[string]schema.Block{

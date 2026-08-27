@@ -101,7 +101,7 @@ output "gcp_production_account" {
 - `id` (String) Eon-assigned account ID.
 - `provider_account_id` (String, Deprecated) Cloud-provider-assigned account ID (AWS account ID or Azure subscription ID). Computed from the `aws` or `azure` block.
 - `status` (String) Connection status of the source account. The provider automatically reconnects accounts that drift to `DISCONNECTED`. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
-- `updated_at` (String) Date and time the source account was last updated.
+- `updated_at` (String) Time at which Terraform last applied a change to this source account. Eon does not report an update timestamp, so this records the local apply time and is not refreshed afterwards.
 
 <a id="nestedblock--aws"></a>
 ### Nested Schema for `aws`
