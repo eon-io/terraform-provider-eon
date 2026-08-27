@@ -1029,18 +1029,10 @@ func (c *EonClient) GetRestoreJob(ctx context.Context, jobId string) (*externalE
 // may be intercepted by a Multi-Party Approval (MPA) policy. On HTTP 202 the
 // restore job started and its ID is read from the response body. On HTTP 201 the
 // operation was intercepted by an MPA policy and cannot proceed without approval.
-func restoreJobIDFromResponse(resp *externalEonSdkAPI.MPAInterceptedResponse, httpResp *http.Response, action string) (string, error) {
+func restoreJobIDFromResponse(resp *externalEonSdkAPI.RestoreJobInitiationResponse, httpResp *http.Response, action string) (string, error) {
 	switch httpResp.StatusCode {
 	case http.StatusAccepted:
-		body, err := io.ReadAll(httpResp.Body)
-		if err != nil {
-			return "", fmt.Errorf("%s: failed to read response body: %w", action, err)
-		}
-		var initiation externalEonSdkAPI.RestoreJobInitiationResponse
-		if err := json.Unmarshal(body, &initiation); err != nil {
-			return "", fmt.Errorf("%s: failed to parse response: %w", action, err)
-		}
-		return initiation.GetJobId(), nil
+		return resp.GetJobId(), nil
 	case http.StatusCreated:
 		mpaReq := resp.GetActionApprovalRequest()
 		return "", fmt.Errorf("%s: operation requires Multi-Party Approval (MPA request ID %q); approve the request and retry", action, mpaReq.GetId())
