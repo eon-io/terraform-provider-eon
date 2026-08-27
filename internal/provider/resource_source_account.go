@@ -88,9 +88,8 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
-				MarkdownDescription: "Date and time the source account was last updated.",
+				MarkdownDescription: "Time at which Terraform last applied a change to this source account.",
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 		Blocks: map[string]schema.Block{
