@@ -88,7 +88,7 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
-				MarkdownDescription: "Time at which Terraform last applied a change to this source account. Eon does not report an update timestamp, so this records the local apply time and is not refreshed afterwards.",
+				MarkdownDescription: "Time at which Terraform last applied a change to this source account.",
 				Computed:            true,
 			},
 		},
