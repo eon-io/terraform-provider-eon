@@ -7,6 +7,9 @@ resource "eon_restore_account_connectivity_config" "aws" {
       region = "us-east-1"
       vpc    = "vpc-01234567890123456"
 
+      # Needed when a subnet here has no internet access: cross-region restores then reach the vault over the S3 gateway endpoint.
+      private_subnet_enabled = true
+
       subnets_per_availability_zone {
         availability_zone = "us-east-1a"
         subnet_id         = "subnet-01234567890123456"
