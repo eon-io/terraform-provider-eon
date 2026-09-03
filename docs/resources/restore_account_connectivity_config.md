@@ -22,6 +22,9 @@ resource "eon_restore_account_connectivity_config" "aws" {
       region = "us-east-1"
       vpc    = "vpc-01234567890123456"
 
+      # Needed when a subnet here has no internet access: cross-region restores then reach the vault over the S3 gateway endpoint.
+      private_subnet_enabled = true
+
       subnets_per_availability_zone {
         availability_zone = "us-east-1a"
         subnet_id         = "subnet-01234567890123456"
@@ -87,6 +90,7 @@ Required:
 
 Optional:
 
+- `private_subnet_enabled` (Boolean) Whether to allow cross-region restore into subnets with no internet access, via an S3 gateway endpoint. When `true`, Eon uses S3 Multi-Region Access Points to reach vault data from this VPC. Turn this on if any subnet in the VPC lacks internet access. Defaults to `false`. In the Eon console, this setting appears as "Allow cross-region restore via S3 gateway endpoint".
 - `security_groups` (Block, Optional) Security groups to use for the restore server and restored RDS instances. (see [below for nested schema](#nestedblock--aws--vpc_configs--security_groups))
 - `subnets_per_availability_zone` (Block List) Subnets to configure for availability zones in the VPC. For availability zones not specified, Eon attempts to use the default subnet. (see [below for nested schema](#nestedblock--aws--vpc_configs--subnets_per_availability_zone))
 

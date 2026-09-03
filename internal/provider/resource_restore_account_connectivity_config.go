@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -45,6 +46,7 @@ type awsConnectivityConfigModel struct {
 type awsVpcConnectivityConfigModel struct {
 	Region                     types.String                      `tfsdk:"region"`
 	Vpc                        types.String                      `tfsdk:"vpc"`
+	PrivateSubnetEnabled       types.Bool                        `tfsdk:"private_subnet_enabled"`
 	SubnetsPerAvailabilityZone []subnetPerAvailabilityZoneModel  `tfsdk:"subnets_per_availability_zone"`
 	SecurityGroups             *resourceTypeToSecurityGroupModel `tfsdk:"security_groups"`
 }
@@ -109,6 +111,12 @@ func (r *RestoreAccountConnectivityConfigResource) Schema(ctx context.Context, r
 								"vpc": schema.StringAttribute{
 									MarkdownDescription: "VPC ID.",
 									Required:            true,
+								},
+								"private_subnet_enabled": schema.BoolAttribute{
+									MarkdownDescription: "Whether to allow cross-region restore into subnets with no internet access, via an S3 gateway endpoint. When `true`, Eon uses S3 Multi-Region Access Points to reach vault data from this VPC. Turn this on if any subnet in the VPC lacks internet access. Defaults to `false`. In the Eon console, this setting appears as \"Allow cross-region restore via S3 gateway endpoint\".",
+									Optional:            true,
+									Computed:            true,
+									Default:             booldefault.StaticBool(false),
 								},
 							},
 							Blocks: map[string]schema.Block{
@@ -326,8 +334,9 @@ func modelToUpdateRequest(ctx context.Context, data *RestoreAccountConnectivityC
 		vpcConfigs := make([]externalEonSdkAPI.AwsVpcConnectivityConfig, 0, len(data.Aws.VpcConfigs))
 		for _, v := range data.Aws.VpcConfigs {
 			vpc := externalEonSdkAPI.AwsVpcConnectivityConfig{
-				Region: v.Region.ValueString(),
-				Vpc:    v.Vpc.ValueString(),
+				Region:               v.Region.ValueString(),
+				Vpc:                  v.Vpc.ValueString(),
+				PrivateSubnetEnabled: v.PrivateSubnetEnabled.ValueBoolPointer(),
 			}
 			for _, s := range v.SubnetsPerAvailabilityZone {
 				vpc.SubnetsPerAvailabilityZone = append(vpc.SubnetsPerAvailabilityZone, externalEonSdkAPI.SubnetPerAvailabilityZone{
@@ -394,8 +403,9 @@ func connectivityConfigToModel(ctx context.Context, config *externalEonSdkAPI.Re
 		awsModel := &awsConnectivityConfigModel{}
 		for _, v := range awsCfg.GetVpcConfigs() {
 			vpcModel := awsVpcConnectivityConfigModel{
-				Region: types.StringValue(v.Region),
-				Vpc:    types.StringValue(v.Vpc),
+				Region:               types.StringValue(v.Region),
+				Vpc:                  types.StringValue(v.Vpc),
+				PrivateSubnetEnabled: types.BoolValue(v.GetPrivateSubnetEnabled()),
 			}
 			for _, s := range v.SubnetsPerAvailabilityZone {
 				vpcModel.SubnetsPerAvailabilityZone = append(vpcModel.SubnetsPerAvailabilityZone, subnetPerAvailabilityZoneModel{
