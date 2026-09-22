@@ -870,6 +870,10 @@ Required:
 - `backup_schedules` (Attributes List) List of backup schedules (see [below for nested schema](#nestedatt--backup_plan--high_frequency_plan--backup_schedules))
 - `resource_types` (List of String) List of resource types for high frequency backups
 
+Optional:
+
+- `reuse_existing_snapshots` (Boolean) Back up RDS resources from a qualifying existing customer snapshot taken within the backup interval, instead of taking a new one. Leave unset to keep whatever the policy already has; set it to false to turn reuse off.
+
 <a id="nestedatt--backup_plan--high_frequency_plan--backup_schedules"></a>
 ### Nested Schema for `backup_plan.high_frequency_plan.backup_schedules`
 
@@ -909,6 +913,7 @@ Required:
 
 Optional:
 
+- `reuse_existing_snapshots` (Boolean) Back up RDS resources from a qualifying existing customer snapshot taken within the backup interval, instead of taking a new one. Leave unset to keep whatever the policy already has; set it to false to turn reuse off.
 - `schedule_timezone` (String) Time zone applied to every schedule window on this policy (mirrors the console's "Schedules are in" setting): 'UTC' runs windows at a fixed UTC hour; 'RESOURCE' runs them at the same local hour in each resource's own region time zone. Defaults to 'UTC' when omitted.
 
 <a id="nestedatt--backup_plan--standard_plan--backup_schedules"></a>

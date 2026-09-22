@@ -53,13 +53,15 @@ type ResourceSelectorModel struct {
 }
 
 type StandardPlanModel struct {
-	BackupSchedules  types.List   `tfsdk:"backup_schedules"`
-	ScheduleTimezone types.String `tfsdk:"schedule_timezone"`
+	BackupSchedules        types.List   `tfsdk:"backup_schedules"`
+	ScheduleTimezone       types.String `tfsdk:"schedule_timezone"`
+	ReuseExistingSnapshots types.Bool   `tfsdk:"reuse_existing_snapshots"`
 }
 
 type HighFrequencyPlanModel struct {
-	ResourceTypes   types.List `tfsdk:"resource_types"`
-	BackupSchedules types.List `tfsdk:"backup_schedules"`
+	ResourceTypes          types.List `tfsdk:"resource_types"`
+	BackupSchedules        types.List `tfsdk:"backup_schedules"`
+	ReuseExistingSnapshots types.Bool `tfsdk:"reuse_existing_snapshots"`
 }
 
 type AwsNativePitrPlanModel struct {
@@ -389,6 +391,10 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 								Optional:            true,
 								Validators:          []validator.String{scheduleTimezoneValidator{}},
 							},
+							"reuse_existing_snapshots": schema.BoolAttribute{
+								MarkdownDescription: "Back up RDS resources from a qualifying existing customer snapshot taken within the backup interval, instead of taking a new one. Leave unset to keep whatever the policy already has; set it to false to turn reuse off.",
+								Optional:            true,
+							},
 							"backup_schedules": schema.ListNestedAttribute{
 								MarkdownDescription: "List of backup schedules",
 								Required:            true,
@@ -419,6 +425,10 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 								MarkdownDescription: "List of resource types for high frequency backups",
 								ElementType:         types.StringType,
 								Required:            true,
+							},
+							"reuse_existing_snapshots": schema.BoolAttribute{
+								MarkdownDescription: "Back up RDS resources from a qualifying existing customer snapshot taken within the backup interval, instead of taking a new one. Leave unset to keep whatever the policy already has; set it to false to turn reuse off.",
+								Optional:            true,
 							},
 							"backup_schedules": schema.ListNestedAttribute{
 								MarkdownDescription: "List of backup schedules",
@@ -662,6 +672,7 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 
 		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(backupSchedules)
 		applyScheduleTimezone(standardPlan, standardPlanModel.ScheduleTimezone)
+		applyStandardReuseExistingSnapshots(standardPlan, standardPlanModel.ReuseExistingSnapshots)
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
@@ -731,6 +742,7 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 			resourceTypes,
 			backupSchedules,
 		)
+		applyHighFrequencyReuseExistingSnapshots(highFrequencyPlan, highFrequencyPlanModel.ReuseExistingSnapshots)
 		backupPlan.SetHighFrequencyPlan(*highFrequencyPlan)
 
 	case "AWS_NATIVE_PITR":
@@ -995,6 +1007,7 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 
 		standardPlan := externalEonSdkAPI.NewStandardBackupPolicyPlan(backupSchedules)
 		applyScheduleTimezone(standardPlan, standardPlanModel.ScheduleTimezone)
+		applyStandardReuseExistingSnapshots(standardPlan, standardPlanModel.ReuseExistingSnapshots)
 		backupPlan.SetStandardPlan(*standardPlan)
 
 	case "HIGH_FREQUENCY":
@@ -1064,6 +1077,7 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 			resourceTypes,
 			backupSchedules,
 		)
+		applyHighFrequencyReuseExistingSnapshots(highFrequencyPlan, highFrequencyPlanModel.ReuseExistingSnapshots)
 		backupPlan.SetHighFrequencyPlan(*highFrequencyPlan)
 
 	case "AWS_NATIVE_PITR":
@@ -1443,6 +1457,20 @@ func (scheduleTimezoneValidator) ValidateString(_ context.Context, req validator
 
 // applyScheduleTimezone sets the plan-level schedule time zone when the config provides one.
 // An empty value leaves the SDK default (UTC) so existing policies keep their historical behavior.
+// A null attribute leaves the field unset, which the API reads as "keep the stored setting" — only an
+// explicit false turns reuse off, so an unrelated apply cannot silently disable it.
+func applyStandardReuseExistingSnapshots(plan *externalEonSdkAPI.StandardBackupPolicyPlan, reuse types.Bool) {
+	if !reuse.IsNull() && !reuse.IsUnknown() {
+		plan.SetReuseExistingSnapshots(reuse.ValueBool())
+	}
+}
+
+func applyHighFrequencyReuseExistingSnapshots(plan *externalEonSdkAPI.HighFrequencyBackupPolicyPlan, reuse types.Bool) {
+	if !reuse.IsNull() && !reuse.IsUnknown() {
+		plan.SetReuseExistingSnapshots(reuse.ValueBool())
+	}
+}
+
 func applyScheduleTimezone(plan *externalEonSdkAPI.StandardBackupPolicyPlan, tz types.String) {
 	if v := tz.ValueString(); v != "" {
 		plan.SetScheduleTimezone(externalEonSdkAPI.ScheduleTimezone(v))

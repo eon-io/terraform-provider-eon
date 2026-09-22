@@ -201,6 +201,21 @@ func priorString(prior types.Object, name string) types.String {
 
 // priorListElement returns the element that held position index in a prior list attribute, matching
 // schedules to their previous representation by position because they carry no identifier.
+func priorBool(prior types.Object, name string) types.Bool {
+	if prior.IsNull() || prior.IsUnknown() {
+		return types.BoolNull()
+	}
+	value, ok := prior.Attributes()[name]
+	if !ok {
+		return types.BoolNull()
+	}
+	flag, ok := value.(types.Bool)
+	if !ok {
+		return types.BoolNull()
+	}
+	return flag
+}
+
 func priorListElement(prior types.Object, name string, index int) types.Object {
 	if prior.IsNull() || prior.IsUnknown() {
 		return types.ObjectNull(nil)
@@ -803,6 +818,10 @@ func flattenStandardPlan(
 	if timezone := flattenScheduleTimezone(plan.ScheduleTimezone, priorString(prior, "schedule_timezone")); !timezone.IsNull() {
 		present["schedule_timezone"] = timezone
 	}
+	if reuse := flattenReuseExistingSnapshots(
+		plan.ReuseExistingSnapshots.Get(), priorBool(prior, "reuse_existing_snapshots")); !reuse.IsNull() {
+		present["reuse_existing_snapshots"] = reuse
+	}
 
 	object, objectDiags := objectValue(t, present)
 	diags.Append(objectDiags...)
@@ -900,6 +919,18 @@ func awsNativeStandardScheduleConfigAsStandard(
 
 // flattenScheduleTimezone keeps schedule_timezone null when the configuration omitted it and Eon
 // reports its UTC default, so an unset optional attribute does not read as drift on every plan.
+// The API answers false for a policy that never opted in, so a config that never set the attribute
+// keeps it null rather than showing a permanent false-vs-unset diff.
+func flattenReuseExistingSnapshots(reuse *bool, prior types.Bool) types.Bool {
+	if reuse == nil {
+		return types.BoolNull()
+	}
+	if prior.IsNull() && !*reuse {
+		return types.BoolNull()
+	}
+	return types.BoolValue(*reuse)
+}
+
 func flattenScheduleTimezone(timezone *externalEonSdkAPI.ScheduleTimezone, prior types.String) types.String {
 	if timezone == nil {
 		return types.StringNull()
@@ -1156,6 +1187,8 @@ func flattenHighFrequencyPlan(
 	object, objectDiags := objectValue(t, map[string]attr.Value{
 		"resource_types":   resourceTypeList,
 		"backup_schedules": scheduleList,
+		"reuse_existing_snapshots": flattenReuseExistingSnapshots(
+			plan.ReuseExistingSnapshots.Get(), priorBool(prior, "reuse_existing_snapshots")),
 	})
 	diags.Append(objectDiags...)
 	return object, diags
