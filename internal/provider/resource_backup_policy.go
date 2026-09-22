@@ -392,7 +392,7 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 								Validators:          []validator.String{scheduleTimezoneValidator{}},
 							},
 							"reuse_existing_snapshots": schema.BoolAttribute{
-								MarkdownDescription: "Back up RDS resources from a qualifying existing customer snapshot taken within the backup interval, instead of taking a new one. Leave unset to keep whatever the policy already has; set it to false to turn reuse off.",
+								MarkdownDescription: "Back up from a qualifying existing customer snapshot taken within the backup interval, instead of taking a new one. Currently supported for RDS resources only. Leave unset to keep whatever the policy already has; set it to false to turn reuse off.",
 								Optional:            true,
 							},
 							"backup_schedules": schema.ListNestedAttribute{
@@ -427,7 +427,7 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 								Required:            true,
 							},
 							"reuse_existing_snapshots": schema.BoolAttribute{
-								MarkdownDescription: "Back up RDS resources from a qualifying existing customer snapshot taken within the backup interval, instead of taking a new one. Leave unset to keep whatever the policy already has; set it to false to turn reuse off.",
+								MarkdownDescription: "Back up from a qualifying existing customer snapshot taken within the backup interval, instead of taking a new one. Currently supported for RDS resources only. Leave unset to keep whatever the policy already has; set it to false to turn reuse off.",
 								Optional:            true,
 							},
 							"backup_schedules": schema.ListNestedAttribute{
