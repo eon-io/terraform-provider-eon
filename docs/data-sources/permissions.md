@@ -18,8 +18,7 @@ data "eon_permissions" "all" {}
 
 # Example: Use a permission when creating a custom role
 resource "eon_role" "inventory_viewer" {
-  name        = "inventory-viewer"
-  description = "Can view inventory resources"
+  name = "inventory-viewer"
 
   permission_grants = [
     {

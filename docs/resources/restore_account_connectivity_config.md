@@ -13,6 +13,26 @@ Manages the connectivity configuration of a restore account. The connectivity co
 ## Example Usage
 
 ```terraform
+# The connectivity config attaches to a restore account
+resource "eon_restore_account" "aws_disaster_recovery" {
+  name           = "Disaster Recovery AWS Account"
+  cloud_provider = "AWS"
+
+  aws {
+    role_arn = "arn:aws:iam::555666777888:role/EonRestoreRole"
+  }
+}
+
+resource "eon_restore_account" "gcp_disaster_recovery" {
+  name           = "Disaster Recovery GCP Project"
+  cloud_provider = "GCP"
+
+  gcp {
+    project_id      = "my-gcp-project-id"
+    service_account = "eon-restore@my-gcp-project-id.iam.gserviceaccount.com"
+  }
+}
+
 # Example: Configure connectivity for an AWS restore account
 resource "eon_restore_account_connectivity_config" "aws" {
   restore_account_id = eon_restore_account.aws_disaster_recovery.id
