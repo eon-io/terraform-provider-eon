@@ -1,0 +1,40 @@
+---
+page_title: "AWS EFS Backup and Conditional Filtering Guide"
+subcategory: ""
+---
+
+# AWS EFS Backup and Conditional Filtering Guide
+
+This guide demonstrates how to configure backup policies for AWS EFS (Elastic
+File System) resources using Eon's conditional resource filtering.
+
+Eon lets you write fine-grained policies with `resource_selector` expressions so
+you only back up EFS file systems that match specific criteria (such as
+environment tags or AWS regions), instead of backing up everything.
+
+## How Filtering Works
+
+When you set `resource_selection_mode = "CONDITIONAL"`, you define an
+`expression` block. This block can evaluate:
+
+- **`resource_type`**: Set to `AWS_EFS` to target EFS resources.
+- **`tag_key_values`**: Filter on specific AWS tags (e.g. `Tier = Critical`).
+- **`source_region`**: Restrict backup to certain AWS regions.
+
+These conditions combine using `group` and logical operators (`AND` / `OR`).
+
+## Provider Setup
+
+Configure the Eon provider. Supply credentials via environment variables
+(`EON_ENDPOINT`, `EON_CLIENT_ID`, `EON_CLIENT_SECRET`, `EON_PROJECT_ID`) rather
+than hardcoding them.
+
+{{ tffile "examples/guides/efs_backup_filters/versions.tf" }}
+
+## Backup Policy
+
+This example targets `AWS_EFS` resources in `us-east-1` that are tagged
+`Tier = Critical`. The destination vault is resolved dynamically with the
+`eon_vaults` data source, so no vault UUID is hardcoded.
+
+{{ tffile "examples/guides/efs_backup_filters/main.tf" }}
