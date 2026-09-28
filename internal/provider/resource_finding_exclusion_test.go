@@ -20,13 +20,13 @@ func TestFindingExclusionStateRoundTrip(t *testing.T) {
 	}{
 		{
 			name: "resource exclusion",
-			apiResponse: `{"id": "exclusion-1", "resourceId": "1ee34dc5-0a7c-4e56-a820-917371e05c8d", "path": "/var/cache",
+			apiResponse: `{"id": "exclusion-1", "resourceId": "1ee34dc5-0a7c-4e56-a820-917371e05c8d", "value": "/var/cache",
 				"type": "PATH", "detector": "MALWARE", "updatedAt": "2026-09-01T00:00:00Z"}`,
 			wantResourceId: types.StringValue("1ee34dc5-0a7c-4e56-a820-917371e05c8d"),
 		},
 		{
 			name: "account-wide exclusion has no resource",
-			apiResponse: `{"id": "exclusion-1", "path": "/var/cache", "type": "PATH", "detector": "MALWARE",
+			apiResponse: `{"id": "exclusion-1", "value": "/var/cache", "type": "PATH", "detector": "MALWARE",
 				"updatedAt": "2026-09-01T00:00:00Z"}`,
 			wantResourceId: types.StringNull(),
 		},
@@ -43,7 +43,7 @@ func TestFindingExclusionStateRoundTrip(t *testing.T) {
 
 			assert.Equal(t, "exclusion-1", state.Id.ValueString())
 			assert.Equal(t, tt.wantResourceId, state.ResourceId)
-			assert.Equal(t, "/var/cache", state.Path.ValueString())
+			assert.Equal(t, "/var/cache", state.Value.ValueString())
 			assert.Equal(t, "PATH", state.Type.ValueString())
 			assert.Equal(t, "MALWARE", state.Detector.ValueString())
 			assert.Equal(t, "2026-09-01T00:00:00Z", state.UpdatedAt.ValueString())
@@ -56,7 +56,7 @@ func TestFindingExclusionStateRoundTrip(t *testing.T) {
 
 			updateReq, diags := findingExclusionUpdateRequest(&state)
 			require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags.Errors())
-			assert.Equal(t, "/var/cache", updateReq.GetPath())
+			assert.Equal(t, "/var/cache", updateReq.GetValue())
 			assert.Equal(t, !tt.wantResourceId.IsNull(), updateReq.HasResourceId())
 		})
 	}
@@ -79,7 +79,7 @@ func TestFindingExclusionRequestRejectsUnknownValues(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			data := &FindingExclusionResourceModel{
-				Path:     types.StringValue("/var/cache"),
+				Value:    types.StringValue("/var/cache"),
 				Type:     types.StringValue(tt.typ),
 				Detector: types.StringValue(tt.detector),
 			}

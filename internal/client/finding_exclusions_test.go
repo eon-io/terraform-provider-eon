@@ -21,7 +21,7 @@ const findingExclusionResponse = `{
 	"findingExclusion": {
 		"id": "exclusion-1",
 		"resourceId": "1ee34dc5-0a7c-4e56-a820-917371e05c8d",
-		"path": "/var/cache",
+		"value": "/var/cache",
 		"type": "PATH",
 		"detector": "MALWARE",
 		"updatedAt": "2026-09-01T00:00:00Z"
@@ -54,7 +54,7 @@ func TestCreateFindingExclusion(t *testing.T) {
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&sent))
 			assert.Equal(t, map[string]any{
 				"resourceId": "1ee34dc5-0a7c-4e56-a820-917371e05c8d",
-				"path":       "/var/cache",
+				"value":      "/var/cache",
 				"type":       "PATH",
 				"detector":   "MALWARE",
 			}, sent)
@@ -91,7 +91,7 @@ func TestGetFindingExclusion(t *testing.T) {
 		exclusion, err := c.GetFindingExclusion(context.Background(), "exclusion-1")
 
 		require.NoError(t, err)
-		assert.Equal(t, "/var/cache", exclusion.GetPath())
+		assert.Equal(t, "/var/cache", exclusion.GetValue())
 		assert.Equal(t, "1ee34dc5-0a7c-4e56-a820-917371e05c8d", exclusion.GetResourceId())
 	})
 
@@ -113,7 +113,7 @@ func TestUpdateFindingExclusion(t *testing.T) {
 	c := findingExclusionTestClient(t, http.MethodPut, findingExclusionPath, http.StatusOK, findingExclusionResponse, func(r *http.Request) {
 		var sent map[string]any
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&sent))
-		assert.Equal(t, map[string]any{"path": "/var/cache", "type": "PATH", "detector": "MALWARE"}, sent)
+		assert.Equal(t, map[string]any{"value": "/var/cache", "type": "PATH", "detector": "MALWARE"}, sent)
 	})
 
 	req := externalEonSdkAPI.NewUpdateFindingExclusionRequest("/var/cache", externalEonSdkAPI.FINDING_OBJECT_TYPE_PATH, externalEonSdkAPI.FINDING_EXCLUSION_DETECTOR_TYPE_MALWARE)

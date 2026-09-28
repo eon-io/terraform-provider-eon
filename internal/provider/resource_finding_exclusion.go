@@ -33,7 +33,7 @@ type FindingExclusionResource struct {
 type FindingExclusionResourceModel struct {
 	Id         types.String `tfsdk:"id"`
 	ResourceId types.String `tfsdk:"resource_id"`
-	Path       types.String `tfsdk:"path"`
+	Value      types.String `tfsdk:"value"`
 	Type       types.String `tfsdk:"type"`
 	Detector   types.String `tfsdk:"detector"`
 	UpdatedAt  types.String `tfsdk:"updated_at"`
@@ -56,12 +56,12 @@ func (r *FindingExclusionResource) Schema(ctx context.Context, req resource.Sche
 				MarkdownDescription: "Eon-assigned ID of the resource the exclusion applies to. Omit it to apply the exclusion to every resource in the account.",
 				Optional:            true,
 			},
-			"path": schema.StringAttribute{
-				MarkdownDescription: "What the exclusion matches, depending on `type`. For `PATH`, every file whose path starts with this value, compared case-sensitively, so `/data/tmp` also matches `/data/tmp2/report.csv`. For `TABLE` or `DATABASE`, the exact table or database name.",
+			"value": schema.StringAttribute{
+				MarkdownDescription: "What the exclusion matches, depending on `type`. For `PATH`, every file whose path starts with this value, so `/data/tmp` also matches `/data/tmp2/report.csv`; Linux paths are compared case-sensitively, and Windows paths as the backup stores them, which is currently lowercase (write them in lowercase, for example `c:/users/app/cache`). For `TABLE` or `DATABASE`, the exact table or database name.",
 				Required:            true,
 			},
 			"type": schema.StringAttribute{
-				MarkdownDescription: "What `path` refers to: `PATH`, `TABLE` or `DATABASE`.",
+				MarkdownDescription: "What `value` refers to: `PATH`, `TABLE` or `DATABASE`.",
 				Required:            true,
 			},
 			"detector": schema.StringAttribute{
@@ -108,7 +108,7 @@ func (r *FindingExclusionResource) Create(ctx context.Context, req resource.Crea
 	}
 
 	tflog.Debug(ctx, "Creating finding exclusion", map[string]interface{}{
-		"path":     data.Path.ValueString(),
+		"value":    data.Value.ValueString(),
 		"type":     data.Type.ValueString(),
 		"detector": data.Detector.ValueString(),
 	})
@@ -221,7 +221,7 @@ func findingExclusionCreateRequest(data *FindingExclusionResourceModel) (externa
 	if diags.HasError() {
 		return externalEonSdkAPI.CreateFindingExclusionRequest{}, diags
 	}
-	req := externalEonSdkAPI.NewCreateFindingExclusionRequest(data.Path.ValueString(), objectType, detector)
+	req := externalEonSdkAPI.NewCreateFindingExclusionRequest(data.Value.ValueString(), objectType, detector)
 	if resourceId := data.ResourceId.ValueString(); resourceId != "" {
 		req.SetResourceId(resourceId)
 	}
@@ -233,7 +233,7 @@ func findingExclusionUpdateRequest(data *FindingExclusionResourceModel) (externa
 	if diags.HasError() {
 		return externalEonSdkAPI.UpdateFindingExclusionRequest{}, diags
 	}
-	req := externalEonSdkAPI.NewUpdateFindingExclusionRequest(data.Path.ValueString(), objectType, detector)
+	req := externalEonSdkAPI.NewUpdateFindingExclusionRequest(data.Value.ValueString(), objectType, detector)
 	if resourceId := data.ResourceId.ValueString(); resourceId != "" {
 		req.SetResourceId(resourceId)
 	}
@@ -247,7 +247,7 @@ func findingExclusionToState(exclusion *externalEonSdkAPI.FindingExclusion, data
 	} else {
 		data.ResourceId = types.StringNull()
 	}
-	data.Path = types.StringValue(exclusion.GetPath())
+	data.Value = types.StringValue(exclusion.GetValue())
 	data.Type = types.StringValue(string(exclusion.GetType()))
 	data.Detector = types.StringValue(string(exclusion.GetDetector()))
 	data.UpdatedAt = types.StringValue(exclusion.GetUpdatedAt().Format(time.RFC3339))

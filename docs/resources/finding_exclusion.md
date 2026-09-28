@@ -15,7 +15,7 @@ Manages a finding exclusion: stops one threat detector from reporting findings f
 ```terraform
 # Stop malware detection on a build cache, on every resource in the account
 resource "eon_finding_exclusion" "build_cache" {
-  path     = "/var/cache/build/"
+  value    = "/var/cache/build/"
   type     = "PATH"
   detector = "MALWARE"
 }
@@ -23,7 +23,7 @@ resource "eon_finding_exclusion" "build_cache" {
 # Stop data-anomaly findings for one table on one database resource
 resource "eon_finding_exclusion" "audit_log_table" {
   resource_id = "1ee34dc5-0a7c-4e56-a820-917371e05c8d"
-  path        = "audit_log"
+  value       = "audit_log"
   type        = "TABLE"
   detector    = "DATA_ANOMALY"
 }
@@ -35,8 +35,8 @@ resource "eon_finding_exclusion" "audit_log_table" {
 ### Required
 
 - `detector` (String) Detector whose findings to suppress: `RANSOMWARE_BEHAVIOR`, `DATA_ANOMALY` or `MALWARE`. `MALWARE` can only exclude paths: databases aren't scanned for malware.
-- `path` (String) What the exclusion matches, depending on `type`. For `PATH`, every file whose path starts with this value, compared case-sensitively, so `/data/tmp` also matches `/data/tmp2/report.csv`. For `TABLE` or `DATABASE`, the exact table or database name.
-- `type` (String) What `path` refers to: `PATH`, `TABLE` or `DATABASE`.
+- `type` (String) What `value` refers to: `PATH`, `TABLE` or `DATABASE`.
+- `value` (String) What the exclusion matches, depending on `type`. For `PATH`, every file whose path starts with this value, so `/data/tmp` also matches `/data/tmp2/report.csv`; Linux paths are compared case-sensitively, and Windows paths as the backup stores them, which is currently lowercase (write them in lowercase, for example `c:/users/app/cache`). For `TABLE` or `DATABASE`, the exact table or database name.
 
 ### Optional
 
