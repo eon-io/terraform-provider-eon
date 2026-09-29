@@ -31,12 +31,13 @@ type FindingExclusionResource struct {
 }
 
 type FindingExclusionResourceModel struct {
-	Id         types.String `tfsdk:"id"`
-	ResourceId types.String `tfsdk:"resource_id"`
-	Value      types.String `tfsdk:"value"`
-	Type       types.String `tfsdk:"type"`
-	Detector   types.String `tfsdk:"detector"`
-	UpdatedAt  types.String `tfsdk:"updated_at"`
+	Id                 types.String `tfsdk:"id"`
+	Scope              types.String `tfsdk:"scope"`
+	ProviderResourceId types.String `tfsdk:"provider_resource_id"`
+	Value              types.String `tfsdk:"value"`
+	Type               types.String `tfsdk:"type"`
+	Detector           types.String `tfsdk:"detector"`
+	UpdatedAt          types.String `tfsdk:"updated_at"`
 }
 
 func (r *FindingExclusionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -52,8 +53,12 @@ func (r *FindingExclusionResource) Schema(ctx context.Context, req resource.Sche
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"resource_id": schema.StringAttribute{
-				MarkdownDescription: "Eon-assigned ID of the resource the exclusion applies to. Omit it to apply the exclusion to every resource in the account.",
+			"scope": schema.StringAttribute{
+				MarkdownDescription: "Where the exclusion applies: `RESOURCE` for the one resource named by `provider_resource_id`, or `ACCOUNT` for every resource in the account.",
+				Required:            true,
+			},
+			"provider_resource_id": schema.StringAttribute{
+				MarkdownDescription: "Cloud-provider-assigned ID of the resource the exclusion applies to, such as an EC2 instance ID. Required when `scope` is `RESOURCE`, and must be omitted when it's `ACCOUNT`.",
 				Optional:            true,
 			},
 			"value": schema.StringAttribute{
@@ -196,10 +201,29 @@ func isNotFound(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
-// findingExclusionFields checks the enum attributes before calling the API, so a typo is reported on the attribute with
-// its allowed values rather than as an API error.
-func findingExclusionFields(data *FindingExclusionResourceModel) (externalEonSdkAPI.FindingObjectType, externalEonSdkAPI.FindingExclusionDetectorType, diag.Diagnostics) {
+type findingExclusionFields struct {
+	scope              externalEonSdkAPI.FindingExclusionScope
+	providerResourceId string
+	objectType         externalEonSdkAPI.FindingObjectType
+	detector           externalEonSdkAPI.FindingExclusionDetectorType
+}
+
+// toFindingExclusionFields checks the attributes before calling the API, so a typo or a scope that disagrees with
+// provider_resource_id is reported on the attribute rather than as an API error.
+func toFindingExclusionFields(data *FindingExclusionResourceModel) (findingExclusionFields, diag.Diagnostics) {
 	var diags diag.Diagnostics
+	providerResourceId := data.ProviderResourceId.ValueString()
+	scope, err := externalEonSdkAPI.NewFindingExclusionScopeFromValue(data.Scope.ValueString())
+	if err != nil {
+		diags.AddAttributeError(path.Root("scope"), "Invalid finding exclusion scope",
+			fmt.Sprintf("%q is not one of %v", data.Scope.ValueString(), externalEonSdkAPI.AllowedFindingExclusionScopeEnumValues))
+	} else if *scope == externalEonSdkAPI.FINDING_EXCLUSION_SCOPE_RESOURCE && providerResourceId == "" {
+		diags.AddAttributeError(path.Root("provider_resource_id"), "Missing provider resource ID",
+			"provider_resource_id is required when scope is RESOURCE.")
+	} else if *scope == externalEonSdkAPI.FINDING_EXCLUSION_SCOPE_ACCOUNT && providerResourceId != "" {
+		diags.AddAttributeError(path.Root("provider_resource_id"), "Unexpected provider resource ID",
+			"provider_resource_id must be omitted when scope is ACCOUNT.")
+	}
 	objectType, err := externalEonSdkAPI.NewFindingObjectTypeFromValue(data.Type.ValueString())
 	if err != nil {
 		diags.AddAttributeError(path.Root("type"), "Invalid finding exclusion type",
@@ -211,41 +235,46 @@ func findingExclusionFields(data *FindingExclusionResourceModel) (externalEonSdk
 			fmt.Sprintf("%q is not one of %v", data.Detector.ValueString(), externalEonSdkAPI.AllowedFindingExclusionDetectorTypeEnumValues))
 	}
 	if diags.HasError() {
-		return "", "", diags
+		return findingExclusionFields{}, diags
 	}
-	return *objectType, *detector, diags
+	return findingExclusionFields{scope: *scope, providerResourceId: providerResourceId, objectType: *objectType, detector: *detector}, diags
 }
 
 func findingExclusionCreateRequest(data *FindingExclusionResourceModel) (externalEonSdkAPI.CreateFindingExclusionRequest, diag.Diagnostics) {
-	objectType, detector, diags := findingExclusionFields(data)
+	fields, diags := toFindingExclusionFields(data)
 	if diags.HasError() {
 		return externalEonSdkAPI.CreateFindingExclusionRequest{}, diags
 	}
-	req := externalEonSdkAPI.NewCreateFindingExclusionRequest(data.Value.ValueString(), objectType, detector)
-	if resourceId := data.ResourceId.ValueString(); resourceId != "" {
-		req.SetResourceId(resourceId)
+	req := externalEonSdkAPI.NewCreateFindingExclusionRequest(fields.scope, data.Value.ValueString(), fields.objectType, fields.detector)
+	if fields.providerResourceId != "" {
+		req.SetProviderResourceId(fields.providerResourceId)
 	}
 	return *req, diags
 }
 
 func findingExclusionUpdateRequest(data *FindingExclusionResourceModel) (externalEonSdkAPI.UpdateFindingExclusionRequest, diag.Diagnostics) {
-	objectType, detector, diags := findingExclusionFields(data)
+	fields, diags := toFindingExclusionFields(data)
 	if diags.HasError() {
 		return externalEonSdkAPI.UpdateFindingExclusionRequest{}, diags
 	}
-	req := externalEonSdkAPI.NewUpdateFindingExclusionRequest(data.Value.ValueString(), objectType, detector)
-	if resourceId := data.ResourceId.ValueString(); resourceId != "" {
-		req.SetResourceId(resourceId)
+	req := externalEonSdkAPI.NewUpdateFindingExclusionRequest(fields.scope, data.Value.ValueString(), fields.objectType, fields.detector)
+	if fields.providerResourceId != "" {
+		req.SetProviderResourceId(fields.providerResourceId)
 	}
 	return *req, diags
 }
 
 func findingExclusionToState(exclusion *externalEonSdkAPI.FindingExclusion, data *FindingExclusionResourceModel) {
 	data.Id = types.StringValue(exclusion.GetId())
-	if resourceId, ok := exclusion.GetResourceIdOk(); ok && resourceId != nil && *resourceId != "" {
-		data.ResourceId = types.StringValue(*resourceId)
-	} else {
-		data.ResourceId = types.StringNull()
+	data.Scope = types.StringValue(string(exclusion.GetScope()))
+	switch providerResourceId := exclusion.GetProviderResourceId(); {
+	case providerResourceId != "":
+		data.ProviderResourceId = types.StringValue(providerResourceId)
+	case exclusion.GetScope() == externalEonSdkAPI.FINDING_EXCLUSION_SCOPE_RESOURCE:
+		// A resource that left the inventory comes back without its provider ID. Keeping the configured one avoids a
+		// diff whose apply could only fail, since the API can no longer resolve that ID.
+	default:
+		data.ProviderResourceId = types.StringNull()
 	}
 	data.Value = types.StringValue(exclusion.GetValue())
 	data.Type = types.StringValue(string(exclusion.GetType()))

@@ -20,7 +20,8 @@ const findingExclusionPath = "/api/v1/projects/project-1/finding-exclusions/excl
 const findingExclusionResponse = `{
 	"findingExclusion": {
 		"id": "exclusion-1",
-		"resourceId": "1ee34dc5-0a7c-4e56-a820-917371e05c8d",
+		"scope": "RESOURCE",
+		"providerResourceId": "i-0abc123def4567890",
 		"value": "/var/cache",
 		"type": "PATH",
 		"detector": "MALWARE",
@@ -53,15 +54,16 @@ func TestCreateFindingExclusion(t *testing.T) {
 			var sent map[string]any
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&sent))
 			assert.Equal(t, map[string]any{
-				"resourceId": "1ee34dc5-0a7c-4e56-a820-917371e05c8d",
-				"value":      "/var/cache",
-				"type":       "PATH",
-				"detector":   "MALWARE",
+				"scope":              "RESOURCE",
+				"providerResourceId": "i-0abc123def4567890",
+				"value":              "/var/cache",
+				"type":               "PATH",
+				"detector":           "MALWARE",
 			}, sent)
 		})
 
-		req := externalEonSdkAPI.NewCreateFindingExclusionRequest("/var/cache", externalEonSdkAPI.FINDING_OBJECT_TYPE_PATH, externalEonSdkAPI.FINDING_EXCLUSION_DETECTOR_TYPE_MALWARE)
-		req.SetResourceId("1ee34dc5-0a7c-4e56-a820-917371e05c8d")
+		req := externalEonSdkAPI.NewCreateFindingExclusionRequest(externalEonSdkAPI.FINDING_EXCLUSION_SCOPE_RESOURCE, "/var/cache", externalEonSdkAPI.FINDING_OBJECT_TYPE_PATH, externalEonSdkAPI.FINDING_EXCLUSION_DETECTOR_TYPE_MALWARE)
+		req.SetProviderResourceId("i-0abc123def4567890")
 		exclusion, err := c.CreateFindingExclusion(context.Background(), *req)
 
 		require.NoError(t, err)
@@ -73,7 +75,7 @@ func TestCreateFindingExclusion(t *testing.T) {
 		t.Parallel()
 		c := findingExclusionTestClient(t, http.MethodPost, findingExclusionsPath, http.StatusBadRequest, `{"error":"malware is not scanned in databases"}`, nil)
 
-		req := externalEonSdkAPI.NewCreateFindingExclusionRequest("orders", externalEonSdkAPI.FINDING_OBJECT_TYPE_TABLE, externalEonSdkAPI.FINDING_EXCLUSION_DETECTOR_TYPE_MALWARE)
+		req := externalEonSdkAPI.NewCreateFindingExclusionRequest(externalEonSdkAPI.FINDING_EXCLUSION_SCOPE_ACCOUNT, "orders", externalEonSdkAPI.FINDING_OBJECT_TYPE_TABLE, externalEonSdkAPI.FINDING_EXCLUSION_DETECTOR_TYPE_MALWARE)
 		exclusion, err := c.CreateFindingExclusion(context.Background(), *req)
 
 		assert.Error(t, err)
@@ -92,7 +94,8 @@ func TestGetFindingExclusion(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "/var/cache", exclusion.GetValue())
-		assert.Equal(t, "1ee34dc5-0a7c-4e56-a820-917371e05c8d", exclusion.GetResourceId())
+		assert.Equal(t, externalEonSdkAPI.FINDING_EXCLUSION_SCOPE_RESOURCE, exclusion.GetScope())
+		assert.Equal(t, "i-0abc123def4567890", exclusion.GetProviderResourceId())
 	})
 
 	t.Run("a missing exclusion is a 404 API error", func(t *testing.T) {
@@ -113,10 +116,10 @@ func TestUpdateFindingExclusion(t *testing.T) {
 	c := findingExclusionTestClient(t, http.MethodPut, findingExclusionPath, http.StatusOK, findingExclusionResponse, func(r *http.Request) {
 		var sent map[string]any
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&sent))
-		assert.Equal(t, map[string]any{"value": "/var/cache", "type": "PATH", "detector": "MALWARE"}, sent)
+		assert.Equal(t, map[string]any{"scope": "ACCOUNT", "value": "/var/cache", "type": "PATH", "detector": "MALWARE"}, sent)
 	})
 
-	req := externalEonSdkAPI.NewUpdateFindingExclusionRequest("/var/cache", externalEonSdkAPI.FINDING_OBJECT_TYPE_PATH, externalEonSdkAPI.FINDING_EXCLUSION_DETECTOR_TYPE_MALWARE)
+	req := externalEonSdkAPI.NewUpdateFindingExclusionRequest(externalEonSdkAPI.FINDING_EXCLUSION_SCOPE_ACCOUNT, "/var/cache", externalEonSdkAPI.FINDING_OBJECT_TYPE_PATH, externalEonSdkAPI.FINDING_EXCLUSION_DETECTOR_TYPE_MALWARE)
 	exclusion, err := c.UpdateFindingExclusion(context.Background(), "exclusion-1", *req)
 
 	require.NoError(t, err)

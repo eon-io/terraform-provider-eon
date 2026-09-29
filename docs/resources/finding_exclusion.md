@@ -15,17 +15,19 @@ Manages a finding exclusion: stops one threat detector from reporting findings f
 ```terraform
 # Stop malware detection on a build cache, on every resource in the account
 resource "eon_finding_exclusion" "build_cache" {
+  scope    = "ACCOUNT"
   value    = "/var/cache/build/"
   type     = "PATH"
   detector = "MALWARE"
 }
 
-# Stop data-anomaly findings for one table on one database resource
-resource "eon_finding_exclusion" "audit_log_table" {
-  resource_id = "1ee34dc5-0a7c-4e56-a820-917371e05c8d"
-  value       = "audit_log"
-  type        = "TABLE"
-  detector    = "DATA_ANOMALY"
+# Stop ransomware-behavior findings for an application's rotating logs on one EC2 instance
+resource "eon_finding_exclusion" "app_logs" {
+  scope                = "RESOURCE"
+  provider_resource_id = "i-0abc123def4567890"
+  value                = "/var/log/app/"
+  type                 = "PATH"
+  detector             = "RANSOMWARE_BEHAVIOR"
 }
 ```
 
@@ -35,12 +37,13 @@ resource "eon_finding_exclusion" "audit_log_table" {
 ### Required
 
 - `detector` (String) Detector whose findings to suppress: `RANSOMWARE_BEHAVIOR`, `DATA_ANOMALY` or `MALWARE`. `MALWARE` can only exclude paths: databases aren't scanned for malware.
+- `scope` (String) Where the exclusion applies: `RESOURCE` for the one resource named by `provider_resource_id`, or `ACCOUNT` for every resource in the account.
 - `type` (String) What `value` refers to: `PATH`, `TABLE` or `DATABASE`.
 - `value` (String) What the exclusion matches, depending on `type`. For `PATH`, every file whose path starts with this value, so `/data/tmp` also matches `/data/tmp2/report.csv`; Linux paths are compared case-sensitively, and Windows paths as the backup stores them, which is currently lowercase (write them in lowercase, for example `c:/users/app/cache`). For `TABLE` or `DATABASE`, the exact table or database name.
 
 ### Optional
 
-- `resource_id` (String) Eon-assigned ID of the resource the exclusion applies to. Omit it to apply the exclusion to every resource in the account.
+- `provider_resource_id` (String) Cloud-provider-assigned ID of the resource the exclusion applies to, such as an EC2 instance ID. Required when `scope` is `RESOURCE`, and must be omitted when it's `ACCOUNT`.
 
 ### Read-Only
 
