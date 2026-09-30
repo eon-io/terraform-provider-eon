@@ -2506,3 +2506,149 @@ func (c *EonClient) ListActionApprovalRules(ctx context.Context) ([]externalEonS
 	}
 	return all, nil
 }
+
+const findingExclusionsPageSize int32 = 100
+
+// CreateFindingExclusion creates a finding exclusion.
+func (c *EonClient) CreateFindingExclusion(ctx context.Context, req externalEonSdkAPI.CreateFindingExclusionRequest) (*externalEonSdkAPI.FindingExclusion, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.FindingExclusionsAPI.CreateFindingExclusion(ctx, c.projectID).CreateFindingExclusionRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to create finding exclusion"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	exclusion, ok := resp.GetFindingExclusionOk()
+	if !ok || exclusion == nil {
+		return nil, fmt.Errorf("API returned empty finding exclusion")
+	}
+	return exclusion, nil
+}
+
+// GetFindingExclusion retrieves a finding exclusion by ID.
+func (c *EonClient) GetFindingExclusion(ctx context.Context, findingExclusionID string) (*externalEonSdkAPI.FindingExclusion, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.FindingExclusionsAPI.GetFindingExclusion(ctx, c.projectID, findingExclusionID).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to get finding exclusion"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	exclusion, ok := resp.GetFindingExclusionOk()
+	if !ok || exclusion == nil {
+		return nil, &APIError{StatusCode: http.StatusNotFound, Message: "finding exclusion not found"}
+	}
+	return exclusion, nil
+}
+
+// UpdateFindingExclusion replaces a finding exclusion.
+func (c *EonClient) UpdateFindingExclusion(ctx context.Context, findingExclusionID string, req externalEonSdkAPI.UpdateFindingExclusionRequest) (*externalEonSdkAPI.FindingExclusion, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.FindingExclusionsAPI.UpdateFindingExclusion(ctx, c.projectID, findingExclusionID).UpdateFindingExclusionRequest(req).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to update finding exclusion"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	exclusion, ok := resp.GetFindingExclusionOk()
+	if !ok || exclusion == nil {
+		return nil, fmt.Errorf("API returned empty finding exclusion")
+	}
+	return exclusion, nil
+}
+
+// DeleteFindingExclusion deletes a finding exclusion.
+func (c *EonClient) DeleteFindingExclusion(ctx context.Context, findingExclusionID string) error {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	httpResp, err := c.client.FindingExclusionsAPI.DeleteFindingExclusion(ctx, c.projectID, findingExclusionID).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to delete finding exclusion"); apiErr != nil {
+		return apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// ListFindingExclusions retrieves every finding exclusion in the project.
+func (c *EonClient) ListFindingExclusions(ctx context.Context) ([]externalEonSdkAPI.FindingExclusion, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	var all []externalEonSdkAPI.FindingExclusion
+	var pageToken string
+
+	for {
+		req := c.client.FindingExclusionsAPI.ListFindingExclusions(ctx, c.projectID).
+			ListFindingExclusionsRequest(*externalEonSdkAPI.NewListFindingExclusionsRequest()).
+			PageSize(findingExclusionsPageSize)
+		if pageToken != "" {
+			req = req.PageToken(pageToken)
+		}
+
+		resp, httpResp, err := req.Execute()
+		if apiErr := c.handleAPIError(err, httpResp, "failed to list finding exclusions"); apiErr != nil {
+			if httpResp != nil {
+				_ = httpResp.Body.Close()
+			}
+			return nil, apiErr
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(httpResp.Body)
+			_ = httpResp.Body.Close()
+			return nil, &APIError{
+				StatusCode: httpResp.StatusCode,
+				Message:    string(body),
+			}
+		}
+
+		if resp.GetFindingExclusions() != nil {
+			all = append(all, resp.GetFindingExclusions()...)
+		}
+
+		hasMore := resp.HasNextPageToken() && resp.GetNextPageToken() != ""
+		_ = httpResp.Body.Close()
+		if !hasMore {
+			break
+		}
+		pageToken = resp.GetNextPageToken()
+	}
+
+	if all == nil {
+		return []externalEonSdkAPI.FindingExclusion{}, nil
+	}
+	return all, nil
+}

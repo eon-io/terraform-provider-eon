@@ -86,6 +86,7 @@ type fakeEonServer struct {
 	metricsConfigs       map[string]*externalEonSdkAPI.RestoreAccountMetricsConfig
 	sourceMetricsConfigs map[string]*externalEonSdkAPI.SourceAccountMetricsConfig
 	actionApprovalRules  map[string]*externalEonSdkAPI.ActionApprovalRule
+	findingExclusions    map[string]*externalEonSdkAPI.FindingExclusion
 	restoreJobs          map[string]*externalEonSdkAPI.RestoreJob
 	nextID               int
 }
@@ -103,6 +104,7 @@ func newFakeEonServer(t *testing.T) *fakeEonServer {
 		metricsConfigs:       make(map[string]*externalEonSdkAPI.RestoreAccountMetricsConfig),
 		sourceMetricsConfigs: make(map[string]*externalEonSdkAPI.SourceAccountMetricsConfig),
 		actionApprovalRules:  make(map[string]*externalEonSdkAPI.ActionApprovalRule),
+		findingExclusions:    make(map[string]*externalEonSdkAPI.FindingExclusion),
 		restoreJobs:          make(map[string]*externalEonSdkAPI.RestoreJob),
 		nextID:               1,
 	}
@@ -202,6 +204,12 @@ func (f *fakeEonServer) DeleteActionApprovalRule(id string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	delete(f.actionApprovalRules, id)
+}
+
+func (f *fakeEonServer) DeleteFindingExclusion(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.findingExclusions, id)
 }
 
 func (f *fakeEonServer) RemoveHold(snapshotID string) {
@@ -331,6 +339,33 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 			f.handleUpdateActionApprovalRule(w, r, id)
 		case http.MethodDelete:
 			f.handleDeleteActionApprovalRule(w, id)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
+	findingExclusionsPrefix := fmt.Sprintf("/v1/projects/%s/finding-exclusions", f.projectID)
+	switch {
+	case r.Method == http.MethodPost && path == findingExclusionsPrefix:
+		f.handleCreateFindingExclusion(w, r)
+		return
+	case r.Method == http.MethodPost && path == findingExclusionsPrefix+"/list":
+		f.handleListFindingExclusions(w, r)
+		return
+	case strings.HasPrefix(path, findingExclusionsPrefix+"/"):
+		id := strings.TrimPrefix(path, findingExclusionsPrefix+"/")
+		if id == "" || strings.Contains(id, "/") {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			f.handleGetFindingExclusion(w, id)
+		case http.MethodPut:
+			f.handleUpdateFindingExclusion(w, r, id)
+		case http.MethodDelete:
+			f.handleDeleteFindingExclusion(w, id)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -994,5 +1029,97 @@ func (f *fakeEonServer) handleListActionApprovalRules(w http.ResponseWriter, r *
 		rules = append(rules, *rule)
 	}
 	resp := externalEonSdkAPI.NewListActionApprovalRulesResponse(rules, int32(len(rules)))
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (f *fakeEonServer) handleCreateFindingExclusion(w http.ResponseWriter, r *http.Request) {
+	var req externalEonSdkAPI.CreateFindingExclusionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	id := fmt.Sprintf("fe-%d", f.nextID)
+	f.nextID++
+	exclusion := externalEonSdkAPI.NewFindingExclusion(
+		id,
+		req.GetScope(),
+		req.GetValue(),
+		req.GetType(),
+		req.GetDetector(),
+		time.Now().UTC().Truncate(time.Second),
+	)
+	if req.HasProviderResourceId() {
+		exclusion.SetProviderResourceId(req.GetProviderResourceId())
+	}
+	f.findingExclusions[id] = exclusion
+	f.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewCreateFindingExclusionResponse(*externalEonSdkAPI.NewNullableFindingExclusion(exclusion)))
+}
+
+func (f *fakeEonServer) handleGetFindingExclusion(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	exclusion, ok := f.findingExclusions[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewGetFindingExclusionResponse(*externalEonSdkAPI.NewNullableFindingExclusion(exclusion)))
+}
+
+func (f *fakeEonServer) handleUpdateFindingExclusion(w http.ResponseWriter, r *http.Request, id string) {
+	var req externalEonSdkAPI.UpdateFindingExclusionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	exclusion, ok := f.findingExclusions[id]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+
+	exclusion.SetScope(req.GetScope())
+	exclusion.SetValue(req.GetValue())
+	exclusion.SetType(req.GetType())
+	exclusion.SetDetector(req.GetDetector())
+	if req.HasProviderResourceId() {
+		exclusion.SetProviderResourceId(req.GetProviderResourceId())
+	} else {
+		exclusion.ProviderResourceId = nil
+	}
+	exclusion.SetUpdatedAt(time.Now().UTC().Truncate(time.Second))
+
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewUpdateFindingExclusionResponse(*externalEonSdkAPI.NewNullableFindingExclusion(exclusion)))
+}
+
+func (f *fakeEonServer) handleDeleteFindingExclusion(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.findingExclusions[id]; !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	delete(f.findingExclusions, id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (f *fakeEonServer) handleListFindingExclusions(w http.ResponseWriter, r *http.Request) {
+	_, _ = io.Copy(io.Discard, r.Body)
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	items := make([]externalEonSdkAPI.FindingExclusion, 0, len(f.findingExclusions))
+	for _, exclusion := range f.findingExclusions {
+		items = append(items, *exclusion)
+	}
+	resp := externalEonSdkAPI.NewListFindingExclusionsResponse(items, int32(len(items)))
 	writeJSON(w, http.StatusOK, resp)
 }
