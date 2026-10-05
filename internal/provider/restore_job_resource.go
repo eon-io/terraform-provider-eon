@@ -1650,7 +1650,7 @@ func (r *RestoreJobResource) createEc2InstanceRestore(ctx context.Context, data 
 			}
 
 			if !volParam.KmsKeyId.IsNull() && volParam.KmsKeyId.ValueString() != "" {
-				param.VolumeEncryptionKeyId = volParam.KmsKeyId.ValueString()
+				param.SetVolumeEncryptionKeyId(volParam.KmsKeyId.ValueString())
 			}
 
 			if !volParam.Description.IsNull() && volParam.Description.ValueString() != "" {
