@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 )
@@ -26,6 +27,7 @@ type MockEonClient struct {
 	EnvironmentOverrides  map[string]string
 	InventoryResources    map[string]*externalEonSdkAPI.InventoryResource
 	ResourceSnapshots     map[string][]externalEonSdkAPI.Snapshot
+	FindingExclusions     map[string]*externalEonSdkAPI.FindingExclusion
 
 	// Behavior controls
 	ShouldFailCreate bool
@@ -57,6 +59,12 @@ type MockEonClient struct {
 	ShouldFailRemoveEnvironmentOverride bool
 	ShouldFailListResourceSnapshots     bool
 	ShouldFailGetResource               bool
+	// Finding exclusion behavior
+	ShouldFailFindingExclusionCreate bool
+	ShouldFailFindingExclusionRead   bool
+	ShouldFailFindingExclusionUpdate bool
+	ShouldFailFindingExclusionDelete bool
+	ShouldFailFindingExclusionList   bool
 
 	// Call tracking
 	CreateCalls                     int
@@ -84,6 +92,11 @@ type MockEonClient struct {
 	RemoveEnvironmentOverrideCalls  int
 	ListResourceSnapshotsCalls      int
 	GetResourceCalls                int
+	FindingExclusionCreateCalls     int
+	FindingExclusionReadCalls       int
+	FindingExclusionUpdateCalls     int
+	FindingExclusionDeleteCalls     int
+	FindingExclusionListCalls       int
 
 	// Mock configuration
 	ProjectID string
@@ -103,6 +116,7 @@ func NewMockEonClient() *MockEonClient {
 		EnvironmentOverrides:  make(map[string]string),
 		InventoryResources:    make(map[string]*externalEonSdkAPI.InventoryResource),
 		ResourceSnapshots:     make(map[string][]externalEonSdkAPI.Snapshot),
+		FindingExclusions:     make(map[string]*externalEonSdkAPI.FindingExclusion),
 		ProjectID:             "mock-project-id",
 	}
 }
@@ -246,6 +260,7 @@ func (m *MockEonClient) Reset() {
 	m.EnvironmentOverrides = make(map[string]string)
 	m.InventoryResources = make(map[string]*externalEonSdkAPI.InventoryResource)
 	m.ResourceSnapshots = make(map[string][]externalEonSdkAPI.Snapshot)
+	m.FindingExclusions = make(map[string]*externalEonSdkAPI.FindingExclusion)
 	m.CreateCalls = 0
 	m.ReadCalls = 0
 	m.UpdateCalls = 0
@@ -271,6 +286,11 @@ func (m *MockEonClient) Reset() {
 	m.RemoveEnvironmentOverrideCalls = 0
 	m.ListResourceSnapshotsCalls = 0
 	m.GetResourceCalls = 0
+	m.FindingExclusionCreateCalls = 0
+	m.FindingExclusionReadCalls = 0
+	m.FindingExclusionUpdateCalls = 0
+	m.FindingExclusionDeleteCalls = 0
+	m.FindingExclusionListCalls = 0
 	m.ShouldFailCreate = false
 	m.ShouldFailRead = false
 	m.ShouldFailUpdate = false
@@ -296,6 +316,11 @@ func (m *MockEonClient) Reset() {
 	m.ShouldFailRemoveEnvironmentOverride = false
 	m.ShouldFailListResourceSnapshots = false
 	m.ShouldFailGetResource = false
+	m.ShouldFailFindingExclusionCreate = false
+	m.ShouldFailFindingExclusionRead = false
+	m.ShouldFailFindingExclusionUpdate = false
+	m.ShouldFailFindingExclusionDelete = false
+	m.ShouldFailFindingExclusionList = false
 }
 
 // AddMockPolicy adds a pre-defined mock policy for testing
@@ -824,4 +849,113 @@ func (m *MockEonClient) AddMockResourceSnapshot(resourceId string, snapshot *ext
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.ResourceSnapshots[resourceId] = append(m.ResourceSnapshots[resourceId], *snapshot)
+}
+
+// CreateFindingExclusion mocks creating a finding exclusion.
+func (m *MockEonClient) CreateFindingExclusion(ctx context.Context, req externalEonSdkAPI.CreateFindingExclusionRequest) (*externalEonSdkAPI.FindingExclusion, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.FindingExclusionCreateCalls++
+	if m.ShouldFailFindingExclusionCreate {
+		return nil, fmt.Errorf("mock create finding exclusion error")
+	}
+
+	id := fmt.Sprintf("mock-fe-%d", m.FindingExclusionCreateCalls)
+	exclusion := externalEonSdkAPI.NewFindingExclusion(
+		id,
+		req.GetScope(),
+		req.GetValue(),
+		req.GetType(),
+		req.GetDetector(),
+		time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+	)
+	if req.HasProviderResourceId() {
+		exclusion.SetProviderResourceId(req.GetProviderResourceId())
+	}
+	m.FindingExclusions[id] = exclusion
+	return exclusion, nil
+}
+
+// GetFindingExclusion mocks getting a finding exclusion.
+func (m *MockEonClient) GetFindingExclusion(ctx context.Context, findingExclusionId string) (*externalEonSdkAPI.FindingExclusion, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.FindingExclusionReadCalls++
+	if m.ShouldFailFindingExclusionRead {
+		return nil, fmt.Errorf("mock read finding exclusion error")
+	}
+	exclusion, exists := m.FindingExclusions[findingExclusionId]
+	if !exists {
+		return nil, fmt.Errorf("finding exclusion not found: %s", findingExclusionId)
+	}
+	return exclusion, nil
+}
+
+// UpdateFindingExclusion mocks updating a finding exclusion.
+func (m *MockEonClient) UpdateFindingExclusion(ctx context.Context, findingExclusionId string, req externalEonSdkAPI.UpdateFindingExclusionRequest) (*externalEonSdkAPI.FindingExclusion, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.FindingExclusionUpdateCalls++
+	if m.ShouldFailFindingExclusionUpdate {
+		return nil, fmt.Errorf("mock update finding exclusion error")
+	}
+	exclusion, exists := m.FindingExclusions[findingExclusionId]
+	if !exists {
+		return nil, fmt.Errorf("finding exclusion not found: %s", findingExclusionId)
+	}
+	exclusion.SetScope(req.GetScope())
+	exclusion.SetValue(req.GetValue())
+	exclusion.SetType(req.GetType())
+	exclusion.SetDetector(req.GetDetector())
+	if req.HasProviderResourceId() {
+		exclusion.SetProviderResourceId(req.GetProviderResourceId())
+	} else {
+		exclusion.ProviderResourceId = nil
+	}
+	exclusion.SetUpdatedAt(exclusion.GetUpdatedAt().Add(time.Minute))
+	m.FindingExclusions[findingExclusionId] = exclusion
+	return exclusion, nil
+}
+
+// DeleteFindingExclusion mocks deleting a finding exclusion.
+func (m *MockEonClient) DeleteFindingExclusion(ctx context.Context, findingExclusionId string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.FindingExclusionDeleteCalls++
+	if m.ShouldFailFindingExclusionDelete {
+		return fmt.Errorf("mock delete finding exclusion error")
+	}
+	if _, exists := m.FindingExclusions[findingExclusionId]; !exists {
+		return fmt.Errorf("finding exclusion not found: %s", findingExclusionId)
+	}
+	delete(m.FindingExclusions, findingExclusionId)
+	return nil
+}
+
+// ListFindingExclusions mocks listing finding exclusions.
+func (m *MockEonClient) ListFindingExclusions(ctx context.Context) ([]externalEonSdkAPI.FindingExclusion, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.FindingExclusionListCalls++
+	if m.ShouldFailFindingExclusionList {
+		return nil, fmt.Errorf("mock list finding exclusions error")
+	}
+	out := make([]externalEonSdkAPI.FindingExclusion, 0, len(m.FindingExclusions))
+	for _, exclusion := range m.FindingExclusions {
+		out = append(out, *exclusion)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Id < out[j].Id })
+	return out, nil
+}
+
+// AddMockFindingExclusion adds a pre-defined mock finding exclusion.
+func (m *MockEonClient) AddMockFindingExclusion(exclusion *externalEonSdkAPI.FindingExclusion) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.FindingExclusions[exclusion.Id] = exclusion
 }
