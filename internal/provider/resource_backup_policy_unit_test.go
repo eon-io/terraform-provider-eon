@@ -1089,3 +1089,63 @@ func TestScheduleTimezoneValidator(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyReuseExistingSnapshots(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		reuse   types.Bool
+		wantSet bool
+		want    bool
+	}{
+		{name: "null leaves the field unset", reuse: types.BoolNull()},
+		{name: "unknown leaves the field unset", reuse: types.BoolUnknown()},
+		{name: "explicit false disables reuse", reuse: types.BoolValue(false), wantSet: true, want: false},
+		{name: "explicit true enables reuse", reuse: types.BoolValue(true), wantSet: true, want: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			standard := externalEonSdkAPI.NewStandardBackupPolicyPlan(nil)
+			applyStandardReuseExistingSnapshots(standard, tc.reuse)
+			assert.Equal(t, tc.wantSet, standard.HasReuseExistingSnapshots())
+
+			highFrequency := externalEonSdkAPI.NewHighFrequencyBackupPolicyPlan(nil, nil)
+			applyHighFrequencyReuseExistingSnapshots(highFrequency, tc.reuse)
+			assert.Equal(t, tc.wantSet, highFrequency.HasReuseExistingSnapshots())
+
+			if tc.wantSet {
+				assert.Equal(t, tc.want, standard.GetReuseExistingSnapshots())
+				assert.Equal(t, tc.want, highFrequency.GetReuseExistingSnapshots())
+			}
+		})
+	}
+}
+
+func TestFlattenReuseExistingSnapshots(t *testing.T) {
+	t.Parallel()
+
+	falseValue, trueValue := false, true
+
+	tests := []struct {
+		name  string
+		reuse *bool
+		prior types.Bool
+		want  types.Bool
+	}{
+		{name: "absent stays null", reuse: nil, prior: types.BoolNull(), want: types.BoolNull()},
+		{name: "false against unset config stays null", reuse: &falseValue, prior: types.BoolNull(), want: types.BoolNull()},
+		{name: "false against configured false is kept", reuse: &falseValue, prior: types.BoolValue(false), want: types.BoolValue(false)},
+		{name: "true is always reflected", reuse: &trueValue, prior: types.BoolNull(), want: types.BoolValue(true)},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, flattenReuseExistingSnapshots(tc.reuse, tc.prior))
+		})
+	}
+}
