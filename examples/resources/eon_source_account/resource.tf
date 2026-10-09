@@ -8,6 +8,18 @@ resource "eon_source_account" "aws_production" {
   }
 }
 
+# Example: Discover only in specific regions. Omit `regions` to leave them to the
+# Eon console, or set `regions = []` to discover in every supported region.
+resource "eon_source_account" "aws_us_only" {
+  name           = "US-only AWS Account"
+  cloud_provider = "AWS"
+  regions        = ["us-east-1", "us-west-2"]
+
+  aws {
+    role_arn = "arn:aws:iam::210987654321:role/EonBackupRole"
+  }
+}
+
 # Example: Connect an Azure source account (subscription)
 resource "eon_source_account" "azure_subscription" {
   name           = "Production Azure Subscription"

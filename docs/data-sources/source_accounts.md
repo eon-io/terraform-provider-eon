@@ -71,5 +71,6 @@ Read-Only:
 - `name` (String) Account display name in Eon.
 - `provider` (String) Cloud provider. Possible values: `AWS`, `AZURE`, `GCP`.
 - `provider_account_id` (String) Cloud-provider-assigned account ID.
+- `regions` (List of String) Regions Eon discovers resources in. Empty means every supported region.
 - `status` (String) Connection status of the AWS account, Azure subscription, or GCP project. Only `CONNECTED` source accounts can be backed up. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
 - `updated_at` (String) Date and time the source account was last updated.

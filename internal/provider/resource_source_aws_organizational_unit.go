@@ -36,6 +36,7 @@ type SourceAwsOrganizationalUnitResourceModel struct {
 	Status                       types.String `tfsdk:"status"`
 	CreatedAt                    types.String `tfsdk:"created_at"`
 	UpdatedAt                    types.String `tfsdk:"updated_at"`
+	Regions                      types.Set    `tfsdk:"regions"`
 }
 
 func (r *SourceAwsOrganizationalUnitResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -87,6 +88,11 @@ func (r *SourceAwsOrganizationalUnitResource) Schema(ctx context.Context, req re
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"regions": discoveryRegionsAttribute(
+				discoveryRegionsDescription+" Applied to every account the organizational unit adds. Set only when connecting: "+
+					"changing it on a connected organizational unit fails the plan.",
+				immutableRegionsModifier{resourceName: "organizational unit"},
+			),
 		},
 	}
 }
@@ -117,6 +123,14 @@ func (r *SourceAwsOrganizationalUnitResource) Create(ctx context.Context, req re
 		RoleArn:                      data.RoleArn.ValueString(),
 		ProviderOrganizationalUnitId: data.ProviderOrganizationalUnitId.ValueString(),
 	}
+	regions, regionsConfigured, diags := regionsFromSet(ctx, data.Regions)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if regionsConfigured {
+		connectReq.SetRegions(regions)
+	}
 
 	tflog.Debug(ctx, "Connecting source AWS organizational unit", map[string]interface{}{
 		"role_arn":                        data.RoleArn.ValueString(),
@@ -137,6 +151,9 @@ func (r *SourceAwsOrganizationalUnitResource) Create(ctx context.Context, req re
 	data.Status = types.StringValue(string(ou.GetStatus()))
 	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	if !regionsConfigured {
+		data.Regions = regionsToSet(ou.GetRegions())
+	}
 
 	tflog.Debug(ctx, "Source AWS organizational unit connected", map[string]interface{}{
 		"id":     data.Id.ValueString(),
@@ -170,6 +187,7 @@ func (r *SourceAwsOrganizationalUnitResource) Read(ctx context.Context, req reso
 			data.ProviderOrganizationalUnitId = types.StringValue(ou.GetProviderOrganizationalUnitId())
 			data.ProviderManagementAccountId = types.StringValue(ou.GetProviderManagementAccountId())
 			data.Status = types.StringValue(string(ou.GetStatus()))
+			data.Regions = regionsToSet(ou.GetRegions())
 
 			if data.CreatedAt.IsNull() || data.CreatedAt.IsUnknown() {
 				data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
@@ -248,6 +266,7 @@ func (r *SourceAwsOrganizationalUnitResource) ImportState(ctx context.Context, r
 			data.ProviderOrganizationalUnitId = types.StringValue(ou.GetProviderOrganizationalUnitId())
 			data.ProviderManagementAccountId = types.StringValue(ou.GetProviderManagementAccountId())
 			data.Status = types.StringValue(string(ou.GetStatus()))
+			data.Regions = regionsToSet(ou.GetRegions())
 			data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 			data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 

@@ -23,6 +23,18 @@ resource "eon_source_account" "aws_production" {
   }
 }
 
+# Example: Discover only in specific regions. Omit `regions` to leave them to the
+# Eon console, or set `regions = []` to discover in every supported region.
+resource "eon_source_account" "aws_us_only" {
+  name           = "US-only AWS Account"
+  cloud_provider = "AWS"
+  regions        = ["us-east-1", "us-west-2"]
+
+  aws {
+    role_arn = "arn:aws:iam::210987654321:role/EonBackupRole"
+  }
+}
+
 # Example: Connect an Azure source account (subscription)
 resource "eon_source_account" "azure_subscription" {
   name           = "Production Azure Subscription"
@@ -93,6 +105,7 @@ output "gcp_production_account" {
 - `aws` (Block, Optional) AWS-specific configuration. Required when `cloud_provider` is `AWS`. (see [below for nested schema](#nestedblock--aws))
 - `azure` (Block, Optional) Azure-specific configuration. Required when `cloud_provider` is `AZURE`. (see [below for nested schema](#nestedblock--azure))
 - `gcp` (Block, Optional) GCP-specific configuration. Required when `cloud_provider` is `GCP`. (see [below for nested schema](#nestedblock--gcp))
+- `regions` (Set of String) Regions Eon discovers resources in. An empty set means every supported region. Omit the attribute to leave the regions to the Eon console instead of Terraform. Resources in a region removed from the set are treated as deleted from the cloud. Discovery honors the regions only when the discovery-regions feature is enabled for the project.
 - `role` (String, Deprecated) **Deprecated:** Use `aws { role_arn = "..." }` instead. ARN of the role Eon assumes to access the account in AWS.
 
 ### Read-Only

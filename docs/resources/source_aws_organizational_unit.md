@@ -25,6 +25,10 @@ Connects a source AWS organizational unit to the Eon project. All AWS accounts w
 resource "eon_source_aws_organizational_unit" "production" {
   role_arn                        = "arn:aws:iam::123456789012:role/EonOrganizationAccountRole"
   provider_organizational_unit_id = "ou-abc1-23456789"
+
+  # Optional: regions to discover in for every account the OU adds. It can only be
+  # set when connecting; changing it later fails the plan.
+  regions = ["us-east-1", "eu-west-1"]
 }
 
 # Output the organizational unit details
@@ -48,6 +52,10 @@ output "production_ou" {
 
 - `provider_organizational_unit_id` (String) AWS Organizational Unit ID.
 - `role_arn` (String) ARN of the role Eon assumes to access the organizational unit in AWS.
+
+### Optional
+
+- `regions` (Set of String) Regions Eon discovers resources in. An empty set means every supported region. Omit the attribute to leave the regions to the Eon console instead of Terraform. Resources in a region removed from the set are treated as deleted from the cloud. Discovery honors the regions only when the discovery-regions feature is enabled for the project. Applied to every account the organizational unit adds. Set only when connecting: changing it on a connected organizational unit fails the plan.
 
 ### Read-Only
 

@@ -7,6 +7,10 @@
 resource "eon_source_aws_organizational_unit" "production" {
   role_arn                        = "arn:aws:iam::123456789012:role/EonOrganizationAccountRole"
   provider_organizational_unit_id = "ou-abc1-23456789"
+
+  # Optional: regions to discover in for every account the OU adds. It can only be
+  # set when connecting; changing it later fails the plan.
+  regions = ["us-east-1", "eu-west-1"]
 }
 
 # Output the organizational unit details

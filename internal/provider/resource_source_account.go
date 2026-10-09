@@ -9,6 +9,7 @@ import (
 
 	externalEonSdkAPI "github.com/eon-io/eon-sdk-go"
 	"github.com/eon-io/terraform-provider-eon/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -38,6 +39,7 @@ type SourceAccountResourceModel struct {
 	Status            types.String             `tfsdk:"status"`
 	CreatedAt         types.String             `tfsdk:"created_at"`
 	UpdatedAt         types.String             `tfsdk:"updated_at"`
+	Regions           types.Set                `tfsdk:"regions"`
 	Aws               *AwsAccountConfigModel   `tfsdk:"aws"`
 	Azure             *AzureAccountConfigModel `tfsdk:"azure"`
 	Gcp               *GcpAccountConfigModel   `tfsdk:"gcp"`
@@ -91,6 +93,7 @@ func (r *SourceAccountResource) Schema(ctx context.Context, req resource.SchemaR
 				MarkdownDescription: "Time at which Terraform last applied a change to this source account.",
 				Computed:            true,
 			},
+			"regions": discoveryRegionsAttribute(discoveryRegionsDescription),
 		},
 		Blocks: map[string]schema.Block{
 			CloudProviderAWS.BlockName():   awsSchemaBlock(),
@@ -125,6 +128,12 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 	cloudProvider := CloudProvider(data.CloudProvider.ValueString())
 	config := externalEonSdkAPI.NewSourceAccountAttributesInput(externalEonSdkAPI.Provider(cloudProvider))
 
+	regions, regionsConfigured, diags := regionsFromSet(ctx, data.Regions)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	switch cloudProvider {
 	case CloudProviderAWS:
 		var roleArn string
@@ -141,6 +150,9 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 			return
 		}
 		awsConfig := externalEonSdkAPI.NewAwsSourceAccountAttributesInput(roleArn)
+		if regionsConfigured {
+			awsConfig.SetRegions(regions)
+		}
 		config.SetAws(*awsConfig)
 
 		tflog.Debug(ctx, "Connecting AWS source account", map[string]interface{}{
@@ -170,6 +182,9 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 		if !data.Azure.ResourceGroupName.IsNull() && data.Azure.ResourceGroupName.ValueString() != "" {
 			azureConfig.SetEonInternalResourceGroupName(data.Azure.ResourceGroupName.ValueString())
 		}
+		if regionsConfigured {
+			azureConfig.SetRegions(regions)
+		}
 		config.SetAzure(*azureConfig)
 
 		tflog.Debug(ctx, "Connecting Azure source account", map[string]interface{}{
@@ -194,6 +209,9 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 			return
 		}
 		gcpConfig := externalEonSdkAPI.NewGcpSourceAccountAttributesInput(data.Gcp.ServiceAccount.ValueString())
+		if regionsConfigured {
+			gcpConfig.SetRegions(regions)
+		}
 		config.SetGcp(*gcpConfig)
 
 		tflog.Debug(ctx, "Connecting GCP source account", map[string]interface{}{
@@ -247,6 +265,9 @@ func (r *SourceAccountResource) Create(ctx context.Context, req resource.CreateR
 	data.CloudProvider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
 	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
+	if !regionsConfigured {
+		data.Regions = regionsToSet(sourceAccountRegions(account))
+	}
 
 	// Set role to null by default, override for AWS (backward compatibility)
 	data.Role = types.StringNull()
@@ -288,6 +309,7 @@ func (r *SourceAccountResource) Read(ctx context.Context, req resource.ReadReque
 
 	cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
 	data.CloudProvider = types.StringValue(cloudProvider.String())
+	data.Regions = regionsToSet(sourceAccountRegions(account))
 
 	// Populate cloud-specific blocks from API response
 	switch cloudProvider {
@@ -369,8 +391,12 @@ func (r *SourceAccountResource) Update(ctx context.Context, req resource.UpdateR
 	accountId := state.Id.ValueString()
 	var latestAccount *externalEonSdkAPI.SourceAccount
 
-	// Step 1: Update mutable fields (name, role_arn) if changed.
-	updateReq := r.buildUpdateRequest(plan, state)
+	// Step 1: Update mutable fields (name, role_arn, regions) if changed.
+	updateReq, diags := buildSourceAccountUpdateRequest(ctx, plan, state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	if updateReq != nil {
 		tflog.Info(ctx, "Updating source account", map[string]interface{}{
 			"id": accountId,
@@ -426,9 +452,9 @@ func (r *SourceAccountResource) Update(ctx context.Context, req resource.UpdateR
 	resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
 }
 
-// buildUpdateRequest compares plan and state and returns an UpdateSourceAccountRequest
+// buildSourceAccountUpdateRequest compares plan and state and returns an UpdateSourceAccountRequest
 // if any mutable fields changed. Returns nil if nothing needs updating.
-func (r *SourceAccountResource) buildUpdateRequest(plan, state SourceAccountResourceModel) *client.UpdateSourceAccountRequest {
+func buildSourceAccountUpdateRequest(ctx context.Context, plan, state SourceAccountResourceModel) (*client.UpdateSourceAccountRequest, diag.Diagnostics) {
 	var req client.UpdateSourceAccountRequest
 	var changed bool
 
@@ -438,21 +464,58 @@ func (r *SourceAccountResource) buildUpdateRequest(plan, state SourceAccountReso
 		changed = true
 	}
 
+	var awsAttrs *client.UpdateAwsSourceAccountAttributes
 	if plan.Aws != nil && state.Aws != nil &&
 		plan.Aws.RoleArn.ValueString() != state.Aws.RoleArn.ValueString() {
 		roleArn := plan.Aws.RoleArn.ValueString()
-		req.SourceAccountAttributes = &client.UpdateSourceAccountAttributes{
-			Aws: &client.UpdateAwsSourceAccountAttributes{
-				RoleArn: &roleArn,
-			},
+		awsAttrs = &client.UpdateAwsSourceAccountAttributes{RoleArn: &roleArn}
+	}
+
+	var attrs client.UpdateSourceAccountAttributes
+	if regionsChanged(plan.Regions, state.Regions) {
+		regions, _, diags := regionsFromSet(ctx, plan.Regions)
+		if diags.HasError() {
+			return nil, diags
 		}
+		switch CloudProvider(plan.CloudProvider.ValueString()) {
+		case CloudProviderAWS:
+			if awsAttrs == nil {
+				awsAttrs = &client.UpdateAwsSourceAccountAttributes{}
+			}
+			awsAttrs.Regions = regions
+		case CloudProviderAzure:
+			attrs.Azure = &client.UpdateAzureSourceAccountAttributes{Regions: regions}
+		case CloudProviderGCP:
+			attrs.Gcp = &client.UpdateGcpSourceAccountAttributes{Regions: regions}
+		}
+	}
+	attrs.Aws = awsAttrs
+	if attrs.Aws != nil || attrs.Azure != nil || attrs.Gcp != nil {
+		req.SourceAccountAttributes = &attrs
 		changed = true
 	}
 
 	if !changed {
-		return nil
+		return nil, nil
 	}
-	return &req
+	return &req, nil
+}
+
+// sourceAccountRegions returns the account's discovery regions; empty means every region.
+func sourceAccountRegions(account *externalEonSdkAPI.SourceAccount) []string {
+	attrs := account.SourceAccountAttributes
+	switch CloudProvider(attrs.GetCloudProvider()) {
+	case CloudProviderAWS:
+		aws := attrs.GetAws()
+		return aws.GetRegions()
+	case CloudProviderAzure:
+		azure := attrs.GetAzure()
+		return azure.GetRegions()
+	case CloudProviderGCP:
+		gcp := attrs.GetGcp()
+		return gcp.GetRegions()
+	}
+	return nil
 }
 
 // mapAccountToState maps a SourceAccount API response to the Terraform resource model.
@@ -465,6 +528,7 @@ func (r *SourceAccountResource) mapAccountToState(account *externalEonSdkAPI.Sou
 		ProviderAccountId: types.StringValue(account.GetProviderAccountId()),
 		CreatedAt:         plan.CreatedAt,
 		UpdatedAt:         types.StringValue(time.Now().Format(time.RFC3339)),
+		Regions:           regionsToSet(sourceAccountRegions(account)),
 	}
 
 	cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
@@ -569,6 +633,7 @@ func (r *SourceAccountResource) ImportState(ctx context.Context, req resource.Im
 
 	cloudProvider := CloudProvider(account.SourceAccountAttributes.GetCloudProvider())
 	data.CloudProvider = types.StringValue(cloudProvider.String())
+	data.Regions = regionsToSet(sourceAccountRegions(account))
 
 	// Populate cloud-specific blocks from API response
 	switch cloudProvider {

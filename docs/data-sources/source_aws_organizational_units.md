@@ -56,5 +56,6 @@ Read-Only:
 - `name` (String) The organizational unit display name in Eon.
 - `provider_management_account_id` (String) AWS Organization management account ID.
 - `provider_organizational_unit_id` (String) AWS Organizational Unit ID.
+- `regions` (List of String) Regions Eon discovers resources in. Empty means every supported region.
 - `role_arn` (String) ARN of the role Eon assumes to access the organizational unit in AWS.
 - `status` (String) Connection status of the AWS organizational unit. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.
