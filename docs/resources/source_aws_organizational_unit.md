@@ -55,7 +55,7 @@ output "production_ou" {
 
 ### Optional
 
-- `regions` (Set of String) Regions Eon discovers resources in. An empty set means every supported region. Omit the attribute to leave the regions to the Eon console instead of Terraform. Resources in a region removed from the set are treated as deleted from the cloud. Discovery honors the regions only when the discovery-regions feature is enabled for the project. Applied to every account the organizational unit adds. Set only when connecting: changing it on a connected organizational unit fails the plan.
+- `regions` (Set of String) Regions Eon discovers resources in. An empty set means every supported region. Omit the attribute to leave the regions to the Eon console instead of Terraform. Resources in a region removed from the set are treated as deleted from the cloud. Applied to every account the organizational unit adds. Set only when connecting: changing it on a connected organizational unit fails the plan.
 
 ### Read-Only
 

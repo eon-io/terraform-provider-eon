@@ -105,7 +105,7 @@ output "gcp_production_account" {
 - `aws` (Block, Optional) AWS-specific configuration. Required when `cloud_provider` is `AWS`. (see [below for nested schema](#nestedblock--aws))
 - `azure` (Block, Optional) Azure-specific configuration. Required when `cloud_provider` is `AZURE`. (see [below for nested schema](#nestedblock--azure))
 - `gcp` (Block, Optional) GCP-specific configuration. Required when `cloud_provider` is `GCP`. (see [below for nested schema](#nestedblock--gcp))
-- `regions` (Set of String) Regions Eon discovers resources in. An empty set means every supported region. Omit the attribute to leave the regions to the Eon console instead of Terraform. Resources in a region removed from the set are treated as deleted from the cloud. Discovery honors the regions only when the discovery-regions feature is enabled for the project.
+- `regions` (Set of String) Regions Eon discovers resources in. An empty set means every supported region. Omit the attribute to leave the regions to the Eon console instead of Terraform. Resources in a region removed from the set are treated as deleted from the cloud.
 - `role` (String, Deprecated) **Deprecated:** Use `aws { role_arn = "..." }` instead. ARN of the role Eon assumes to access the account in AWS.
 
 ### Read-Only

@@ -17,8 +17,7 @@ import (
 
 const discoveryRegionsDescription = "Regions Eon discovers resources in. An empty set means every supported region. " +
 	"Omit the attribute to leave the regions to the Eon console instead of Terraform. " +
-	"Resources in a region removed from the set are treated as deleted from the cloud. " +
-	"Discovery honors the regions only when the discovery-regions feature is enabled for the project."
+	"Resources in a region removed from the set are treated as deleted from the cloud."
 
 // discoveryRegionsAttribute is Optional+Computed so that omitting it leaves regions managed outside Terraform,
 // while an explicit empty set still means "every region"; null and empty differ in the API the same way.
