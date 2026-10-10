@@ -31,6 +31,7 @@ type SourceAwsOrganizationalUnitModel struct {
 	ProviderOrganizationalUnitId types.String `tfsdk:"provider_organizational_unit_id"`
 	ProviderManagementAccountId  types.String `tfsdk:"provider_management_account_id"`
 	Status                       types.String `tfsdk:"status"`
+	Regions                      []string     `tfsdk:"regions"`
 }
 
 func (d *SourceAwsOrganizationalUnitsDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -68,6 +69,11 @@ func (d *SourceAwsOrganizationalUnitsDataSource) Schema(ctx context.Context, req
 						},
 						"status": schema.StringAttribute{
 							MarkdownDescription: "Connection status of the AWS organizational unit. Possible values: `CONNECTED`, `DISCONNECTED`, `INSUFFICIENT_PERMISSIONS`.",
+							Computed:            true,
+						},
+						"regions": schema.ListAttribute{
+							MarkdownDescription: "Regions Eon discovers resources in. Empty means every supported region.",
+							ElementType:         types.StringType,
 							Computed:            true,
 						},
 					},
@@ -111,6 +117,7 @@ func (d *SourceAwsOrganizationalUnitsDataSource) Read(ctx context.Context, req d
 			ProviderOrganizationalUnitId: types.StringValue(ou.GetProviderOrganizationalUnitId()),
 			ProviderManagementAccountId:  types.StringValue(ou.GetProviderManagementAccountId()),
 			Status:                       types.StringValue(string(ou.GetStatus())),
+			Regions:                      append([]string{}, ou.GetRegions()...),
 		}
 
 		data.OrganizationalUnits = append(data.OrganizationalUnits, ouModel)

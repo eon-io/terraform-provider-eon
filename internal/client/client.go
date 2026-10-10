@@ -297,12 +297,62 @@ type UpdateSourceAccountRequest struct {
 
 // UpdateSourceAccountAttributes contains cloud-provider-specific attributes to update.
 type UpdateSourceAccountAttributes struct {
-	Aws *UpdateAwsSourceAccountAttributes
+	Aws   *UpdateAwsSourceAccountAttributes
+	Azure *UpdateAzureSourceAccountAttributes
+	Gcp   *UpdateGcpSourceAccountAttributes
 }
 
 // UpdateAwsSourceAccountAttributes contains AWS-specific attributes to update.
+// A nil Regions leaves the regions unchanged; an empty non-nil slice means every region.
 type UpdateAwsSourceAccountAttributes struct {
 	RoleArn *string
+	Regions []string
+}
+
+// UpdateAzureSourceAccountAttributes contains Azure-specific attributes to update.
+// A nil Regions leaves the regions unchanged; an empty non-nil slice means every region.
+type UpdateAzureSourceAccountAttributes struct {
+	Regions []string
+}
+
+// UpdateGcpSourceAccountAttributes contains GCP-specific attributes to update.
+// A nil Regions leaves the regions unchanged; an empty non-nil slice means every region.
+type UpdateGcpSourceAccountAttributes struct {
+	Regions []string
+}
+
+// toSdkUpdateSourceAccountAttributes relies on the SDK serializing a nil Regions as absent and an empty non-nil
+// one as [], which the API reads as "unchanged" and "every region" respectively.
+func toSdkUpdateSourceAccountAttributes(in UpdateSourceAccountAttributes) *externalEonSdkAPI.UpdateSourceAccountAttributesInput {
+	if in.Aws == nil && in.Azure == nil && in.Gcp == nil {
+		return nil
+	}
+	attrs := externalEonSdkAPI.NewUpdateSourceAccountAttributesInput()
+	if in.Aws != nil {
+		awsAttrs := externalEonSdkAPI.UpdateAwsSourceAccountAttributes{}
+		if in.Aws.RoleArn != nil {
+			awsAttrs.SetRoleArn(*in.Aws.RoleArn)
+		}
+		if in.Aws.Regions != nil {
+			awsAttrs.SetRegions(in.Aws.Regions)
+		}
+		attrs.SetAws(awsAttrs)
+	}
+	if in.Azure != nil {
+		azureAttrs := externalEonSdkAPI.UpdateAzureSourceAccountAttributes{}
+		if in.Azure.Regions != nil {
+			azureAttrs.SetRegions(in.Azure.Regions)
+		}
+		attrs.SetAzure(azureAttrs)
+	}
+	if in.Gcp != nil {
+		gcpAttrs := externalEonSdkAPI.UpdateGcpSourceAccountAttributes{}
+		if in.Gcp.Regions != nil {
+			gcpAttrs.SetRegions(in.Gcp.Regions)
+		}
+		attrs.SetGcp(gcpAttrs)
+	}
+	return attrs
 }
 
 // UpdateSourceAccount updates mutable fields of a source account via
@@ -316,14 +366,10 @@ func (c *EonClient) UpdateSourceAccount(ctx context.Context, accountId string, r
 	if req.Name != nil {
 		sdkReq.SetName(*req.Name)
 	}
-	if req.SourceAccountAttributes != nil && req.SourceAccountAttributes.Aws != nil {
-		attrs := externalEonSdkAPI.NewUpdateSourceAccountAttributesInput()
-		awsAttrs := externalEonSdkAPI.UpdateAwsSourceAccountAttributes{}
-		if req.SourceAccountAttributes.Aws.RoleArn != nil {
-			awsAttrs.SetRoleArn(*req.SourceAccountAttributes.Aws.RoleArn)
+	if req.SourceAccountAttributes != nil {
+		if attrs := toSdkUpdateSourceAccountAttributes(*req.SourceAccountAttributes); attrs != nil {
+			sdkReq.SetSourceAccountAttributes(*attrs)
 		}
-		attrs.SetAws(awsAttrs)
-		sdkReq.SetSourceAccountAttributes(*attrs)
 	}
 
 	resp, httpResp, err := c.client.AccountsAPI.UpdateSourceAccount(ctx, c.projectID, accountId).

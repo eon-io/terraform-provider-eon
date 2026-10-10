@@ -33,6 +33,7 @@ type SourceAccountModel struct {
 	Status            types.String `tfsdk:"status"`
 	CreatedAt         types.String `tfsdk:"created_at"`
 	UpdatedAt         types.String `tfsdk:"updated_at"`
+	Regions           []string     `tfsdk:"regions"`
 }
 
 func (d *SourceAccountsDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -80,6 +81,11 @@ func (d *SourceAccountsDataSource) Schema(ctx context.Context, req datasource.Sc
 							MarkdownDescription: "Date and time the source account was last updated.",
 							Computed:            true,
 						},
+						"regions": schema.ListAttribute{
+							MarkdownDescription: "Regions Eon discovers resources in. Empty means every supported region.",
+							ElementType:         types.StringType,
+							Computed:            true,
+						},
 					},
 				},
 			},
@@ -121,6 +127,7 @@ func (d *SourceAccountsDataSource) Read(ctx context.Context, req datasource.Read
 			Status:            types.StringValue(string(account.Status)),
 			CreatedAt:         types.StringNull(),
 			UpdatedAt:         types.StringNull(),
+			Regions:           append([]string{}, sourceAccountRegions(&account)...),
 		}
 
 		accountModel.Provider = types.StringValue(string(account.SourceAccountAttributes.GetCloudProvider()))
