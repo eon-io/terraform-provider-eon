@@ -264,6 +264,7 @@ func flattenBackupPolicy(
 	data.Id = types.StringValue(policy.Id)
 	data.Name = types.StringValue(policy.Name)
 	data.Enabled = types.BoolValue(policy.Enabled)
+	data.Labels = labelsToSet(policy.GetLabels())
 	data.ResourceSelector = selector
 	data.BackupPlan = plan
 

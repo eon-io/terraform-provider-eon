@@ -87,6 +87,7 @@ output "multi_region_vault_ids" {
 ### Optional
 
 - `aws_kms_key_arn` (String) ARN of the AWS KMS customer-managed key (CMK) for encryption. If omitted, Eon uses its own managed encryption key. **Only applicable for AWS vaults.**
+- `labels` (Set of String) User-defined metadata labels, used for filtering and search only. They don't affect backup behavior, access control, or the tags Eon sets on your cloud resources.
 
 ### Read-Only
 

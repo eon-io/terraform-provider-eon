@@ -38,6 +38,7 @@ type VaultResourceModel struct {
 	VaultAccountId    types.String `tfsdk:"vault_account_id"`
 	ProviderAccountId types.String `tfsdk:"provider_account_id"`
 	IsManagedByEon    types.Bool   `tfsdk:"is_managed_by_eon"`
+	Labels            types.Set    `tfsdk:"labels"`
 }
 
 // VaultUserInput contains only user-configurable fields for vault creation.
@@ -50,6 +51,7 @@ type VaultUserInput struct {
 	Region        string
 	CloudProvider string
 	AwsKmsKeyArn  *string
+	Labels        []string
 }
 
 // ToUserInput extracts user-configurable fields from the Terraform model.
@@ -65,6 +67,8 @@ func (m *VaultResourceModel) ToUserInput() VaultUserInput {
 		kms := m.AwsKmsKeyArn.ValueString()
 		input.AwsKmsKeyArn = &kms
 	}
+
+	input.Labels = labelsFromSet(m.Labels)
 
 	return input
 }
@@ -101,6 +105,10 @@ func (input *VaultUserInput) ToCreateRequest() (*externalEonSdkAPI.CreateVaultRe
 		*vaultAttributes,
 	)
 
+	if len(input.Labels) > 0 {
+		createReq.SetLabels(input.Labels)
+	}
+
 	return createReq, nil
 }
 
@@ -134,6 +142,11 @@ func (input *VaultUserInput) MatchesVault(vault *externalEonSdkAPI.BackupVault) 
 			return false, fmt.Sprintf("AWS KMS key mismatch: existing=%s, requested=%s",
 				existingKms, *input.AwsKmsKeyArn)
 		}
+	}
+
+	if !labelsEqual(input.Labels, vault.GetLabels()) {
+		return false, fmt.Sprintf("labels mismatch: existing=%v, requested=%v",
+			vault.GetLabels(), input.Labels)
 	}
 
 	return true, ""
@@ -180,6 +193,11 @@ func (r *VaultResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 				MarkdownDescription: "Cloud provider-assigned ID of the vault account.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"labels": schema.SetAttribute{
+				MarkdownDescription: "User-defined metadata labels, used for filtering and search only. They don't affect backup behavior, access control, or the tags Eon sets on your cloud resources.",
+				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"is_managed_by_eon": schema.BoolAttribute{
 				MarkdownDescription: "Whether the vault is in an Eon-managed vault account.",
@@ -347,6 +365,8 @@ func (r *VaultResource) Create(ctx context.Context, req resource.CreateRequest, 
 		}
 	}
 
+	data.Labels = labelsToSet(vault.GetLabels())
+
 	tflog.Debug(ctx, "Vault state updated", map[string]interface{}{
 		"id":                  data.Id.ValueString(),
 		"vault_account_id":    data.VaultAccountId.ValueString(),
@@ -391,6 +411,8 @@ func (r *VaultResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		data.AwsKmsKeyArn = types.StringNull()
 	}
 
+	data.Labels = labelsToSet(vault.GetLabels())
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -404,9 +426,10 @@ func (r *VaultResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	// Only name can be updated - other attributes are immutable and marked with RequiresReplace
-	if !plan.Name.Equal(state.Name) {
+	// Name and labels are the only mutable fields; the rest are marked RequiresReplace.
+	if !plan.Name.Equal(state.Name) || !plan.Labels.Equal(state.Labels) {
 		updateReq := externalEonSdkAPI.NewUpdateVaultRequest(plan.Name.ValueString())
+		updateReq.SetLabels(labelsFromSet(plan.Labels))
 
 		tflog.Debug(ctx, "Updating vault name", map[string]interface{}{
 			"id":       state.Id.ValueString(),
@@ -422,6 +445,7 @@ func (r *VaultResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 		// Update state with the new name from response
 		plan.Name = types.StringValue(vault.Name)
+		plan.Labels = labelsToSet(vault.GetLabels())
 
 		tflog.Debug(ctx, "Vault name updated", map[string]interface{}{
 			"id":   state.Id.ValueString(),

@@ -733,6 +733,10 @@ output "backup_policies_summary" {
 - `name` (String) Display name for the backup policy
 - `resource_selector` (Attributes) Resource selector configuration (see [below for nested schema](#nestedatt--resource_selector))
 
+### Optional
+
+- `labels` (Set of String) User-defined metadata labels, used for filtering and search only. They don't affect backup behavior, access control, or the tags Eon sets on your cloud resources.
+
 ### Read-Only
 
 - `created_at` (String) Time at which Terraform created this policy. Eon does not report policy timestamps, so this records the local apply time and is not refreshed afterwards
