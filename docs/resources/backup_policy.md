@@ -25,6 +25,10 @@ terraform {
 resource "eon_backup_policy" "daily_backup" {
   name    = "Daily Production Backup"
   enabled = true
+
+  # Metadata labels are for filtering and search only; they don't affect what gets backed up.
+  labels = ["production", "tier-1"]
+
   resource_selector = {
     resource_selection_mode = "ALL"
   }
@@ -732,6 +736,10 @@ output "backup_policies_summary" {
 - `enabled` (Boolean) Whether the backup policy is enabled
 - `name` (String) Display name for the backup policy
 - `resource_selector` (Attributes) Resource selector configuration (see [below for nested schema](#nestedatt--resource_selector))
+
+### Optional
+
+- `labels` (Set of String) User-defined metadata labels, used for filtering and search only. They don't affect backup behavior, access control, or the tags Eon sets on your cloud resources.
 
 ### Read-Only
 

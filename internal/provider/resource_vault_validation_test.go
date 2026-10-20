@@ -91,6 +91,16 @@ func TestVaultUserInput_AllFieldsValidated(t *testing.T) {
 				}
 				t.Logf("Field '%s': ✓ Mismatch detected - %s", fieldName, reason)
 
+			case "Labels":
+				modifiedVault.Labels = []string{"production"}
+				modifiedInput.Labels = []string{"staging"}
+
+				matches, reason := modifiedInput.MatchesVault(&modifiedVault)
+				if matches {
+					t.Errorf("Field '%s': Expected mismatch to be detected, but MatchesVault returned true", fieldName)
+				}
+				t.Logf("Field '%s': ✓ Mismatch detected - %s", fieldName, reason)
+
 			default:
 				t.Errorf("⚠️  UNHANDLED FIELD: '%s'\n\n"+
 					"A new field was added to VaultUserInput but this test doesn't know how to test it!\n\n"+

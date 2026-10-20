@@ -43,6 +43,7 @@ type BackupPolicyResourceModel struct {
 	BackupPlan       types.Object `tfsdk:"backup_plan"`
 	CreatedAt        types.String `tfsdk:"created_at"`
 	UpdatedAt        types.String `tfsdk:"updated_at"`
+	Labels           types.Set    `tfsdk:"labels"`
 }
 
 type ResourceSelectorModel struct {
@@ -257,6 +258,11 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 			"enabled": schema.BoolAttribute{
 				MarkdownDescription: "Whether the backup policy is enabled",
 				Required:            true,
+			},
+			"labels": schema.SetAttribute{
+				MarkdownDescription: "User-defined metadata labels, used for filtering and search only. They don't affect backup behavior, access control, or the tags Eon sets on your cloud resources.",
+				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"resource_selector": schema.SingleNestedAttribute{
 				MarkdownDescription: "Resource selector configuration",
@@ -792,6 +798,10 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 		createReq.SetEnabled(enabled)
 	}
 
+	if labels := labelsFromSet(data.Labels); len(labels) > 0 {
+		createReq.SetLabels(labels)
+	}
+
 	tflog.Debug(ctx, "Creating backup policy", map[string]interface{}{
 		"name":    data.Name.ValueString(),
 		"enabled": data.Enabled.ValueBool(),
@@ -805,6 +815,7 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 
 	data.Id = types.StringValue(policy.Id)
 	data.Name = types.StringValue(policy.Name)
+	data.Labels = labelsToSet(policy.GetLabels())
 	data.Enabled = types.BoolValue(policy.Enabled)
 	data.CreatedAt = types.StringValue(time.Now().Format(time.RFC3339))
 	data.UpdatedAt = types.StringValue(time.Now().Format(time.RFC3339))
@@ -1125,6 +1136,9 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 		updateReq.SetEnabled(enabled)
 	}
 
+	// Always sent, so removing every label from the configuration clears them server-side.
+	updateReq.SetLabels(labelsFromSet(plan.Labels))
+
 	tflog.Debug(ctx, "Updating backup policy", map[string]interface{}{
 		"name":    plan.Name.ValueString(),
 		"enabled": plan.Enabled.ValueBool(),
@@ -1141,6 +1155,7 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 
 	plan.Id = types.StringValue(updatedPolicy.Id)
 	plan.Name = types.StringValue(updatedPolicy.Name)
+	plan.Labels = labelsToSet(updatedPolicy.GetLabels())
 	plan.Enabled = types.BoolValue(updatedPolicy.Enabled)
 	plan.CreatedAt = state.CreatedAt
 	if plan.CreatedAt.IsNull() || plan.CreatedAt.IsUnknown() {

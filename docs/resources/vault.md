@@ -28,6 +28,14 @@ resource "eon_vault" "production_eu_central_cmk" {
   aws_kms_key_arn = "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012"
 }
 
+# Example: Create a vault with metadata labels for filtering and search
+resource "eon_vault" "production_labelled" {
+  name           = "Production US West 2"
+  region         = "us-west-2"
+  cloud_provider = "AWS"
+  labels         = ["production", "tier-1"]
+}
+
 # Example: Create vaults in multiple regions using for_each
 resource "eon_vault" "multi_region" {
   for_each = toset(["us-east-1", "us-west-2", "eu-west-1"])
@@ -87,6 +95,7 @@ output "multi_region_vault_ids" {
 ### Optional
 
 - `aws_kms_key_arn` (String) ARN of the AWS KMS customer-managed key (CMK) for encryption. If omitted, Eon uses its own managed encryption key. **Only applicable for AWS vaults.**
+- `labels` (Set of String) User-defined metadata labels, used for filtering and search only. They don't affect backup behavior, access control, or the tags Eon sets on your cloud resources.
 
 ### Read-Only
 
