@@ -25,6 +25,10 @@ terraform {
 resource "eon_backup_policy" "daily_backup" {
   name    = "Daily Production Backup"
   enabled = true
+
+  # Metadata labels are for filtering and search only; they don't affect what gets backed up.
+  labels = ["production", "tier-1"]
+
   resource_selector = {
     resource_selection_mode = "ALL"
   }
