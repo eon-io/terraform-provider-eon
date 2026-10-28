@@ -14,6 +14,7 @@ import (
 
 const actionApprovalRulesPath = "/api/v1/projects/project-1/action-approvals/rules"
 const actionApprovalRulePath = "/api/v1/projects/project-1/action-approvals/rules/rule-1"
+const actionApprovalRulesListPath = "/api/v1/projects/project-1/action-approvals/rules/list"
 
 const actionApprovalRuleResponse = `{
 	"actionApprovalRule": {
@@ -146,7 +147,7 @@ func TestUpdateActionApprovalRule(t *testing.T) {
 			t.Parallel()
 
 			c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-				assert.Equal(t, http.MethodPut, r.Method)
+				assert.Equal(t, http.MethodPatch, r.Method)
 				assert.Equal(t, actionApprovalRulePath, r.URL.Path)
 				return &http.Response{
 					StatusCode: tt.statusCode,
@@ -226,8 +227,8 @@ func TestListActionApprovalRules(t *testing.T) {
 			t.Parallel()
 
 			c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-				assert.Equal(t, http.MethodGet, r.Method)
-				assert.Equal(t, actionApprovalRulesPath, r.URL.Path)
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Equal(t, actionApprovalRulesListPath, r.URL.Path)
 				assert.Equal(t, "100", r.URL.Query().Get("pageSize"))
 				return &http.Response{
 					StatusCode: tt.statusCode,
