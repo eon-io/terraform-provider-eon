@@ -88,6 +88,9 @@ type fakeEonServer struct {
 	actionApprovalRules  map[string]*externalEonSdkAPI.ActionApprovalRule
 	findingExclusions    map[string]*externalEonSdkAPI.FindingExclusion
 	restoreJobs          map[string]*externalEonSdkAPI.RestoreJob
+	s3Buckets            map[string][]externalEonSdkAPI.S3Bucket
+	instanceTypes        map[string]*externalEonSdkAPI.ListInstanceTypesResponse
+	securityGroups       map[string]*externalEonSdkAPI.RestoreSecurityGroups
 	nextID               int
 }
 
@@ -106,6 +109,9 @@ func newFakeEonServer(t *testing.T) *fakeEonServer {
 		actionApprovalRules:  make(map[string]*externalEonSdkAPI.ActionApprovalRule),
 		findingExclusions:    make(map[string]*externalEonSdkAPI.FindingExclusion),
 		restoreJobs:          make(map[string]*externalEonSdkAPI.RestoreJob),
+		s3Buckets:            make(map[string][]externalEonSdkAPI.S3Bucket),
+		instanceTypes:        make(map[string]*externalEonSdkAPI.ListInstanceTypesResponse),
+		securityGroups:       make(map[string]*externalEonSdkAPI.RestoreSecurityGroups),
 		nextID:               1,
 	}
 	f.server = httptest.NewServer(http.HandlerFunc(f.handle))
@@ -227,6 +233,24 @@ func (f *fakeEonServer) DeleteRestoreJob(jobID string) {
 	delete(f.restoreJobs, jobID)
 }
 
+func (f *fakeEonServer) SetS3Buckets(accountID string, buckets []externalEonSdkAPI.S3Bucket) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.s3Buckets[accountID] = buckets
+}
+
+func (f *fakeEonServer) SetAwsInstanceTypes(accountID, region string, resp *externalEonSdkAPI.ListInstanceTypesResponse) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.instanceTypes[accountID+"/"+region] = resp
+}
+
+func (f *fakeEonServer) SetAwsSecurityGroups(accountID, region string, resp *externalEonSdkAPI.RestoreSecurityGroups) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.securityGroups[accountID+"/"+region] = resp
+}
+
 func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	path = strings.TrimPrefix(path, "/api")
@@ -299,6 +323,23 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	restoreAccountAwsLookupsPrefix := fmt.Sprintf("/projects/%s/restore-accounts/", f.projectID)
+	if r.Method == http.MethodGet && strings.HasPrefix(path, restoreAccountAwsLookupsPrefix) {
+		rest := strings.TrimPrefix(path, restoreAccountAwsLookupsPrefix)
+		parts := strings.Split(rest, "/")
+		switch {
+		case len(parts) == 3 && parts[1] == "aws" && parts[2] == "s3-buckets":
+			f.handleListS3Buckets(w, parts[0])
+			return
+		case len(parts) == 4 && parts[1] == "regions" && parts[3] == "aws-instance-types":
+			f.handleListAwsInstanceTypes(w, r, parts[0], parts[2])
+			return
+		case len(parts) == 4 && parts[1] == "regions" && parts[3] == "aws-security-groups":
+			f.handleListAwsSecurityGroups(w, r, parts[0], parts[2])
+			return
+		}
+	}
+
 	sourceAccountsPrefix := fmt.Sprintf("/v1/projects/%s/source-accounts/", f.projectID)
 	if strings.HasPrefix(path, sourceAccountsPrefix) {
 		rest := strings.TrimPrefix(path, sourceAccountsPrefix)
@@ -323,7 +364,7 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && path == actionApprovalRulesPrefix:
 		f.handleCreateActionApprovalRule(w, r)
 		return
-	case r.Method == http.MethodGet && path == actionApprovalRulesPrefix:
+	case r.Method == http.MethodPost && path == actionApprovalRulesPrefix+"/list":
 		f.handleListActionApprovalRules(w, r)
 		return
 	case strings.HasPrefix(path, actionApprovalRulesPrefix+"/"):
@@ -335,7 +376,7 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			f.handleGetActionApprovalRule(w, id)
-		case http.MethodPut:
+		case http.MethodPatch:
 			f.handleUpdateActionApprovalRule(w, r, id)
 		case http.MethodDelete:
 			f.handleDeleteActionApprovalRule(w, id)
@@ -834,6 +875,57 @@ func (f *fakeEonServer) handleStartRestore(w http.ResponseWriter, r *http.Reques
 		"jobId":                 jobID,
 		"actionApprovalRequest": nil,
 	})
+}
+
+func (f *fakeEonServer) handleListS3Buckets(w http.ResponseWriter, accountID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	buckets, ok := f.s3Buckets[accountID]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewS3Buckets(buckets))
+}
+
+func (f *fakeEonServer) handleListAwsInstanceTypes(w http.ResponseWriter, r *http.Request, accountID, region string) {
+	if r.URL.Query().Get("subnetId") == "" {
+		http.Error(w, `{"message":"subnetId is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	resp, ok := f.instanceTypes[accountID+"/"+region]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (f *fakeEonServer) handleListAwsSecurityGroups(w http.ResponseWriter, r *http.Request, accountID, region string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	resp, ok := f.securityGroups[accountID+"/"+region]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+		return
+	}
+
+	vpcID := r.URL.Query().Get("vpcId")
+	if vpcID == "" {
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
+
+	filtered := make([]externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner, 0, len(resp.GetSecurityGroups()))
+	for _, sg := range resp.GetSecurityGroups() {
+		if sg.GetVpc() == vpcID {
+			filtered = append(filtered, sg)
+		}
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewRestoreSecurityGroups(resp.GetRegion(), filtered))
 }
 
 func newTestInventoryResource(id string) *externalEonSdkAPI.InventoryResource {
