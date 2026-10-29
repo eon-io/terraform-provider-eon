@@ -323,7 +323,7 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && path == actionApprovalRulesPrefix:
 		f.handleCreateActionApprovalRule(w, r)
 		return
-	case r.Method == http.MethodGet && path == actionApprovalRulesPrefix:
+	case r.Method == http.MethodPost && path == actionApprovalRulesPrefix+"/list":
 		f.handleListActionApprovalRules(w, r)
 		return
 	case strings.HasPrefix(path, actionApprovalRulesPrefix+"/"):
@@ -335,7 +335,7 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			f.handleGetActionApprovalRule(w, id)
-		case http.MethodPut:
+		case http.MethodPatch:
 			f.handleUpdateActionApprovalRule(w, r, id)
 		case http.MethodDelete:
 			f.handleDeleteActionApprovalRule(w, id)
