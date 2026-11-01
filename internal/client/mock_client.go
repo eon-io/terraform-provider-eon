@@ -28,6 +28,10 @@ type MockEonClient struct {
 	InventoryResources    map[string]*externalEonSdkAPI.InventoryResource
 	ResourceSnapshots     map[string][]externalEonSdkAPI.Snapshot
 	FindingExclusions     map[string]*externalEonSdkAPI.FindingExclusion
+	// Restore-target lookups, keyed by restore account ID (S3 buckets) or "<accountId>/<region>"
+	RestoreAccountS3Buckets      map[string][]externalEonSdkAPI.S3Bucket
+	RestoreAccountInstanceTypes  map[string]*externalEonSdkAPI.ListInstanceTypesResponse
+	RestoreAccountSecurityGroups map[string][]externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner
 
 	// Behavior controls
 	ShouldFailCreate bool
@@ -65,6 +69,10 @@ type MockEonClient struct {
 	ShouldFailFindingExclusionUpdate bool
 	ShouldFailFindingExclusionDelete bool
 	ShouldFailFindingExclusionList   bool
+	// Restore-target lookup behavior
+	ShouldFailListRestoreAccountS3Buckets      bool
+	ShouldFailListRestoreAccountInstanceTypes  bool
+	ShouldFailListRestoreAccountSecurityGroups bool
 
 	// Call tracking
 	CreateCalls                     int
@@ -97,6 +105,10 @@ type MockEonClient struct {
 	FindingExclusionUpdateCalls     int
 	FindingExclusionDeleteCalls     int
 	FindingExclusionListCalls       int
+	// Restore-target lookup call tracking
+	ListRestoreAccountS3BucketsCalls      int
+	ListRestoreAccountInstanceTypesCalls  int
+	ListRestoreAccountSecurityGroupsCalls int
 
 	// Mock configuration
 	ProjectID string
@@ -105,19 +117,22 @@ type MockEonClient struct {
 // NewMockEonClient creates a new mock client with default behavior
 func NewMockEonClient() *MockEonClient {
 	return &MockEonClient{
-		BackupPolicies:        make(map[string]*externalEonSdkAPI.BackupPolicy),
-		BackupPostureControls: make(map[string]*externalEonSdkAPI.BackupPostureControl),
-		IdpGroups:             make(map[string]*externalEonSdkAPI.IdpGroup),
-		Idps:                  make(map[string]*externalEonSdkAPI.Idp),
-		Roles:                 make(map[string]*externalEonSdkAPI.Role),
-		Permissions:           []externalEonSdkAPI.Permission{},
-		ResourceExclusions:    make(map[string]bool),
-		DataClassesOverrides:  make(map[string][]string),
-		EnvironmentOverrides:  make(map[string]string),
-		InventoryResources:    make(map[string]*externalEonSdkAPI.InventoryResource),
-		ResourceSnapshots:     make(map[string][]externalEonSdkAPI.Snapshot),
-		FindingExclusions:     make(map[string]*externalEonSdkAPI.FindingExclusion),
-		ProjectID:             "mock-project-id",
+		BackupPolicies:               make(map[string]*externalEonSdkAPI.BackupPolicy),
+		BackupPostureControls:        make(map[string]*externalEonSdkAPI.BackupPostureControl),
+		IdpGroups:                    make(map[string]*externalEonSdkAPI.IdpGroup),
+		Idps:                         make(map[string]*externalEonSdkAPI.Idp),
+		Roles:                        make(map[string]*externalEonSdkAPI.Role),
+		Permissions:                  []externalEonSdkAPI.Permission{},
+		ResourceExclusions:           make(map[string]bool),
+		DataClassesOverrides:         make(map[string][]string),
+		EnvironmentOverrides:         make(map[string]string),
+		InventoryResources:           make(map[string]*externalEonSdkAPI.InventoryResource),
+		ResourceSnapshots:            make(map[string][]externalEonSdkAPI.Snapshot),
+		FindingExclusions:            make(map[string]*externalEonSdkAPI.FindingExclusion),
+		RestoreAccountS3Buckets:      make(map[string][]externalEonSdkAPI.S3Bucket),
+		RestoreAccountInstanceTypes:  make(map[string]*externalEonSdkAPI.ListInstanceTypesResponse),
+		RestoreAccountSecurityGroups: make(map[string][]externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner),
+		ProjectID:                    "mock-project-id",
 	}
 }
 
@@ -261,6 +276,9 @@ func (m *MockEonClient) Reset() {
 	m.InventoryResources = make(map[string]*externalEonSdkAPI.InventoryResource)
 	m.ResourceSnapshots = make(map[string][]externalEonSdkAPI.Snapshot)
 	m.FindingExclusions = make(map[string]*externalEonSdkAPI.FindingExclusion)
+	m.RestoreAccountS3Buckets = make(map[string][]externalEonSdkAPI.S3Bucket)
+	m.RestoreAccountInstanceTypes = make(map[string]*externalEonSdkAPI.ListInstanceTypesResponse)
+	m.RestoreAccountSecurityGroups = make(map[string][]externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner)
 	m.CreateCalls = 0
 	m.ReadCalls = 0
 	m.UpdateCalls = 0
@@ -291,6 +309,9 @@ func (m *MockEonClient) Reset() {
 	m.FindingExclusionUpdateCalls = 0
 	m.FindingExclusionDeleteCalls = 0
 	m.FindingExclusionListCalls = 0
+	m.ListRestoreAccountS3BucketsCalls = 0
+	m.ListRestoreAccountInstanceTypesCalls = 0
+	m.ListRestoreAccountSecurityGroupsCalls = 0
 	m.ShouldFailCreate = false
 	m.ShouldFailRead = false
 	m.ShouldFailUpdate = false
@@ -321,6 +342,9 @@ func (m *MockEonClient) Reset() {
 	m.ShouldFailFindingExclusionUpdate = false
 	m.ShouldFailFindingExclusionDelete = false
 	m.ShouldFailFindingExclusionList = false
+	m.ShouldFailListRestoreAccountS3Buckets = false
+	m.ShouldFailListRestoreAccountInstanceTypes = false
+	m.ShouldFailListRestoreAccountSecurityGroups = false
 }
 
 // AddMockPolicy adds a pre-defined mock policy for testing
@@ -958,4 +982,77 @@ func (m *MockEonClient) AddMockFindingExclusion(exclusion *externalEonSdkAPI.Fin
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.FindingExclusions[exclusion.Id] = exclusion
+}
+
+func mockRestoreAccountRegionKey(accountId, region string) string {
+	return accountId + "/" + region
+}
+
+// ListRestoreAccountS3Buckets mocks listing the S3 buckets of a restore account.
+func (m *MockEonClient) ListRestoreAccountS3Buckets(ctx context.Context, accountId string) ([]externalEonSdkAPI.S3Bucket, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListRestoreAccountS3BucketsCalls++
+	if m.ShouldFailListRestoreAccountS3Buckets {
+		return nil, fmt.Errorf("mock list restore account S3 buckets error")
+	}
+	return append([]externalEonSdkAPI.S3Bucket{}, m.RestoreAccountS3Buckets[accountId]...), nil
+}
+
+// ListRestoreAccountAwsInstanceTypes mocks listing the EC2 instance types of a restore account region.
+func (m *MockEonClient) ListRestoreAccountAwsInstanceTypes(ctx context.Context, accountId, region, subnetId string, opts ListAwsInstanceTypesOptions) (*externalEonSdkAPI.ListInstanceTypesResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListRestoreAccountInstanceTypesCalls++
+	if m.ShouldFailListRestoreAccountInstanceTypes {
+		return nil, fmt.Errorf("mock list restore account AWS instance types error")
+	}
+	resp, ok := m.RestoreAccountInstanceTypes[mockRestoreAccountRegionKey(accountId, region)]
+	if !ok {
+		return externalEonSdkAPI.NewListInstanceTypesResponse(), nil
+	}
+	return resp, nil
+}
+
+// ListRestoreAccountAwsSecurityGroups mocks listing the security groups of a restore account region.
+func (m *MockEonClient) ListRestoreAccountAwsSecurityGroups(ctx context.Context, accountId, region string, vpcId, subnetId *string) ([]externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListRestoreAccountSecurityGroupsCalls++
+	if m.ShouldFailListRestoreAccountSecurityGroups {
+		return nil, fmt.Errorf("mock list restore account AWS security groups error")
+	}
+	out := make([]externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner, 0)
+	for _, sg := range m.RestoreAccountSecurityGroups[mockRestoreAccountRegionKey(accountId, region)] {
+		if vpcId != nil && sg.Vpc != *vpcId {
+			continue
+		}
+		out = append(out, sg)
+	}
+	return out, nil
+}
+
+// AddMockRestoreAccountS3Bucket adds a pre-defined S3 bucket to a restore account.
+func (m *MockEonClient) AddMockRestoreAccountS3Bucket(accountId string, bucket externalEonSdkAPI.S3Bucket) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.RestoreAccountS3Buckets[accountId] = append(m.RestoreAccountS3Buckets[accountId], bucket)
+}
+
+// SetMockRestoreAccountInstanceTypes sets the instance types returned for a restore account region.
+func (m *MockEonClient) SetMockRestoreAccountInstanceTypes(accountId, region string, resp *externalEonSdkAPI.ListInstanceTypesResponse) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.RestoreAccountInstanceTypes[mockRestoreAccountRegionKey(accountId, region)] = resp
+}
+
+// AddMockRestoreAccountSecurityGroup adds a pre-defined security group to a restore account region.
+func (m *MockEonClient) AddMockRestoreAccountSecurityGroup(accountId, region string, sg externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := mockRestoreAccountRegionKey(accountId, region)
+	m.RestoreAccountSecurityGroups[key] = append(m.RestoreAccountSecurityGroups[key], sg)
 }

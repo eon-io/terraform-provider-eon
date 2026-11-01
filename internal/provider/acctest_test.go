@@ -89,6 +89,14 @@ type fakeEonServer struct {
 	findingExclusions    map[string]*externalEonSdkAPI.FindingExclusion
 	restoreJobs          map[string]*externalEonSdkAPI.RestoreJob
 	nextID               int
+
+	// Restore-target lookups. s3Buckets is keyed by restore account ID; instanceTypes by
+	// "<accountId>/<region>/<subnetId>"; securityGroups by "<accountId>/<region>".
+	s3Buckets              map[string][]externalEonSdkAPI.S3Bucket
+	instanceTypes          map[string]*externalEonSdkAPI.ListInstanceTypesResponse
+	securityGroups         map[string][]externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner
+	subnetVpcs             map[string]string
+	lastInstanceTypesQuery map[string]string
 }
 
 func newFakeEonServer(t *testing.T) *fakeEonServer {
@@ -107,6 +115,10 @@ func newFakeEonServer(t *testing.T) *fakeEonServer {
 		findingExclusions:    make(map[string]*externalEonSdkAPI.FindingExclusion),
 		restoreJobs:          make(map[string]*externalEonSdkAPI.RestoreJob),
 		nextID:               1,
+		s3Buckets:            make(map[string][]externalEonSdkAPI.S3Bucket),
+		instanceTypes:        make(map[string]*externalEonSdkAPI.ListInstanceTypesResponse),
+		securityGroups:       make(map[string][]externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner),
+		subnetVpcs:           make(map[string]string),
 	}
 	f.server = httptest.NewServer(http.HandlerFunc(f.handle))
 	t.Cleanup(f.server.Close)
@@ -227,6 +239,63 @@ func (f *fakeEonServer) DeleteRestoreJob(jobID string) {
 	delete(f.restoreJobs, jobID)
 }
 
+func (f *fakeEonServer) AddS3Bucket(accountID string, bucket *externalEonSdkAPI.S3Bucket) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.s3Buckets[accountID] = append(f.s3Buckets[accountID], *bucket)
+}
+
+func (f *fakeEonServer) DeleteS3Bucket(accountID, bucketName string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	kept := f.s3Buckets[accountID][:0]
+	for _, b := range f.s3Buckets[accountID] {
+		if b.BucketName != bucketName {
+			kept = append(kept, b)
+		}
+	}
+	f.s3Buckets[accountID] = kept
+}
+
+func (f *fakeEonServer) SetInstanceTypes(accountID, region, subnetID string, resp *externalEonSdkAPI.ListInstanceTypesResponse) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.instanceTypes[accountID+"/"+region+"/"+subnetID] = resp
+}
+
+// LastInstanceTypesQuery returns the query parameters of the most recent instance types request.
+func (f *fakeEonServer) LastInstanceTypesQuery() map[string]string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.lastInstanceTypesQuery
+}
+
+func (f *fakeEonServer) AddSecurityGroup(accountID, region string, sg *externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	key := accountID + "/" + region
+	f.securityGroups[key] = append(f.securityGroups[key], *sg)
+}
+
+func (f *fakeEonServer) DeleteSecurityGroup(accountID, region, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	key := accountID + "/" + region
+	kept := f.securityGroups[key][:0]
+	for _, sg := range f.securityGroups[key] {
+		if sg.Id != id {
+			kept = append(kept, sg)
+		}
+	}
+	f.securityGroups[key] = kept
+}
+
+func (f *fakeEonServer) AddSubnet(subnetID, vpcID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.subnetVpcs[subnetID] = vpcID
+}
+
 func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	path = strings.TrimPrefix(path, "/api")
@@ -278,6 +347,24 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && path == "/v1/permissions":
 		f.handleListPermissions(w, r)
 		return
+	}
+
+	// Restore-target lookups are published without the /v1 prefix.
+	restoreTargetsPrefix := fmt.Sprintf("/projects/%s/restore-accounts/", f.projectID)
+	if strings.HasPrefix(path, restoreTargetsPrefix) && r.Method == http.MethodGet {
+		parts := strings.Split(strings.TrimPrefix(path, restoreTargetsPrefix), "/")
+		if len(parts) == 3 && parts[1] == "aws" && parts[2] == "s3-buckets" {
+			f.handleListS3Buckets(w, parts[0])
+			return
+		}
+		if len(parts) == 4 && parts[1] == "regions" && parts[3] == "aws-instance-types" {
+			f.handleListInstanceTypes(w, r, parts[0], parts[2])
+			return
+		}
+		if len(parts) == 4 && parts[1] == "regions" && parts[3] == "aws-security-groups" {
+			f.handleListSecurityGroups(w, r, parts[0], parts[2])
+			return
+		}
 	}
 
 	restoreAccountsPrefix := fmt.Sprintf("/v1/projects/%s/restore-accounts/", f.projectID)
@@ -1131,4 +1218,69 @@ func (f *fakeEonServer) handleListFindingExclusions(w http.ResponseWriter, r *ht
 		items = append(items, *exclusion)
 	}
 	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewListFindingExclusionsResponse(items, int32(len(items))))
+}
+
+func (f *fakeEonServer) handleListS3Buckets(w http.ResponseWriter, accountID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	buckets, ok := f.s3Buckets[accountID]
+	if !ok {
+		http.Error(w, `{"message":"restore account not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewS3Buckets(append([]externalEonSdkAPI.S3Bucket{}, buckets...)))
+}
+
+func (f *fakeEonServer) handleListInstanceTypes(w http.ResponseWriter, r *http.Request, accountID, region string) {
+	query := r.URL.Query()
+	subnetID := query.Get("subnetId")
+	if subnetID == "" {
+		http.Error(w, `{"message":"subnetId is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lastInstanceTypesQuery = map[string]string{}
+	for k := range query {
+		f.lastInstanceTypesQuery[k] = query.Get(k)
+	}
+	resp, ok := f.instanceTypes[accountID+"/"+region+"/"+subnetID]
+	if !ok {
+		http.Error(w, `{"message":"subnet not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (f *fakeEonServer) handleListSecurityGroups(w http.ResponseWriter, r *http.Request, accountID, region string) {
+	vpcID := r.URL.Query().Get("vpcId")
+	subnetID := r.URL.Query().Get("subnetId")
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	groups, ok := f.securityGroups[accountID+"/"+region]
+	if !ok {
+		http.Error(w, `{"message":"restore account region not found"}`, http.StatusNotFound)
+		return
+	}
+	if subnetID != "" {
+		subnetVpc, known := f.subnetVpcs[subnetID]
+		if !known {
+			http.Error(w, `{"message":"subnet not found"}`, http.StatusNotFound)
+			return
+		}
+		if vpcID != "" && vpcID != subnetVpc {
+			writeJSON(w, http.StatusOK, externalEonSdkAPI.NewRestoreSecurityGroups(region, []externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner{}))
+			return
+		}
+		vpcID = subnetVpc
+	}
+	items := make([]externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner, 0, len(groups))
+	for _, sg := range groups {
+		if vpcID == "" || sg.Vpc == vpcID {
+			items = append(items, sg)
+		}
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewRestoreSecurityGroups(region, items))
 }
