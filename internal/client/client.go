@@ -737,6 +737,109 @@ func (c *EonClient) ReconnectRestoreAccount(ctx context.Context, accountId strin
 	return &account, nil
 }
 
+// ListS3Buckets retrieves the S3 buckets available to Eon in the specified restore account.
+func (c *EonClient) ListS3Buckets(ctx context.Context, accountId string) ([]externalEonSdkAPI.S3Bucket, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.ListS3BucketsAPI.ListS3Buckets(ctx, c.projectID, accountId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list S3 buckets"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	buckets := resp.GetBuckets()
+	if buckets == nil {
+		return []externalEonSdkAPI.S3Bucket{}, nil
+	}
+	return buckets, nil
+}
+
+// ListAwsInstanceTypesOptions holds the optional filters accepted by ListAwsInstanceTypes.
+type ListAwsInstanceTypesOptions struct {
+	VolumeCount      *int32
+	TotalVolumeBytes *int64
+}
+
+// ListAwsInstanceTypes retrieves the EC2 instance types available for restore in the specified
+// subnet and region of a restore account.
+func (c *EonClient) ListAwsInstanceTypes(ctx context.Context, accountId, region, subnetId string, opts ListAwsInstanceTypesOptions) (*externalEonSdkAPI.ListInstanceTypesResponse, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	apiReq := c.client.ListAwsInstanceTypesAPI.ListAwsInstanceTypes(ctx, c.projectID, accountId, region).SubnetId(subnetId)
+	if opts.VolumeCount != nil {
+		apiReq = apiReq.VolumeCount(*opts.VolumeCount)
+	}
+	if opts.TotalVolumeBytes != nil {
+		apiReq = apiReq.TotalVolumeBytes(*opts.TotalVolumeBytes)
+	}
+
+	resp, httpResp, err := apiReq.Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list AWS instance types"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return resp, nil
+}
+
+// ListAwsSecurityGroupsOptions holds the optional filters accepted by ListAwsSecurityGroups.
+type ListAwsSecurityGroupsOptions struct {
+	VpcId    *string
+	SubnetId *string
+}
+
+// ListAwsSecurityGroups retrieves the security groups available to Eon in the specified region of
+// a restore account.
+func (c *EonClient) ListAwsSecurityGroups(ctx context.Context, accountId, region string, opts ListAwsSecurityGroupsOptions) (*externalEonSdkAPI.RestoreSecurityGroups, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	apiReq := c.client.ListAwsSecurityGroupsAPI.ListAwsSecurityGroups(ctx, c.projectID, accountId, region)
+	if opts.VpcId != nil {
+		apiReq = apiReq.VpcId(*opts.VpcId)
+	}
+	if opts.SubnetId != nil {
+		apiReq = apiReq.SubnetId(*opts.SubnetId)
+	}
+
+	resp, httpResp, err := apiReq.Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list AWS security groups"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return resp, nil
+}
+
 // GetRestoreAccountConnectivityConfig retrieves the connectivity configuration of a restore account.
 func (c *EonClient) GetRestoreAccountConnectivityConfig(ctx context.Context, accountId string) (*externalEonSdkAPI.RestoreAccountConnectivityConfig, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {

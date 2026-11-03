@@ -88,6 +88,9 @@ type fakeEonServer struct {
 	actionApprovalRules  map[string]*externalEonSdkAPI.ActionApprovalRule
 	findingExclusions    map[string]*externalEonSdkAPI.FindingExclusion
 	restoreJobs          map[string]*externalEonSdkAPI.RestoreJob
+	s3Buckets            map[string][]externalEonSdkAPI.S3Bucket
+	awsInstanceTypes     map[string]*externalEonSdkAPI.ListInstanceTypesResponse
+	awsSecurityGroups    map[string]*externalEonSdkAPI.RestoreSecurityGroups
 	nextID               int
 }
 
@@ -106,6 +109,9 @@ func newFakeEonServer(t *testing.T) *fakeEonServer {
 		actionApprovalRules:  make(map[string]*externalEonSdkAPI.ActionApprovalRule),
 		findingExclusions:    make(map[string]*externalEonSdkAPI.FindingExclusion),
 		restoreJobs:          make(map[string]*externalEonSdkAPI.RestoreJob),
+		s3Buckets:            make(map[string][]externalEonSdkAPI.S3Bucket),
+		awsInstanceTypes:     make(map[string]*externalEonSdkAPI.ListInstanceTypesResponse),
+		awsSecurityGroups:    make(map[string]*externalEonSdkAPI.RestoreSecurityGroups),
 		nextID:               1,
 	}
 	f.server = httptest.NewServer(http.HandlerFunc(f.handle))
@@ -227,6 +233,29 @@ func (f *fakeEonServer) DeleteRestoreJob(jobID string) {
 	delete(f.restoreJobs, jobID)
 }
 
+// fakeAwsRegionKey builds the compound key used to scope region-level fake server data by account and region.
+func fakeAwsRegionKey(accountID, region string) string {
+	return accountID + "|" + region
+}
+
+func (f *fakeEonServer) SetS3Buckets(accountID string, buckets []externalEonSdkAPI.S3Bucket) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.s3Buckets[accountID] = buckets
+}
+
+func (f *fakeEonServer) SetAwsInstanceTypes(accountID, region string, resp *externalEonSdkAPI.ListInstanceTypesResponse) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.awsInstanceTypes[fakeAwsRegionKey(accountID, region)] = resp
+}
+
+func (f *fakeEonServer) SetAwsSecurityGroups(accountID, region string, resp *externalEonSdkAPI.RestoreSecurityGroups) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.awsSecurityGroups[fakeAwsRegionKey(accountID, region)] = resp
+}
+
 func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	path = strings.TrimPrefix(path, "/api")
@@ -296,6 +325,25 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 				f.handleDisableMetricsConfig(w, parts[0])
 				return
 			}
+		}
+	}
+
+	// The AWS restore-account lookup endpoints (S3 buckets, instance types, security groups) were
+	// added to the SDK without a "/v1" path prefix, unlike every other restore-account route.
+	restoreAccountsLookupPrefix := fmt.Sprintf("/projects/%s/restore-accounts/", f.projectID)
+	if r.Method == http.MethodGet && strings.HasPrefix(path, restoreAccountsLookupPrefix) {
+		rest := strings.TrimPrefix(path, restoreAccountsLookupPrefix)
+		parts := strings.Split(rest, "/")
+		switch {
+		case len(parts) == 3 && parts[1] == "aws" && parts[2] == "s3-buckets":
+			f.handleListS3Buckets(w, parts[0])
+			return
+		case len(parts) == 4 && parts[1] == "regions" && parts[3] == "aws-instance-types":
+			f.handleListAwsInstanceTypes(w, r, parts[0], parts[2])
+			return
+		case len(parts) == 4 && parts[1] == "regions" && parts[3] == "aws-security-groups":
+			f.handleListAwsSecurityGroups(w, r, parts[0], parts[2])
+			return
 		}
 	}
 
@@ -734,6 +782,43 @@ func (f *fakeEonServer) handleDisableMetricsConfig(w http.ResponseWriter, accoun
 	}
 	delete(f.metricsConfigs, accountID)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (f *fakeEonServer) handleListS3Buckets(w http.ResponseWriter, accountID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	buckets := f.s3Buckets[accountID]
+	if buckets == nil {
+		buckets = []externalEonSdkAPI.S3Bucket{}
+	}
+	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewS3Buckets(buckets))
+}
+
+func (f *fakeEonServer) handleListAwsInstanceTypes(w http.ResponseWriter, r *http.Request, accountID, region string) {
+	if r.URL.Query().Get("subnetId") == "" {
+		http.Error(w, `{"message":"subnetId is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	resp, ok := f.awsInstanceTypes[fakeAwsRegionKey(accountID, region)]
+	if !ok {
+		resp = externalEonSdkAPI.NewListInstanceTypesResponse()
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (f *fakeEonServer) handleListAwsSecurityGroups(w http.ResponseWriter, r *http.Request, accountID, region string) {
+	_, _ = io.Copy(io.Discard, r.Body)
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	resp, ok := f.awsSecurityGroups[fakeAwsRegionKey(accountID, region)]
+	if !ok {
+		resp = externalEonSdkAPI.NewRestoreSecurityGroups(region, []externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner{})
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (f *fakeEonServer) handleGetSnapshot(w http.ResponseWriter, id string) {
