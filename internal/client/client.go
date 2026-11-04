@@ -35,6 +35,29 @@ type EonClient struct {
 	client         *externalEonSdkAPI.APIClient
 	projectID      string
 	tokenRefresher TokenRefresher
+	// actionApprovalRequestID is sent in the X-Action-Approval-Request-Id
+	// header on operations protected by an action approval policy, so that an
+	// approved request runs instead of creating a new approval request.
+	actionApprovalRequestID string
+}
+
+// actionApprovalRequestIDHeader is the header that carries the ID of an
+// approved action approval request.
+const actionApprovalRequestIDHeader = "X-Action-Approval-Request-Id"
+
+// actionApprovable is an SDK request builder for an operation that an action
+// approval policy can protect.
+type actionApprovable[T any] interface {
+	XActionApprovalRequestId(xActionApprovalRequestId string) T
+}
+
+// withActionApproval sets the X-Action-Approval-Request-Id header on an SDK
+// request when the provider is configured with an approved request ID.
+func withActionApproval[T actionApprovable[T]](c *EonClient, r T) T {
+	if c.actionApprovalRequestID == "" {
+		return r
+	}
+	return r.XActionApprovalRequestId(c.actionApprovalRequestID)
 }
 
 // CloudResourceBackupMethodConfig represents the auto/user-controlled backup method
@@ -548,7 +571,7 @@ func (c *EonClient) ConnectRestoreAwsOrganizationalUnit(ctx context.Context, req
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ConnectRestoreAwsOrganizationalUnit(ctx, c.projectID).ConnectRestoreAwsOrganizationalUnitRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.AccountsAPI.ConnectRestoreAwsOrganizationalUnit(ctx, c.projectID).ConnectRestoreAwsOrganizationalUnitRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to connect restore AWS organizational unit"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -593,7 +616,7 @@ func (c *EonClient) ConnectRestoreAccount(ctx context.Context, req externalEonSd
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ConnectRestoreAccount(ctx, c.projectID).ConnectRestoreAccountRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.AccountsAPI.ConnectRestoreAccount(ctx, c.projectID).ConnectRestoreAccountRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to connect restore account"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -730,7 +753,7 @@ func (c *EonClient) ReconnectRestoreAccount(ctx context.Context, accountId strin
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.AccountsAPI.ReconnectRestoreAccount(ctx, c.projectID, accountId).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.AccountsAPI.ReconnectRestoreAccount(ctx, c.projectID, accountId)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to reconnect restore account"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -962,7 +985,7 @@ func (c *EonClient) RemoveSnapshotHold(ctx context.Context, snapshotId string) e
 		return fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	_, httpResp, err := c.client.SnapshotsAPI.RemoveSnapshotHold(ctx, c.projectID, snapshotId).Execute()
+	_, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RemoveSnapshotHold(ctx, c.projectID, snapshotId)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to remove snapshot hold"); apiErr != nil {
 		return apiErr
 	}
@@ -1131,7 +1154,7 @@ func (c *EonClient) StartVolumeRestore(ctx context.Context, resourceId, snapshot
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreEbsVolume(ctx, c.projectID, resourceId, snapshotId).RestoreVolumeToEbsRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreEbsVolume(ctx, c.projectID, resourceId, snapshotId).RestoreVolumeToEbsRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start volume restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1169,7 +1192,7 @@ func (c *EonClient) StartRdsRestore(ctx context.Context, resourceId, snapshotId 
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreDatabase(ctx, c.projectID, resourceId, snapshotId).RestoreDbToRdsInstanceRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreDatabase(ctx, c.projectID, resourceId, snapshotId).RestoreDbToRdsInstanceRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start RDS restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1185,7 +1208,7 @@ func (c *EonClient) StartEc2InstanceRestore(ctx context.Context, resourceId, sna
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreEc2Instance(ctx, c.projectID, resourceId, snapshotId).RestoreAwsEc2InstanceRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreEc2Instance(ctx, c.projectID, resourceId, snapshotId).RestoreAwsEc2InstanceRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start EC2 instance restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1201,7 +1224,7 @@ func (c *EonClient) StartS3BucketRestore(ctx context.Context, resourceId, snapsh
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreBucket(ctx, c.projectID, resourceId, snapshotId).RestoreBucketRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreBucket(ctx, c.projectID, resourceId, snapshotId).RestoreBucketRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start S3 bucket restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1238,7 +1261,7 @@ func (c *EonClient) StartGcpVmInstanceRestore(ctx context.Context, resourceId, s
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreGcpVmInstance(ctx, c.projectID, resourceId, snapshotId).RestoreGcpVmInstanceRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreGcpVmInstance(ctx, c.projectID, resourceId, snapshotId).RestoreGcpVmInstanceRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start GCP VM instance restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1254,7 +1277,7 @@ func (c *EonClient) StartGcpDiskRestore(ctx context.Context, resourceId, snapsho
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreGcpDisk(ctx, c.projectID, resourceId, snapshotId).RestoreGcpDiskRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreGcpDisk(ctx, c.projectID, resourceId, snapshotId).RestoreGcpDiskRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start GCP disk restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1270,7 +1293,7 @@ func (c *EonClient) StartGcpCloudSqlRestore(ctx context.Context, resourceId, sna
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreGcpCloudSql(ctx, c.projectID, resourceId, snapshotId).RestoreGcpCloudSqlRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreGcpCloudSql(ctx, c.projectID, resourceId, snapshotId).RestoreGcpCloudSqlRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start GCP Cloud SQL restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1286,7 +1309,7 @@ func (c *EonClient) StartAzureDiskRestore(ctx context.Context, resourceId, snaps
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreAzureDisk(ctx, c.projectID, resourceId, snapshotId).RestoreAzureDiskRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreAzureDisk(ctx, c.projectID, resourceId, snapshotId).RestoreAzureDiskRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start Azure disk restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1301,7 +1324,7 @@ func (c *EonClient) StartAzureSqlDatabaseRestore(ctx context.Context, resourceId
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreAzureSqlDatabase(ctx, c.projectID, resourceId, snapshotId).RestoreAzureSqlDatabaseRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreAzureSqlDatabase(ctx, c.projectID, resourceId, snapshotId).RestoreAzureSqlDatabaseRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start Azure SQL database restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1316,7 +1339,7 @@ func (c *EonClient) StartAzureVmInstanceRestore(ctx context.Context, resourceId,
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreAzureVmInstance(ctx, c.projectID, resourceId, snapshotId).RestoreAzureVmInstanceRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreAzureVmInstance(ctx, c.projectID, resourceId, snapshotId).RestoreAzureVmInstanceRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start Azure VM instance restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1331,7 +1354,7 @@ func (c *EonClient) StartDynamoDBTableRestore(ctx context.Context, resourceId, s
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreDynamoDBTable(ctx, c.projectID, resourceId, snapshotId).RestoreDynamoDBTableRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreDynamoDBTable(ctx, c.projectID, resourceId, snapshotId).RestoreDynamoDBTableRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start DynamoDB table restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1346,7 +1369,7 @@ func (c *EonClient) StartEbsSnapshotRestore(ctx context.Context, resourceId, sna
 		return "", fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.SnapshotsAPI.RestoreToEbsSnapshot(ctx, c.projectID, resourceId, snapshotId).RestoreVolumeToEbsSnapshotRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.SnapshotsAPI.RestoreToEbsSnapshot(ctx, c.projectID, resourceId, snapshotId).RestoreVolumeToEbsSnapshotRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to start EBS snapshot restore"); apiErr != nil {
 		return "", apiErr
 	}
@@ -1399,6 +1422,9 @@ func (c *EonClient) StartBigQueryDatasetRestore(ctx context.Context, resourceId,
 	// Copy auth and default headers from the SDK client config
 	for key, value := range c.client.GetConfig().DefaultHeader {
 		httpReq.Header.Set(key, value)
+	}
+	if c.actionApprovalRequestID != "" {
+		httpReq.Header.Set(actionApprovalRequestIDHeader, c.actionApprovalRequestID)
 	}
 
 	httpResp, err := c.client.GetConfig().HTTPClient.Do(httpReq) // #nosec G704 -- URL is built from trusted server configuration, not user input
@@ -1829,7 +1855,7 @@ func (c *EonClient) CreateBackupPolicy(ctx context.Context, req externalEonSdkAP
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.BackupPoliciesAPI.CreateBackupPolicy(ctx, c.projectID).CreateBackupPolicyRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.BackupPoliciesAPI.CreateBackupPolicy(ctx, c.projectID).CreateBackupPolicyRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to create backup policy"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -1855,7 +1881,7 @@ func (c *EonClient) UpdateBackupPolicy(ctx context.Context, policyId string, req
 		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	resp, httpResp, err := c.client.BackupPoliciesAPI.UpdateBackupPolicy(ctx, c.projectID, policyId).UpdateBackupPolicyRequest(req).Execute()
+	resp, httpResp, err := withActionApproval(c, c.client.BackupPoliciesAPI.UpdateBackupPolicy(ctx, c.projectID, policyId).UpdateBackupPolicyRequest(req)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to update backup policy"); apiErr != nil {
 		return nil, apiErr
 	}
@@ -1880,7 +1906,7 @@ func (c *EonClient) DeleteBackupPolicy(ctx context.Context, policyId string) err
 		return fmt.Errorf("failed to ensure valid token: %w", err)
 	}
 
-	httpResp, err := c.client.BackupPoliciesAPI.DeleteBackupPolicy(ctx, c.projectID, policyId).Execute()
+	httpResp, err := withActionApproval(c, c.client.BackupPoliciesAPI.DeleteBackupPolicy(ctx, c.projectID, policyId)).Execute()
 	if apiErr := c.handleAPIError(err, httpResp, "failed to delete backup policy"); apiErr != nil {
 		return apiErr
 	}

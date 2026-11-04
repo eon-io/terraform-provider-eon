@@ -32,6 +32,8 @@ type EonProviderModel struct {
 	ClientId     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
 	ProjectId    types.String `tfsdk:"project_id"`
+
+	ActionApprovalRequestId types.String `tfsdk:"action_approval_request_id"`
 }
 
 // New creates a new provider instance with the given client factory.
@@ -71,6 +73,15 @@ func (p *EonProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 				MarkdownDescription: "Eon project ID. Can also be set with the `EON_PROJECT_ID` environment variable.",
 				Optional:            true,
 			},
+			"action_approval_request_id": schema.StringAttribute{
+				MarkdownDescription: "ID of an approved action approval request. " +
+					"When an action approval policy protects an operation, the operation fails with the ID of the approval request it created. " +
+					"After the request is approved, set this value and run the same operation again to execute it. " +
+					"The provider sends the ID in the `X-Action-Approval-Request-Id` header on every operation that an action approval policy can protect, " +
+					"so run only the approved operation while it is set (for example, with `-target`), and unset it afterwards. " +
+					"Can also be set with the `EON_ACTION_APPROVAL_REQUEST_ID` environment variable.",
+				Optional: true,
+			},
 		},
 	}
 }
@@ -88,6 +99,7 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 	clientId := os.Getenv("EON_CLIENT_ID")
 	clientSecret := os.Getenv("EON_CLIENT_SECRET")
 	projectId := os.Getenv("EON_PROJECT_ID")
+	actionApprovalRequestId := os.Getenv("EON_ACTION_APPROVAL_REQUEST_ID")
 
 	if !data.Endpoint.IsNull() {
 		endpoint = data.Endpoint.ValueString()
@@ -103,6 +115,10 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 
 	if !data.ProjectId.IsNull() {
 		projectId = data.ProjectId.ValueString()
+	}
+
+	if !data.ActionApprovalRequestId.IsNull() {
+		actionApprovalRequestId = data.ActionApprovalRequestId.ValueString()
 	}
 
 	// Validate required fields
@@ -154,6 +170,8 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		ClientSecret:   clientSecret,
 		ProjectID:      projectId,
 		DefaultHeaders: parseDefaultHeaders(os.Getenv("EON_DEFAULT_HEADERS")),
+
+		ActionApprovalRequestID: actionApprovalRequestId,
 	}
 
 	eonClient, err := p.clientFactory(cfg)
