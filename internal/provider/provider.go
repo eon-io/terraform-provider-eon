@@ -80,7 +80,7 @@ func (p *EonProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 					"Wire it to a Terraform variable that defaults to `null` and pass the ID only for that run (for example, `terraform apply -var=... -target=...`). " +
 					"The provider sends the ID in the `X-Action-Approval-Request-Id` header on every operation that an action approval policy can protect, " +
 					"so run only the approved operation while it is set. " +
-					"Can also be set with the `EON_ACTION_APPROVAL_REQUEST_ID` environment variable.",
+					"Unlike the other settings, it has no environment variable, so it is set only where the configuration passes it.",
 				Optional: true,
 			},
 		},
@@ -100,7 +100,6 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 	clientId := os.Getenv("EON_CLIENT_ID")
 	clientSecret := os.Getenv("EON_CLIENT_SECRET")
 	projectId := os.Getenv("EON_PROJECT_ID")
-	actionApprovalRequestId := os.Getenv("EON_ACTION_APPROVAL_REQUEST_ID")
 
 	if !data.Endpoint.IsNull() {
 		endpoint = data.Endpoint.ValueString()
@@ -118,9 +117,9 @@ func (p *EonProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		projectId = data.ProjectId.ValueString()
 	}
 
-	if !data.ActionApprovalRequestId.IsNull() {
-		actionApprovalRequestId = data.ActionApprovalRequestId.ValueString()
-	}
+	// The approved request ID is set only in the provider block, never from
+	// the environment, so a stale ID cannot leak into unrelated runs.
+	actionApprovalRequestId := data.ActionApprovalRequestId.ValueString()
 
 	// Validate required fields
 	if endpoint == "" {

@@ -48,17 +48,15 @@ func TestProviderConfigure_ActionApprovalRequestID(t *testing.T) {
 	fromConfig := "config-id"
 
 	t.Run("unset", func(t *testing.T) {
-		t.Setenv("EON_ACTION_APPROVAL_REQUEST_ID", "")
 		assert.Empty(t, configureProvider(t, nil).ActionApprovalRequestID)
 	})
 
-	t.Run("from environment variable", func(t *testing.T) {
-		t.Setenv("EON_ACTION_APPROVAL_REQUEST_ID", "env-id")
-		assert.Equal(t, "env-id", configureProvider(t, nil).ActionApprovalRequestID)
+	t.Run("from provider block", func(t *testing.T) {
+		assert.Equal(t, fromConfig, configureProvider(t, &fromConfig).ActionApprovalRequestID)
 	})
 
-	t.Run("provider block overrides environment variable", func(t *testing.T) {
+	t.Run("environment variable is ignored", func(t *testing.T) {
 		t.Setenv("EON_ACTION_APPROVAL_REQUEST_ID", "env-id")
-		assert.Equal(t, fromConfig, configureProvider(t, &fromConfig).ActionApprovalRequestID)
+		assert.Empty(t, configureProvider(t, nil).ActionApprovalRequestID)
 	})
 }
