@@ -554,7 +554,11 @@ func (c *EonClient) ConnectRestoreAwsOrganizationalUnit(ctx context.Context, req
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+	if httpResp.StatusCode == http.StatusCreated {
+		mpaReq := resp.GetActionApprovalRequest()
+		return nil, mpaRequiredError("failed to connect restore AWS organizational unit", mpaReq.GetId())
+	}
+	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
@@ -595,7 +599,11 @@ func (c *EonClient) ConnectRestoreAccount(ctx context.Context, req externalEonSd
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+	if httpResp.StatusCode == http.StatusCreated {
+		mpaReq := resp.GetActionApprovalRequest()
+		return nil, mpaRequiredError("failed to connect restore account", mpaReq.GetId())
+	}
+	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
@@ -728,6 +736,10 @@ func (c *EonClient) ReconnectRestoreAccount(ctx context.Context, accountId strin
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
+	if httpResp.StatusCode == http.StatusCreated {
+		mpaReq := resp.GetActionApprovalRequest()
+		return nil, mpaRequiredError("failed to reconnect restore account", mpaReq.GetId())
+	}
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
@@ -956,6 +968,9 @@ func (c *EonClient) RemoveSnapshotHold(ctx context.Context, snapshotId string) e
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
+	if httpResp.StatusCode == http.StatusCreated {
+		return mpaRequiredError("failed to remove snapshot hold", mpaRequestIDFromBody(httpResp.Body))
+	}
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(httpResp.Body)
 		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
@@ -1071,6 +1086,28 @@ func (c *EonClient) GetRestoreJob(ctx context.Context, jobId string) (*externalE
 	return &job, nil
 }
 
+// mpaRequiredError is returned when the API gateway intercepts an operation
+// covered by a Multi-Party Approval (MPA) policy. The gateway answers HTTP 201
+// instead of running the handler, so the response carries no resource payload.
+func mpaRequiredError(action, mpaRequestID string) error {
+	return fmt.Errorf("%s: operation requires Multi-Party Approval (MPA request ID %q); approve the request and retry", action, mpaRequestID)
+}
+
+// mpaRequestIDFromBody reads the MPA request ID from an MPA-intercepted
+// response body, for operations whose SDK method does not decode one. Decoding
+// is lenient so that a partial body still yields the ID for the error message.
+func mpaRequestIDFromBody(body io.Reader) string {
+	var intercepted struct {
+		ActionApprovalRequest *struct {
+			ID string `json:"id"`
+		} `json:"actionApprovalRequest"`
+	}
+	if err := json.NewDecoder(body).Decode(&intercepted); err != nil || intercepted.ActionApprovalRequest == nil {
+		return ""
+	}
+	return intercepted.ActionApprovalRequest.ID
+}
+
 // restoreJobIDFromResponse interprets the response from a restore endpoint that
 // may be intercepted by a Multi-Party Approval (MPA) policy. On HTTP 202 the
 // restore job started and its ID is read from the response body. On HTTP 201 the
@@ -1081,7 +1118,7 @@ func restoreJobIDFromResponse(resp *externalEonSdkAPI.RestoreJobInitiationRespon
 		return resp.GetJobId(), nil
 	case http.StatusCreated:
 		mpaReq := resp.GetActionApprovalRequest()
-		return "", fmt.Errorf("%s: operation requires Multi-Party Approval (MPA request ID %q); approve the request and retry", action, mpaReq.GetId())
+		return "", mpaRequiredError(action, mpaReq.GetId())
 	default:
 		body, _ := io.ReadAll(httpResp.Body)
 		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
@@ -1370,6 +1407,9 @@ func (c *EonClient) StartBigQueryDatasetRestore(ctx context.Context, resourceId,
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
+	if httpResp.StatusCode == http.StatusCreated {
+		return "", mpaRequiredError("failed to start BigQuery dataset restore", mpaRequestIDFromBody(httpResp.Body))
+	}
 	if httpResp.StatusCode != http.StatusAccepted {
 		respBody, _ := io.ReadAll(httpResp.Body)
 		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
@@ -1796,7 +1836,11 @@ func (c *EonClient) CreateBackupPolicy(ctx context.Context, req externalEonSdkAP
 
 	defer func() { _ = httpResp.Body.Close() }()
 
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+	if httpResp.StatusCode == http.StatusCreated {
+		mpaReq := resp.GetActionApprovalRequest()
+		return nil, mpaRequiredError("failed to create backup policy", mpaReq.GetId())
+	}
+	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
@@ -1817,6 +1861,10 @@ func (c *EonClient) UpdateBackupPolicy(ctx context.Context, policyId string, req
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
+	if httpResp.StatusCode == http.StatusCreated {
+		mpaReq := resp.GetActionApprovalRequest()
+		return nil, mpaRequiredError("failed to update backup policy", mpaReq.GetId())
+	}
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
@@ -1838,6 +1886,9 @@ func (c *EonClient) DeleteBackupPolicy(ctx context.Context, policyId string) err
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
+	if httpResp.StatusCode == http.StatusCreated {
+		return mpaRequiredError("failed to delete backup policy", mpaRequestIDFromBody(httpResp.Body))
+	}
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(httpResp.Body)
 		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
