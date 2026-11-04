@@ -1112,8 +1112,11 @@ func (c *EonClient) GetRestoreJob(ctx context.Context, jobId string) (*externalE
 // mpaRequiredError is returned when the API gateway intercepts an operation
 // covered by a Multi-Party Approval (MPA) policy. The gateway answers HTTP 201
 // instead of running the handler, so the response carries no resource payload.
+// The message tells the user how to run the operation once it is approved.
 func mpaRequiredError(action, mpaRequestID string) error {
-	return fmt.Errorf("%s: operation requires Multi-Party Approval (MPA request ID %q); approve the request and retry", action, mpaRequestID)
+	return fmt.Errorf("%s: operation requires Multi-Party Approval (MPA request ID %q); "+
+		"after the request is approved, run the same operation again with the provider's action_approval_request_id "+
+		"(or the EON_ACTION_APPROVAL_REQUEST_ID environment variable) set to %q", action, mpaRequestID, mpaRequestID)
 }
 
 // mpaRequestIDFromBody reads the MPA request ID from an MPA-intercepted

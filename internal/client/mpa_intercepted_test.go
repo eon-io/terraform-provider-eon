@@ -26,7 +26,9 @@ const mpaInterceptedBody = `{
 	"mpaPolicies": {}
 }`
 
-const mpaRequiredMessage = `operation requires Multi-Party Approval (MPA request ID "mpa-1")`
+const mpaRequiredMessage = `operation requires Multi-Party Approval (MPA request ID "mpa-1"); ` +
+	`after the request is approved, run the same operation again with the provider's action_approval_request_id ` +
+	`(or the EON_ACTION_APPROVAL_REQUEST_ID environment variable) set to "mpa-1"`
 
 func mpaInterceptedTransport(t *testing.T, wantMethod, wantPath string) http.RoundTripper {
 	return roundTripperFunc(func(r *http.Request) (*http.Response, error) {
