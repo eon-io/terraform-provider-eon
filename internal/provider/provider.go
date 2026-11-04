@@ -77,8 +77,9 @@ func (p *EonProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 				MarkdownDescription: "ID of an approved action approval request. " +
 					"When an action approval policy protects an operation, the operation fails with the ID of the approval request it created. " +
 					"After the request is approved, set this value and run the same operation again to execute it. " +
+					"Wire it to a Terraform variable that defaults to `null` and pass the ID only for that run (for example, `terraform apply -var=... -target=...`). " +
 					"The provider sends the ID in the `X-Action-Approval-Request-Id` header on every operation that an action approval policy can protect, " +
-					"so run only the approved operation while it is set (for example, with `-target`), and unset it afterwards. " +
+					"so run only the approved operation while it is set. " +
 					"Can also be set with the `EON_ACTION_APPROVAL_REQUEST_ID` environment variable.",
 				Optional: true,
 			},
