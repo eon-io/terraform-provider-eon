@@ -554,7 +554,11 @@ func (c *EonClient) ConnectRestoreAwsOrganizationalUnit(ctx context.Context, req
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+	if httpResp.StatusCode == http.StatusCreated {
+		mpaReq := resp.GetActionApprovalRequest()
+		return nil, mpaRequiredError("failed to connect restore AWS organizational unit", mpaReq.GetId())
+	}
+	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
@@ -595,7 +599,11 @@ func (c *EonClient) ConnectRestoreAccount(ctx context.Context, req externalEonSd
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+	if httpResp.StatusCode == http.StatusCreated {
+		mpaReq := resp.GetActionApprovalRequest()
+		return nil, mpaRequiredError("failed to connect restore account", mpaReq.GetId())
+	}
+	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
@@ -728,6 +736,10 @@ func (c *EonClient) ReconnectRestoreAccount(ctx context.Context, accountId strin
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
+	if httpResp.StatusCode == http.StatusCreated {
+		mpaReq := resp.GetActionApprovalRequest()
+		return nil, mpaRequiredError("failed to reconnect restore account", mpaReq.GetId())
+	}
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
@@ -735,6 +747,109 @@ func (c *EonClient) ReconnectRestoreAccount(ctx context.Context, accountId strin
 
 	account := resp.GetRestoreAccount()
 	return &account, nil
+}
+
+// ListS3Buckets retrieves the S3 buckets available to Eon in the specified restore account.
+func (c *EonClient) ListS3Buckets(ctx context.Context, accountId string) ([]externalEonSdkAPI.S3Bucket, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.ListS3BucketsAPI.ListS3Buckets(ctx, c.projectID, accountId).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list S3 buckets"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	buckets := resp.GetBuckets()
+	if buckets == nil {
+		return []externalEonSdkAPI.S3Bucket{}, nil
+	}
+	return buckets, nil
+}
+
+// ListAwsInstanceTypesOptions holds the optional filters accepted by ListAwsInstanceTypes.
+type ListAwsInstanceTypesOptions struct {
+	VolumeCount      *int32
+	TotalVolumeBytes *int64
+}
+
+// ListAwsInstanceTypes retrieves the EC2 instance types available for restore in the specified
+// subnet and region of a restore account.
+func (c *EonClient) ListAwsInstanceTypes(ctx context.Context, accountId, region, subnetId string, opts ListAwsInstanceTypesOptions) (*externalEonSdkAPI.ListInstanceTypesResponse, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	apiReq := c.client.ListAwsInstanceTypesAPI.ListAwsInstanceTypes(ctx, c.projectID, accountId, region).SubnetId(subnetId)
+	if opts.VolumeCount != nil {
+		apiReq = apiReq.VolumeCount(*opts.VolumeCount)
+	}
+	if opts.TotalVolumeBytes != nil {
+		apiReq = apiReq.TotalVolumeBytes(*opts.TotalVolumeBytes)
+	}
+
+	resp, httpResp, err := apiReq.Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list AWS instance types"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return resp, nil
+}
+
+// ListAwsSecurityGroupsOptions holds the optional filters accepted by ListAwsSecurityGroups.
+type ListAwsSecurityGroupsOptions struct {
+	VpcId    *string
+	SubnetId *string
+}
+
+// ListAwsSecurityGroups retrieves the security groups available to Eon in the specified region of
+// a restore account.
+func (c *EonClient) ListAwsSecurityGroups(ctx context.Context, accountId, region string, opts ListAwsSecurityGroupsOptions) (*externalEonSdkAPI.RestoreSecurityGroups, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	apiReq := c.client.ListAwsSecurityGroupsAPI.ListAwsSecurityGroups(ctx, c.projectID, accountId, region)
+	if opts.VpcId != nil {
+		apiReq = apiReq.VpcId(*opts.VpcId)
+	}
+	if opts.SubnetId != nil {
+		apiReq = apiReq.SubnetId(*opts.SubnetId)
+	}
+
+	resp, httpResp, err := apiReq.Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list AWS security groups"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return resp, nil
 }
 
 // GetRestoreAccountConnectivityConfig retrieves the connectivity configuration of a restore account.
@@ -956,6 +1071,9 @@ func (c *EonClient) RemoveSnapshotHold(ctx context.Context, snapshotId string) e
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
+	if httpResp.StatusCode == http.StatusCreated {
+		return mpaRequiredError("failed to remove snapshot hold", mpaRequestIDFromBody(httpResp.Body))
+	}
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(httpResp.Body)
 		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
@@ -1071,6 +1189,28 @@ func (c *EonClient) GetRestoreJob(ctx context.Context, jobId string) (*externalE
 	return &job, nil
 }
 
+// mpaRequiredError is returned when the API gateway intercepts an operation
+// covered by a Multi-Party Approval (MPA) policy. The gateway answers HTTP 201
+// instead of running the handler, so the response carries no resource payload.
+func mpaRequiredError(action, mpaRequestID string) error {
+	return fmt.Errorf("%s: operation requires Multi-Party Approval (MPA request ID %q); approve the request and retry", action, mpaRequestID)
+}
+
+// mpaRequestIDFromBody reads the MPA request ID from an MPA-intercepted
+// response body, for operations whose SDK method does not decode one. Decoding
+// is lenient so that a partial body still yields the ID for the error message.
+func mpaRequestIDFromBody(body io.Reader) string {
+	var intercepted struct {
+		ActionApprovalRequest *struct {
+			ID string `json:"id"`
+		} `json:"actionApprovalRequest"`
+	}
+	if err := json.NewDecoder(body).Decode(&intercepted); err != nil || intercepted.ActionApprovalRequest == nil {
+		return ""
+	}
+	return intercepted.ActionApprovalRequest.ID
+}
+
 // restoreJobIDFromResponse interprets the response from a restore endpoint that
 // may be intercepted by a Multi-Party Approval (MPA) policy. On HTTP 202 the
 // restore job started and its ID is read from the response body. On HTTP 201 the
@@ -1081,7 +1221,7 @@ func restoreJobIDFromResponse(resp *externalEonSdkAPI.RestoreJobInitiationRespon
 		return resp.GetJobId(), nil
 	case http.StatusCreated:
 		mpaReq := resp.GetActionApprovalRequest()
-		return "", fmt.Errorf("%s: operation requires Multi-Party Approval (MPA request ID %q); approve the request and retry", action, mpaReq.GetId())
+		return "", mpaRequiredError(action, mpaReq.GetId())
 	default:
 		body, _ := io.ReadAll(httpResp.Body)
 		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
@@ -1370,6 +1510,9 @@ func (c *EonClient) StartBigQueryDatasetRestore(ctx context.Context, resourceId,
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
+	if httpResp.StatusCode == http.StatusCreated {
+		return "", mpaRequiredError("failed to start BigQuery dataset restore", mpaRequestIDFromBody(httpResp.Body))
+	}
 	if httpResp.StatusCode != http.StatusAccepted {
 		respBody, _ := io.ReadAll(httpResp.Body)
 		return "", fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(respBody))
@@ -1796,7 +1939,11 @@ func (c *EonClient) CreateBackupPolicy(ctx context.Context, req externalEonSdkAP
 
 	defer func() { _ = httpResp.Body.Close() }()
 
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusCreated {
+	if httpResp.StatusCode == http.StatusCreated {
+		mpaReq := resp.GetActionApprovalRequest()
+		return nil, mpaRequiredError("failed to create backup policy", mpaReq.GetId())
+	}
+	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
 	}
@@ -1817,6 +1964,10 @@ func (c *EonClient) UpdateBackupPolicy(ctx context.Context, policyId string, req
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
+	if httpResp.StatusCode == http.StatusCreated {
+		mpaReq := resp.GetActionApprovalRequest()
+		return nil, mpaRequiredError("failed to update backup policy", mpaReq.GetId())
+	}
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
 		return nil, fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
@@ -1838,6 +1989,9 @@ func (c *EonClient) DeleteBackupPolicy(ctx context.Context, policyId string) err
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
+	if httpResp.StatusCode == http.StatusCreated {
+		return mpaRequiredError("failed to delete backup policy", mpaRequestIDFromBody(httpResp.Body))
+	}
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(httpResp.Body)
 		return fmt.Errorf("API error %d: %s", httpResp.StatusCode, string(body))
