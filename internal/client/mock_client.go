@@ -28,6 +28,9 @@ type MockEonClient struct {
 	InventoryResources    map[string]*externalEonSdkAPI.InventoryResource
 	ResourceSnapshots     map[string][]externalEonSdkAPI.Snapshot
 	FindingExclusions     map[string]*externalEonSdkAPI.FindingExclusion
+	S3Buckets             map[string][]externalEonSdkAPI.S3Bucket
+	AwsInstanceTypes      map[string]*externalEonSdkAPI.ListInstanceTypesResponse
+	AwsSecurityGroups     map[string]*externalEonSdkAPI.RestoreSecurityGroups
 
 	// Behavior controls
 	ShouldFailCreate bool
@@ -59,6 +62,9 @@ type MockEonClient struct {
 	ShouldFailRemoveEnvironmentOverride bool
 	ShouldFailListResourceSnapshots     bool
 	ShouldFailGetResource               bool
+	ShouldFailListS3Buckets             bool
+	ShouldFailListAwsInstanceTypes      bool
+	ShouldFailListAwsSecurityGroups     bool
 	// Finding exclusion behavior
 	ShouldFailFindingExclusionCreate bool
 	ShouldFailFindingExclusionRead   bool
@@ -92,6 +98,9 @@ type MockEonClient struct {
 	RemoveEnvironmentOverrideCalls  int
 	ListResourceSnapshotsCalls      int
 	GetResourceCalls                int
+	ListS3BucketsCalls              int
+	ListAwsInstanceTypesCalls       int
+	ListAwsSecurityGroupsCalls      int
 	FindingExclusionCreateCalls     int
 	FindingExclusionReadCalls       int
 	FindingExclusionUpdateCalls     int
@@ -117,6 +126,9 @@ func NewMockEonClient() *MockEonClient {
 		InventoryResources:    make(map[string]*externalEonSdkAPI.InventoryResource),
 		ResourceSnapshots:     make(map[string][]externalEonSdkAPI.Snapshot),
 		FindingExclusions:     make(map[string]*externalEonSdkAPI.FindingExclusion),
+		S3Buckets:             make(map[string][]externalEonSdkAPI.S3Bucket),
+		AwsInstanceTypes:      make(map[string]*externalEonSdkAPI.ListInstanceTypesResponse),
+		AwsSecurityGroups:     make(map[string]*externalEonSdkAPI.RestoreSecurityGroups),
 		ProjectID:             "mock-project-id",
 	}
 }
@@ -958,4 +970,77 @@ func (m *MockEonClient) AddMockFindingExclusion(exclusion *externalEonSdkAPI.Fin
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.FindingExclusions[exclusion.Id] = exclusion
+}
+
+// ListS3Buckets mocks listing the S3 buckets available in a restore account.
+func (m *MockEonClient) ListS3Buckets(ctx context.Context, accountId string) ([]externalEonSdkAPI.S3Bucket, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListS3BucketsCalls++
+	if m.ShouldFailListS3Buckets {
+		return nil, fmt.Errorf("mock list S3 buckets error")
+	}
+	buckets := m.S3Buckets[accountId]
+	out := make([]externalEonSdkAPI.S3Bucket, len(buckets))
+	copy(out, buckets)
+	return out, nil
+}
+
+// AddMockS3Bucket adds a pre-defined mock S3 bucket for a restore account.
+func (m *MockEonClient) AddMockS3Bucket(accountId string, bucket externalEonSdkAPI.S3Bucket) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.S3Buckets[accountId] = append(m.S3Buckets[accountId], bucket)
+}
+
+// awsRegionKey builds the compound key used to scope region-level mock data by account and region.
+func awsRegionKey(accountId, region string) string {
+	return accountId + "|" + region
+}
+
+// ListAwsInstanceTypes mocks listing the EC2 instance types available for restore.
+func (m *MockEonClient) ListAwsInstanceTypes(ctx context.Context, accountId, region, subnetId string, opts ListAwsInstanceTypesOptions) (*externalEonSdkAPI.ListInstanceTypesResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListAwsInstanceTypesCalls++
+	if m.ShouldFailListAwsInstanceTypes {
+		return nil, fmt.Errorf("mock list AWS instance types error")
+	}
+	resp, exists := m.AwsInstanceTypes[awsRegionKey(accountId, region)]
+	if !exists {
+		return externalEonSdkAPI.NewListInstanceTypesResponse(), nil
+	}
+	return resp, nil
+}
+
+// SetMockAwsInstanceTypes sets the pre-defined mock instance types response for a restore account region.
+func (m *MockEonClient) SetMockAwsInstanceTypes(accountId, region string, resp *externalEonSdkAPI.ListInstanceTypesResponse) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.AwsInstanceTypes[awsRegionKey(accountId, region)] = resp
+}
+
+// ListAwsSecurityGroups mocks listing the security groups available in a restore account region.
+func (m *MockEonClient) ListAwsSecurityGroups(ctx context.Context, accountId, region string, opts ListAwsSecurityGroupsOptions) (*externalEonSdkAPI.RestoreSecurityGroups, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListAwsSecurityGroupsCalls++
+	if m.ShouldFailListAwsSecurityGroups {
+		return nil, fmt.Errorf("mock list AWS security groups error")
+	}
+	resp, exists := m.AwsSecurityGroups[awsRegionKey(accountId, region)]
+	if !exists {
+		return externalEonSdkAPI.NewRestoreSecurityGroups(region, []externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner{}), nil
+	}
+	return resp, nil
+}
+
+// SetMockAwsSecurityGroups sets the pre-defined mock security groups response for a restore account region.
+func (m *MockEonClient) SetMockAwsSecurityGroups(accountId, region string, resp *externalEonSdkAPI.RestoreSecurityGroups) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.AwsSecurityGroups[awsRegionKey(accountId, region)] = resp
 }
