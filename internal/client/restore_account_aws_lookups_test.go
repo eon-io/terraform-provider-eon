@@ -227,3 +227,211 @@ func TestListAwsSecurityGroups_WithoutOptionalFilters(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Empty(t, result.GetSecurityGroups())
 }
+
+func TestListAwsSubnets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		wantErr    bool
+		wantLen    int
+	}{
+		{
+			name:       "success",
+			statusCode: http.StatusOK,
+			body:       `{"subnets": [{"id": "subnet-1", "vpc": "vpc-1", "availabilityZone": "us-east-1a", "name": "private-a", "cidrBlock": "10.0.0.0/24"}]}`,
+			wantLen:    1,
+		},
+		{
+			name:       "empty list",
+			statusCode: http.StatusOK,
+			body:       `{"subnets": []}`,
+			wantLen:    0,
+		},
+		{
+			name:       "not found",
+			statusCode: http.StatusNotFound,
+			body:       `{"message":"not found"}`,
+			wantErr:    true,
+		},
+		{
+			name:       "server error",
+			statusCode: http.StatusInternalServerError,
+			body:       `{"message":"boom"}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+				assert.Equal(t, http.MethodGet, r.Method)
+				assert.Equal(t, "/api/projects/project-1/restore-accounts/acct-1/regions/us-east-1/aws-subnets-v2", r.URL.Path)
+				return &http.Response{
+					StatusCode: tt.statusCode,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(tt.body)),
+				}, nil
+			}))
+
+			result, err := c.ListAwsSubnets(context.Background(), "acct-1", "us-east-1")
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Len(t, result.GetSubnets(), tt.wantLen)
+			if tt.wantLen > 0 {
+				subnet := result.GetSubnets()[0]
+				assert.Equal(t, "subnet-1", subnet.GetId())
+				assert.Equal(t, "vpc-1", subnet.GetVpc())
+				assert.Equal(t, "us-east-1a", subnet.GetAvailabilityZone())
+				assert.Equal(t, "private-a", subnet.GetName())
+				assert.Equal(t, "10.0.0.0/24", subnet.GetCidrBlock())
+			}
+		})
+	}
+}
+
+func TestListAwsVpcs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		wantErr    bool
+		wantLen    int
+	}{
+		{
+			name:       "success",
+			statusCode: http.StatusOK,
+			body:       `{"vpcs": [{"id": "vpc-1", "name": "main"}, {"id": "vpc-2"}]}`,
+			wantLen:    2,
+		},
+		{
+			name:       "empty list",
+			statusCode: http.StatusOK,
+			body:       `{"vpcs": []}`,
+			wantLen:    0,
+		},
+		{
+			name:       "forbidden",
+			statusCode: http.StatusForbidden,
+			body:       `{"message":"forbidden"}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+				assert.Equal(t, http.MethodGet, r.Method)
+				assert.Equal(t, "/api/projects/project-1/restore-accounts/acct-1/regions/us-east-1/aws-vpcs", r.URL.Path)
+				return &http.Response{
+					StatusCode: tt.statusCode,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(tt.body)),
+				}, nil
+			}))
+
+			result, err := c.ListAwsVpcs(context.Background(), "acct-1", "us-east-1")
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Len(t, result.GetVpcs(), tt.wantLen)
+			if tt.wantLen > 0 {
+				assert.Equal(t, "vpc-1", result.GetVpcs()[0].GetId())
+				assert.Equal(t, "main", result.GetVpcs()[0].GetName())
+				assert.Equal(t, "vpc-2", result.GetVpcs()[1].GetId())
+				assert.False(t, result.GetVpcs()[1].HasName())
+			}
+		})
+	}
+}
+
+func TestListEncryptionKeys(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		wantErr    bool
+	}{
+		{
+			name:       "success",
+			statusCode: http.StatusOK,
+			body:       `{"keys": [{"id": "key-1", "arn": "arn:aws:kms:us-east-1:123456789012:key/key-1", "aliasName": "alias/restore"}]}`,
+		},
+		{
+			name:       "bad request",
+			statusCode: http.StatusBadRequest,
+			body:       `{"message":"invalid"}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+				assert.Equal(t, http.MethodGet, r.Method)
+				assert.Equal(t, "/api/projects/project-1/restore-accounts/acct-1/regions/us-east-1/encryption-keys", r.URL.Path)
+				assert.Equal(t, "true", r.URL.Query().Get("includeAwsManagedKeys"))
+				return &http.Response{
+					StatusCode: tt.statusCode,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(tt.body)),
+				}, nil
+			}))
+
+			includeAwsManagedKeys := true
+			result, err := c.ListEncryptionKeys(context.Background(), "acct-1", "us-east-1", ListEncryptionKeysOptions{
+				IncludeAwsManagedKeys: &includeAwsManagedKeys,
+			})
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Len(t, result.GetKeys(), 1)
+			assert.Equal(t, "key-1", result.GetKeys()[0].GetId())
+			assert.Equal(t, "arn:aws:kms:us-east-1:123456789012:key/key-1", result.GetKeys()[0].GetArn())
+			assert.Equal(t, "alias/restore", result.GetKeys()[0].GetAliasName())
+		})
+	}
+}
+
+func TestListEncryptionKeys_WithoutOptionalFilters(t *testing.T) {
+	t.Parallel()
+
+	c := newTestClient(roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		assert.Empty(t, r.URL.Query().Get("includeAwsManagedKeys"))
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"keys": []}`)),
+		}, nil
+	}))
+
+	result, err := c.ListEncryptionKeys(context.Background(), "acct-1", "us-east-1", ListEncryptionKeysOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Empty(t, result.GetKeys())
+}
