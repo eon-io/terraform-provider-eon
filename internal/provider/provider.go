@@ -218,6 +218,9 @@ func (p *EonProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		NewRestoreAccountAwsS3BucketsDataSource,
 		NewRestoreAccountRegionAwsInstanceTypesDataSource,
 		NewRestoreAccountRegionAwsSecurityGroupsDataSource,
+		NewRestoreAccountRegionAwsSubnetsDataSource,
+		NewRestoreAccountRegionAwsVpcsDataSource,
+		NewRestoreAccountRegionEncryptionKeysDataSource,
 	}
 }
 
