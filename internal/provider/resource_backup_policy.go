@@ -72,6 +72,11 @@ type AwsNativeStandardPlanModel struct {
 	BackupSchedules types.List `tfsdk:"backup_schedules"`
 }
 
+type GoogleWorkspacePlanModel struct {
+	VaultId       types.String `tfsdk:"vault_id"`
+	RetentionDays types.Int64  `tfsdk:"retention_days"`
+}
+
 type BackupScheduleModel struct {
 	VaultId        types.String `tfsdk:"vault_id"`
 	RetentionDays  types.Int64  `tfsdk:"retention_days"`
@@ -383,7 +388,7 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 				Required:            true,
 				Attributes: map[string]schema.Attribute{
 					"backup_policy_type": schema.StringAttribute{
-						MarkdownDescription: "Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', 'PITR', 'AWS_NATIVE_PITR', or 'AWS_NATIVE_STANDARD'",
+						MarkdownDescription: "Backup policy type: 'STANDARD', 'HIGH_FREQUENCY', 'PITR', 'AWS_NATIVE_PITR', 'AWS_NATIVE_STANDARD', or 'GOOGLE_WORKSPACE'",
 						Required:            true,
 					},
 					"standard_plan": schema.SingleNestedAttribute{
@@ -512,6 +517,21 @@ func (r *BackupPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 								},
 							},
 						},
+					},
+					"google_workspace_plan": schema.SingleNestedAttribute{
+						MarkdownDescription: "Google Workspace backup plan. Required when backup_policy_type is 'GOOGLE_WORKSPACE'. Backups run on a fixed daily cadence into the given vault, so only the vault and retention are configurable. Select the workspace with resource_selection_mode 'NONE' and its resource ID in resource_inclusion_override",
+						Optional:            true,
+						Attributes: map[string]schema.Attribute{
+							"vault_id": schema.StringAttribute{
+								MarkdownDescription: "ID of the vault the Google Workspace backups are written to. Must be a GCP vault",
+								Required:            true,
+							},
+							"retention_days": schema.Int64Attribute{
+								MarkdownDescription: "Number of days to retain each backup. Minimum 1",
+								Required:            true,
+							},
+						},
+						Validators: []validator.Object{googleWorkspacePlanValidator{}},
 					},
 				},
 			},
@@ -777,6 +797,14 @@ func (r *BackupPolicyResource) Create(ctx context.Context, req resource.CreateRe
 			return
 		}
 		backupPlan.SetAwsNativeStandardPlan(*awsNativeStandardPlan)
+
+	case "GOOGLE_WORKSPACE":
+		googleWorkspacePlan, planDiags := buildGoogleWorkspacePlan(ctx, backupPlanAttrs)
+		resp.Diagnostics.Append(planDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		backupPlan.SetGoogleWorkspacePlan(*googleWorkspacePlan)
 
 	default:
 		resp.Diagnostics.AddError(
@@ -1115,6 +1143,14 @@ func (r *BackupPolicyResource) Update(ctx context.Context, req resource.UpdateRe
 			return
 		}
 		backupPlan.SetAwsNativeStandardPlan(*awsNativeStandardPlan)
+
+	case "GOOGLE_WORKSPACE":
+		googleWorkspacePlan, planDiags := buildGoogleWorkspacePlan(ctx, backupPlanAttrs)
+		resp.Diagnostics.Append(planDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		backupPlan.SetGoogleWorkspacePlan(*googleWorkspacePlan)
 
 	default:
 		resp.Diagnostics.AddError(
@@ -1464,7 +1500,7 @@ func applyScheduleTimezone(plan *externalEonSdkAPI.StandardBackupPolicyPlan, tz 
 	}
 }
 
-const supportedBackupPolicyTypes = "STANDARD, PITR, HIGH_FREQUENCY, AWS_NATIVE_PITR, AWS_NATIVE_STANDARD"
+const supportedBackupPolicyTypes = "STANDARD, PITR, HIGH_FREQUENCY, AWS_NATIVE_PITR, AWS_NATIVE_STANDARD, GOOGLE_WORKSPACE"
 
 // Vault-backed standard policies only accept the three intervals the console offers, while AWS
 // source-account policies map onto AWS Backup rules and accept the shorter ones too.
@@ -2387,4 +2423,61 @@ func normalizeResourceNameOperator(operator string) string {
 		return "NOT_CONTAINS"
 	}
 	return operator
+}
+
+// googleWorkspacePlanValidator rejects a retention Eon would refuse, so the mistake surfaces at
+// plan time rather than on apply.
+type googleWorkspacePlanValidator struct{}
+
+func (googleWorkspacePlanValidator) Description(_ context.Context) string {
+	return fmt.Sprintf("retention_days must be at least %d", googleWorkspaceMinRetentionDays)
+}
+
+func (v googleWorkspacePlanValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (googleWorkspacePlanValidator) ValidateObject(_ context.Context, req validator.ObjectRequest, resp *validator.ObjectResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	retention, ok := req.ConfigValue.Attributes()["retention_days"].(types.Int64)
+	if !ok || retention.IsNull() || retention.IsUnknown() {
+		return
+	}
+	if days := retention.ValueInt64(); days < googleWorkspaceMinRetentionDays {
+		resp.Diagnostics.AddAttributeError(req.Path.AtName("retention_days"), "Invalid retention_days",
+			fmt.Sprintf("retention_days must be at least %d, got %d", googleWorkspaceMinRetentionDays, days))
+	}
+}
+
+const googleWorkspaceMinRetentionDays = 1
+
+// buildGoogleWorkspacePlan converts the google_workspace_plan block into the API plan. Google
+// Workspace backups always run daily, so the plan carries only the vault and retention.
+func buildGoogleWorkspacePlan(
+	ctx context.Context,
+	backupPlanAttrs map[string]attr.Value,
+) (*externalEonSdkAPI.GoogleWorkspaceBackupPolicyPlan, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	planObj, err := requiredPlanObject(backupPlanAttrs, "google_workspace_plan", "GOOGLE_WORKSPACE")
+	if err != nil {
+		diags.AddError("Missing Google Workspace Plan", err.Error())
+		return nil, diags
+	}
+
+	var planModel GoogleWorkspacePlanModel
+	diags.Append(planObj.As(ctx, &planModel, basetypes.ObjectAsOptions{})...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	retentionDays, err := SafeInt32Conversion(planModel.RetentionDays.ValueInt64())
+	if err != nil {
+		diags.AddError("Invalid Retention Days", fmt.Sprintf("Failed to validate retention days: %s", err))
+		return nil, diags
+	}
+
+	return externalEonSdkAPI.NewGoogleWorkspaceBackupPolicyPlan(planModel.VaultId.ValueString(), retentionDays), nil
 }

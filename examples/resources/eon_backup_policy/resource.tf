@@ -710,3 +710,23 @@ output "backup_policies_summary" {
     }
   }
 }
+
+# Example: Google Workspace backups. Backups run daily into a GCP vault, so only the vault and
+# retention are configurable. The policy targets exactly one workspace by its Eon resource ID.
+resource "eon_backup_policy" "google_workspace_backup" {
+  name    = "Google Workspace - Daily"
+  enabled = true
+  resource_selector = {
+    resource_selection_mode     = "NONE"
+    resource_inclusion_override = ["<google-workspace-resource-id>"]
+  }
+
+  backup_plan = {
+    backup_policy_type = "GOOGLE_WORKSPACE"
+
+    google_workspace_plan = {
+      vault_id       = "<gcp-vault-id>"
+      retention_days = 30
+    }
+  }
+}
