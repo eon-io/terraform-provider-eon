@@ -734,6 +734,26 @@ func flattenBackupPlan(
 		diags.Append(awsNativeStandardDiags...)
 		present["aws_native_standard_plan"] = flattened
 
+	case "GOOGLE_WORKSPACE":
+		googleWorkspace := plan.GoogleWorkspacePlan.Get()
+		if googleWorkspace == nil {
+			diags.AddError("Backup Policy Refresh Failed", "Eon reported policy type GOOGLE_WORKSPACE without a Google Workspace plan")
+			return types.ObjectNull(t.AttrTypes), diags
+		}
+
+		googleWorkspaceType, typeDiags := nestedObjectType(t, "google_workspace_plan")
+		diags.Append(typeDiags...)
+		if diags.HasError() {
+			return types.ObjectNull(t.AttrTypes), diags
+		}
+
+		flattened, googleWorkspaceDiags := objectValue(googleWorkspaceType, map[string]attr.Value{
+			"vault_id":       types.StringValue(googleWorkspace.VaultId),
+			"retention_days": types.Int64Value(int64(googleWorkspace.BackupRetentionDays)),
+		})
+		diags.Append(googleWorkspaceDiags...)
+		present["google_workspace_plan"] = flattened
+
 	default:
 		diags.AddError(
 			"Unsupported Backup Policy Type",

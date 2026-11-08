@@ -78,6 +78,7 @@ type fakeEonServer struct {
 	projectID string
 
 	controls             map[string]*externalEonSdkAPI.BackupPostureControl
+	backupPolicies       map[string]*externalEonSdkAPI.BackupPolicy
 	idps                 map[string]*externalEonSdkAPI.Idp
 	permissions          []externalEonSdkAPI.Permission
 	resources            map[string]*externalEonSdkAPI.InventoryResource
@@ -99,6 +100,7 @@ func newFakeEonServer(t *testing.T) *fakeEonServer {
 	f := &fakeEonServer{
 		projectID:            testAccProjectID,
 		controls:             make(map[string]*externalEonSdkAPI.BackupPostureControl),
+		backupPolicies:       make(map[string]*externalEonSdkAPI.BackupPolicy),
 		idps:                 make(map[string]*externalEonSdkAPI.Idp),
 		permissions:          []externalEonSdkAPI.Permission{},
 		resources:            make(map[string]*externalEonSdkAPI.InventoryResource),
@@ -273,6 +275,30 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 			"expires_in":   43200,
 			"token_type":   "Bearer",
 		})
+		return
+	}
+
+	policiesPrefix := fmt.Sprintf("/v1/projects/%s/backup-policies", f.projectID)
+	switch {
+	case r.Method == http.MethodPost && path == policiesPrefix:
+		f.handleCreateBackupPolicy(w, r)
+		return
+	case strings.HasPrefix(path, policiesPrefix+"/"):
+		id := strings.TrimPrefix(path, policiesPrefix+"/")
+		if id == "" || strings.Contains(id, "/") {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			f.handleGetBackupPolicy(w, id)
+		case http.MethodPut, http.MethodPatch:
+			f.handleUpdateBackupPolicy(w, r, id)
+		case http.MethodDelete:
+			f.handleDeleteBackupPolicy(w, id)
+		default:
+			http.NotFound(w, r)
+		}
 		return
 	}
 
@@ -1216,4 +1242,74 @@ func (f *fakeEonServer) handleListFindingExclusions(w http.ResponseWriter, r *ht
 		items = append(items, *exclusion)
 	}
 	writeJSON(w, http.StatusOK, externalEonSdkAPI.NewListFindingExclusionsResponse(items, int32(len(items))))
+}
+
+// MutateBackupPolicy edits a stored policy behind Terraform's back so tests can exercise drift.
+func (f *fakeEonServer) MutateBackupPolicy(id string, mutate func(policy *externalEonSdkAPI.BackupPolicy)) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if policy, ok := f.backupPolicies[id]; ok {
+		mutate(policy)
+	}
+}
+
+func (f *fakeEonServer) handleCreateBackupPolicy(w http.ResponseWriter, r *http.Request) {
+	var req externalEonSdkAPI.CreateBackupPolicyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	id := fmt.Sprintf("bp-%d", f.nextID)
+	f.nextID++
+	policy := externalEonSdkAPI.NewBackupPolicy(id, req.GetName(), req.GetEnabled(), req.ResourceSelector, req.BackupPlan)
+	policy.SetLabels(req.GetLabels())
+	f.backupPolicies[id] = policy
+	writeJSON(w, http.StatusOK, map[string]interface{}{"backupPolicy": policy})
+}
+
+func (f *fakeEonServer) handleGetBackupPolicy(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	policy, ok := f.backupPolicies[id]
+	if !ok {
+		http.Error(w, "{\"message\":\"not found\"}", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"backupPolicy": policy})
+}
+
+func (f *fakeEonServer) handleUpdateBackupPolicy(w http.ResponseWriter, r *http.Request, id string) {
+	var req externalEonSdkAPI.UpdateBackupPolicyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	policy, ok := f.backupPolicies[id]
+	if !ok {
+		http.Error(w, "{\"message\":\"not found\"}", http.StatusNotFound)
+		return
+	}
+	policy.Name = req.GetName()
+	policy.Enabled = req.GetEnabled()
+	policy.ResourceSelector = req.ResourceSelector
+	policy.BackupPlan = req.BackupPlan
+	policy.SetLabels(req.GetLabels())
+	writeJSON(w, http.StatusOK, map[string]interface{}{"backupPolicy": policy})
+}
+
+func (f *fakeEonServer) handleDeleteBackupPolicy(w http.ResponseWriter, id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.backupPolicies[id]; !ok {
+		http.Error(w, "{\"message\":\"not found\"}", http.StatusNotFound)
+		return
+	}
+	delete(f.backupPolicies, id)
+	w.WriteHeader(http.StatusNoContent)
 }
