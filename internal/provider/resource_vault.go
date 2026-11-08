@@ -515,6 +515,8 @@ func (r *VaultResource) ImportState(ctx context.Context, req resource.ImportStat
 		data.AwsKmsKeyArn = types.StringNull()
 	}
 
+	data.Labels = labelsToSet(vault.GetLabels())
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 
 	tflog.Info(ctx, "Successfully imported vault", map[string]interface{}{
