@@ -92,6 +92,10 @@ type fakeEonServer struct {
 	s3Buckets            map[string][]externalEonSdkAPI.S3Bucket
 	awsInstanceTypes     map[string]*externalEonSdkAPI.ListInstanceTypesResponse
 	awsSecurityGroups    map[string]*externalEonSdkAPI.RestoreSecurityGroups
+	awsSubnets           map[string]*externalEonSdkAPI.ListSubnetsResponseV2
+	awsVpcs              map[string]*externalEonSdkAPI.ListAwsVpcsResponse
+	encryptionKeys       map[string]*externalEonSdkAPI.EncryptionKeys
+	encryptionKeyQueries []string
 	nextID               int
 }
 
@@ -114,6 +118,9 @@ func newFakeEonServer(t *testing.T) *fakeEonServer {
 		s3Buckets:            make(map[string][]externalEonSdkAPI.S3Bucket),
 		awsInstanceTypes:     make(map[string]*externalEonSdkAPI.ListInstanceTypesResponse),
 		awsSecurityGroups:    make(map[string]*externalEonSdkAPI.RestoreSecurityGroups),
+		awsSubnets:           make(map[string]*externalEonSdkAPI.ListSubnetsResponseV2),
+		awsVpcs:              make(map[string]*externalEonSdkAPI.ListAwsVpcsResponse),
+		encryptionKeys:       make(map[string]*externalEonSdkAPI.EncryptionKeys),
 		nextID:               1,
 	}
 	f.server = httptest.NewServer(http.HandlerFunc(f.handle))
@@ -258,6 +265,31 @@ func (f *fakeEonServer) SetAwsSecurityGroups(accountID, region string, resp *ext
 	f.awsSecurityGroups[fakeAwsRegionKey(accountID, region)] = resp
 }
 
+func (f *fakeEonServer) SetAwsSubnets(accountID, region string, resp *externalEonSdkAPI.ListSubnetsResponseV2) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.awsSubnets[fakeAwsRegionKey(accountID, region)] = resp
+}
+
+func (f *fakeEonServer) SetAwsVpcs(accountID, region string, resp *externalEonSdkAPI.ListAwsVpcsResponse) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.awsVpcs[fakeAwsRegionKey(accountID, region)] = resp
+}
+
+func (f *fakeEonServer) SetEncryptionKeys(accountID, region string, resp *externalEonSdkAPI.EncryptionKeys) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.encryptionKeys[fakeAwsRegionKey(accountID, region)] = resp
+}
+
+// EncryptionKeyQueries returns the includeAwsManagedKeys query value of every list-encryption-keys request received.
+func (f *fakeEonServer) EncryptionKeyQueries() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.encryptionKeyQueries...)
+}
+
 func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	path = strings.TrimPrefix(path, "/api")
@@ -354,7 +386,8 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// The AWS restore-account lookup endpoints (S3 buckets, instance types, security groups) were
+	// The AWS restore-account lookup endpoints (S3 buckets, instance types, security groups, subnets,
+	// VPCs, encryption keys) were
 	// added to the SDK without a "/v1" path prefix, unlike every other restore-account route.
 	restoreAccountsLookupPrefix := fmt.Sprintf("/projects/%s/restore-accounts/", f.projectID)
 	if r.Method == http.MethodGet && strings.HasPrefix(path, restoreAccountsLookupPrefix) {
@@ -369,6 +402,15 @@ func (f *fakeEonServer) handle(w http.ResponseWriter, r *http.Request) {
 			return
 		case len(parts) == 4 && parts[1] == "regions" && parts[3] == "aws-security-groups":
 			f.handleListAwsSecurityGroups(w, r, parts[0], parts[2])
+			return
+		case len(parts) == 4 && parts[1] == "regions" && parts[3] == "aws-subnets-v2":
+			f.handleListAwsSubnets(w, parts[0], parts[2])
+			return
+		case len(parts) == 4 && parts[1] == "regions" && parts[3] == "aws-vpcs":
+			f.handleListAwsVpcs(w, parts[0], parts[2])
+			return
+		case len(parts) == 4 && parts[1] == "regions" && parts[3] == "encryption-keys":
+			f.handleListEncryptionKeys(w, r, parts[0], parts[2])
 			return
 		}
 	}
@@ -843,6 +885,37 @@ func (f *fakeEonServer) handleListAwsSecurityGroups(w http.ResponseWriter, r *ht
 	resp, ok := f.awsSecurityGroups[fakeAwsRegionKey(accountID, region)]
 	if !ok {
 		resp = externalEonSdkAPI.NewRestoreSecurityGroups(region, []externalEonSdkAPI.RestoreSecurityGroupsSecurityGroupsInner{})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (f *fakeEonServer) handleListAwsSubnets(w http.ResponseWriter, accountID, region string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	resp, ok := f.awsSubnets[fakeAwsRegionKey(accountID, region)]
+	if !ok {
+		resp = externalEonSdkAPI.NewListSubnetsResponseV2([]externalEonSdkAPI.ListSubnetsResponseV2SubnetsInner{})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (f *fakeEonServer) handleListAwsVpcs(w http.ResponseWriter, accountID, region string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	resp, ok := f.awsVpcs[fakeAwsRegionKey(accountID, region)]
+	if !ok {
+		resp = externalEonSdkAPI.NewListAwsVpcsResponse([]externalEonSdkAPI.ListAwsVpcsResponseVpcsInner{})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (f *fakeEonServer) handleListEncryptionKeys(w http.ResponseWriter, r *http.Request, accountID, region string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.encryptionKeyQueries = append(f.encryptionKeyQueries, r.URL.Query().Get("includeAwsManagedKeys"))
+	resp, ok := f.encryptionKeys[fakeAwsRegionKey(accountID, region)]
+	if !ok {
+		resp = externalEonSdkAPI.NewEncryptionKeys([]externalEonSdkAPI.EncryptionKey{})
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

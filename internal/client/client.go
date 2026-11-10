@@ -852,6 +852,86 @@ func (c *EonClient) ListAwsSecurityGroups(ctx context.Context, accountId, region
 	return resp, nil
 }
 
+// ListAwsSubnets retrieves the subnets available to Eon in the specified region of a restore account.
+func (c *EonClient) ListAwsSubnets(ctx context.Context, accountId, region string) (*externalEonSdkAPI.ListSubnetsResponseV2, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.ListAwsSubnetsV2API.ListAwsSubnetsV2(ctx, c.projectID, accountId, region).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list AWS subnets"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return resp, nil
+}
+
+// ListAwsVpcs retrieves the VPCs available to Eon in the specified region of a restore account.
+func (c *EonClient) ListAwsVpcs(ctx context.Context, accountId, region string) (*externalEonSdkAPI.ListAwsVpcsResponse, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	resp, httpResp, err := c.client.ListAwsVpcsAPI.ListAwsVpcs(ctx, c.projectID, accountId, region).Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list AWS VPCs"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return resp, nil
+}
+
+// ListEncryptionKeysOptions holds the optional filters accepted by ListEncryptionKeys.
+type ListEncryptionKeysOptions struct {
+	IncludeAwsManagedKeys *bool
+}
+
+// ListEncryptionKeys retrieves the encryption keys available to Eon in the specified region of a
+// restore account.
+func (c *EonClient) ListEncryptionKeys(ctx context.Context, accountId, region string, opts ListEncryptionKeysOptions) (*externalEonSdkAPI.EncryptionKeys, error) {
+	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
+		return nil, fmt.Errorf("failed to ensure valid token: %w", err)
+	}
+
+	apiReq := c.client.ListEncryptionKeysAPI.ListEncryptionKeys(ctx, c.projectID, accountId, region)
+	if opts.IncludeAwsManagedKeys != nil {
+		apiReq = apiReq.IncludeAwsManagedKeys(*opts.IncludeAwsManagedKeys)
+	}
+
+	resp, httpResp, err := apiReq.Execute()
+	if apiErr := c.handleAPIError(err, httpResp, "failed to list encryption keys"); apiErr != nil {
+		return nil, apiErr
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(httpResp.Body)
+		return nil, &APIError{
+			StatusCode: httpResp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return resp, nil
+}
+
 // GetRestoreAccountConnectivityConfig retrieves the connectivity configuration of a restore account.
 func (c *EonClient) GetRestoreAccountConnectivityConfig(ctx context.Context, accountId string) (*externalEonSdkAPI.RestoreAccountConnectivityConfig, error) {
 	if err := c.tokenRefresher.EnsureValidToken(); err != nil {
