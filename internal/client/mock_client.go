@@ -31,6 +31,9 @@ type MockEonClient struct {
 	S3Buckets             map[string][]externalEonSdkAPI.S3Bucket
 	AwsInstanceTypes      map[string]*externalEonSdkAPI.ListInstanceTypesResponse
 	AwsSecurityGroups     map[string]*externalEonSdkAPI.RestoreSecurityGroups
+	AwsSubnets            map[string]*externalEonSdkAPI.ListSubnetsResponseV2
+	AwsVpcs               map[string]*externalEonSdkAPI.ListAwsVpcsResponse
+	EncryptionKeys        map[string]*externalEonSdkAPI.EncryptionKeys
 
 	// Behavior controls
 	ShouldFailCreate bool
@@ -65,6 +68,9 @@ type MockEonClient struct {
 	ShouldFailListS3Buckets             bool
 	ShouldFailListAwsInstanceTypes      bool
 	ShouldFailListAwsSecurityGroups     bool
+	ShouldFailListAwsSubnets            bool
+	ShouldFailListAwsVpcs               bool
+	ShouldFailListEncryptionKeys        bool
 	// Finding exclusion behavior
 	ShouldFailFindingExclusionCreate bool
 	ShouldFailFindingExclusionRead   bool
@@ -101,6 +107,9 @@ type MockEonClient struct {
 	ListS3BucketsCalls              int
 	ListAwsInstanceTypesCalls       int
 	ListAwsSecurityGroupsCalls      int
+	ListAwsSubnetsCalls             int
+	ListAwsVpcsCalls                int
+	ListEncryptionKeysCalls         int
 	FindingExclusionCreateCalls     int
 	FindingExclusionReadCalls       int
 	FindingExclusionUpdateCalls     int
@@ -129,6 +138,9 @@ func NewMockEonClient() *MockEonClient {
 		S3Buckets:             make(map[string][]externalEonSdkAPI.S3Bucket),
 		AwsInstanceTypes:      make(map[string]*externalEonSdkAPI.ListInstanceTypesResponse),
 		AwsSecurityGroups:     make(map[string]*externalEonSdkAPI.RestoreSecurityGroups),
+		AwsSubnets:            make(map[string]*externalEonSdkAPI.ListSubnetsResponseV2),
+		AwsVpcs:               make(map[string]*externalEonSdkAPI.ListAwsVpcsResponse),
+		EncryptionKeys:        make(map[string]*externalEonSdkAPI.EncryptionKeys),
 		ProjectID:             "mock-project-id",
 	}
 }
@@ -1043,4 +1055,73 @@ func (m *MockEonClient) SetMockAwsSecurityGroups(accountId, region string, resp 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.AwsSecurityGroups[awsRegionKey(accountId, region)] = resp
+}
+
+// ListAwsSubnets mocks listing the subnets available in a restore account region.
+func (m *MockEonClient) ListAwsSubnets(ctx context.Context, accountId, region string) (*externalEonSdkAPI.ListSubnetsResponseV2, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListAwsSubnetsCalls++
+	if m.ShouldFailListAwsSubnets {
+		return nil, fmt.Errorf("mock list AWS subnets error")
+	}
+	resp, exists := m.AwsSubnets[awsRegionKey(accountId, region)]
+	if !exists {
+		return externalEonSdkAPI.NewListSubnetsResponseV2([]externalEonSdkAPI.ListSubnetsResponseV2SubnetsInner{}), nil
+	}
+	return resp, nil
+}
+
+// SetMockAwsSubnets sets the pre-defined mock subnets response for a restore account region.
+func (m *MockEonClient) SetMockAwsSubnets(accountId, region string, resp *externalEonSdkAPI.ListSubnetsResponseV2) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.AwsSubnets[awsRegionKey(accountId, region)] = resp
+}
+
+// ListAwsVpcs mocks listing the VPCs available in a restore account region.
+func (m *MockEonClient) ListAwsVpcs(ctx context.Context, accountId, region string) (*externalEonSdkAPI.ListAwsVpcsResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListAwsVpcsCalls++
+	if m.ShouldFailListAwsVpcs {
+		return nil, fmt.Errorf("mock list AWS VPCs error")
+	}
+	resp, exists := m.AwsVpcs[awsRegionKey(accountId, region)]
+	if !exists {
+		return externalEonSdkAPI.NewListAwsVpcsResponse([]externalEonSdkAPI.ListAwsVpcsResponseVpcsInner{}), nil
+	}
+	return resp, nil
+}
+
+// SetMockAwsVpcs sets the pre-defined mock VPCs response for a restore account region.
+func (m *MockEonClient) SetMockAwsVpcs(accountId, region string, resp *externalEonSdkAPI.ListAwsVpcsResponse) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.AwsVpcs[awsRegionKey(accountId, region)] = resp
+}
+
+// ListEncryptionKeys mocks listing the encryption keys available in a restore account region.
+func (m *MockEonClient) ListEncryptionKeys(ctx context.Context, accountId, region string, opts ListEncryptionKeysOptions) (*externalEonSdkAPI.EncryptionKeys, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ListEncryptionKeysCalls++
+	if m.ShouldFailListEncryptionKeys {
+		return nil, fmt.Errorf("mock list encryption keys error")
+	}
+	resp, exists := m.EncryptionKeys[awsRegionKey(accountId, region)]
+	if !exists {
+		return externalEonSdkAPI.NewEncryptionKeys([]externalEonSdkAPI.EncryptionKey{}), nil
+	}
+	return resp, nil
+}
+
+// SetMockEncryptionKeys sets the pre-defined mock encryption keys response for a restore account region.
+func (m *MockEonClient) SetMockEncryptionKeys(accountId, region string, resp *externalEonSdkAPI.EncryptionKeys) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.EncryptionKeys[awsRegionKey(accountId, region)] = resp
 }
