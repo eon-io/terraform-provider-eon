@@ -216,11 +216,11 @@ func TestEonProvider_ProviderSchema(t *testing.T) {
 	require.NotNil(t, resp.Schema)
 	assert.False(t, resp.Diagnostics.HasError())
 
-	// Test that we have exactly 4 attributes
-	assert.Equal(t, 4, len(resp.Schema.Attributes))
+	// Test that we have exactly 5 attributes
+	assert.Equal(t, 5, len(resp.Schema.Attributes))
 
 	// Test attribute names
-	expectedAttributes := []string{"endpoint", "client_id", "client_secret", "project_id"}
+	expectedAttributes := []string{"endpoint", "client_id", "client_secret", "project_id", "action_approval_request_id"}
 	for _, attr := range expectedAttributes {
 		assert.Contains(t, resp.Schema.Attributes, attr)
 	}
