@@ -194,6 +194,7 @@ func (p *EonProvider) Resources(ctx context.Context) []func() resource.Resource 
 		NewResourceDataClassesOverrideResource,
 		NewResourceEnvironmentOverrideResource,
 		NewGcsBucketConfigurationResource,
+		NewS3BucketConfigurationResource,
 	}
 }
 
