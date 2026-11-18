@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -92,17 +93,19 @@ func (r *S3BucketConfigurationResource) Schema(ctx context.Context, req resource
 				MarkdownDescription: "How Eon lists the bucket's objects during a full scan. Supported values: " +
 					"`AUTO` (Eon decides), `INVENTORY` (read S3 Inventory reports), `LIST_OBJECTS` (call the S3 ListObjects API). " +
 					"Defaults to `AUTO`.",
-				Optional: true,
-				Computed: true,
-				Default:  stringdefault.StaticString(s3BucketModeAuto),
+				Optional:   true,
+				Computed:   true,
+				Default:    stringdefault.StaticString(s3BucketModeAuto),
+				Validators: []validator.String{s3ScanModeOption},
 			},
 			"change_detection_mode": schema.StringAttribute{
 				MarkdownDescription: "How Eon detects object changes between full scans. Supported values: " +
 					"`AUTO` (Eon decides), `SCAN_AND_CHANGE_EVENTS` (scan plus S3 event notifications), `SCAN_ONLY` (full scans only). " +
 					"Defaults to `AUTO`.",
-				Optional: true,
-				Computed: true,
-				Default:  stringdefault.StaticString(s3BucketModeAuto),
+				Optional:   true,
+				Computed:   true,
+				Default:    stringdefault.StaticString(s3BucketModeAuto),
+				Validators: []validator.String{s3ChangeDetectionModeOption},
 			},
 		},
 	}
@@ -319,4 +322,20 @@ func (o s3BucketModeOption) fromAPIConfig(config client.CloudResourceBackupMetho
 
 func (o s3BucketModeOption) allowedValues() []string {
 	return []string{s3BucketModeAuto, o.enabledValue, o.disabledValue}
+}
+
+func (o s3BucketModeOption) Description(_ context.Context) string {
+	return fmt.Sprintf("value must be one of: %s", strings.Join(o.allowedValues(), ", "))
+}
+
+func (o s3BucketModeOption) MarkdownDescription(ctx context.Context) string {
+	return o.Description(ctx)
+}
+
+func (o s3BucketModeOption) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	_, diags := o.toAPIConfig(req.ConfigValue.ValueString())
+	resp.Diagnostics.Append(diags...)
 }

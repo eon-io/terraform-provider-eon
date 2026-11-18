@@ -1,9 +1,11 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
 	"github.com/eon-io/terraform-provider-eon/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,4 +96,31 @@ func TestS3BucketConfigurationToModel_UserControlledWithoutEnabled(t *testing.T)
 		CdcBackup:       client.CloudResourceBackupMethodConfig{SystemControlled: new(true)},
 	}, &S3BucketConfigurationResourceModel{})
 	assert.True(t, diags.HasError())
+}
+
+func TestS3BucketModeOptionValidator(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		option  s3BucketModeOption
+		value   types.String
+		wantErr bool
+	}{
+		{name: "scan mode list objects", option: s3ScanModeOption, value: types.StringValue("LIST_OBJECTS")},
+		{name: "change detection auto", option: s3ChangeDetectionModeOption, value: types.StringValue("AUTO")},
+		{name: "null", option: s3ScanModeOption, value: types.StringNull()},
+		{name: "unknown", option: s3ScanModeOption, value: types.StringUnknown()},
+		{name: "change detection value on scan mode", option: s3ScanModeOption, value: types.StringValue("SCAN_ONLY"), wantErr: true},
+		{name: "gcs value on change detection", option: s3ChangeDetectionModeOption, value: types.StringValue("FORCE_ENABLED"), wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			resp := &validator.StringResponse{}
+			tt.option.ValidateString(context.Background(), validator.StringRequest{ConfigValue: tt.value}, resp)
+			assert.Equal(t, tt.wantErr, resp.Diagnostics.HasError())
+		})
+	}
 }
