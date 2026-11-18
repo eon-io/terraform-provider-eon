@@ -1,6 +1,6 @@
 module github.com/eon-io/terraform-provider-eon
 
-go 1.25.8
+go 1.27.0
 
 require (
 	github.com/eon-io/eon-sdk-go v1.244.0
