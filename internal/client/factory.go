@@ -24,9 +24,10 @@ func newClient(cfg ClientConfig, refresher TokenRefresher) (*EonClient, error) {
 	}
 
 	return &EonClient{
-		client:         apiClient,
-		projectID:      cfg.ProjectID,
-		tokenRefresher: refresher,
+		client:                  apiClient,
+		projectID:               cfg.ProjectID,
+		tokenRefresher:          refresher,
+		actionApprovalRequestID: cfg.ActionApprovalRequestID,
 	}, nil
 }
 
